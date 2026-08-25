@@ -16,13 +16,56 @@
 <p id="status">En güncel RPYS hazırlanıyor…</p>
 <div class="bar"><div id="fill" class="fill"></div></div>
 <div id="err" class="err"></div>
-<div class="small">Program GitHub Pages üzerinden açılır; ana veri ve kayıtlar Supabase bulutta tutulur.</div>
+<div class="small">Program GitHub Pages üzerinden açılır; uygulama ve ana veri güvenli Supabase katmanından gelir.</div>
 </div>
 <script>
 (async()=>{
- const BASE='https://wiflnajancyomgdtheyr.supabase.co/storage/v1/object/public/rpys-web/';
+ const APP_SOURCE='https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-app-source';
  const status=document.getElementById('status'),fill=document.getElementById('fill'),err=document.getElementById('err');
  const replaceOnce=(s,a,b)=>s.includes(a)?s.replace(a,b):s;
+ const MOBILE_CSS=`<style id="rpys-mobile-secure-v302">
+.rpysMobileMenuBtn,.rpysMobileBackdrop{display:none}
+@media(max-width:900px){
+ html,body{max-width:100%!important;overflow-x:hidden!important;-webkit-text-size-adjust:100%}
+ body{padding-bottom:env(safe-area-inset-bottom)}
+ .app{display:block!important;min-height:100dvh!important;width:100%!important}
+ .sidebar{position:fixed!important;left:0!important;top:0!important;bottom:0!important;width:min(84vw,310px)!important;max-width:310px!important;height:100dvh!important;max-height:100dvh!important;display:block!important;overflow-y:auto!important;overflow-x:hidden!important;transform:translateX(-104%);transition:transform .22s ease;z-index:10020!important;padding:12px!important;box-shadow:8px 0 28px rgba(10,28,48,.28)}
+ body.rpysMobileMenuOpen .sidebar{transform:translateX(0)}
+ .rpysMobileMenuBtn{display:flex!important;position:fixed;left:max(10px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));z-index:10030;width:46px;height:46px;border:0;border-radius:13px;background:#17365d;color:#fff;align-items:center;justify-content:center;font-size:24px;font-weight:900;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+ .rpysMobileBackdrop{display:none;position:fixed;inset:0;z-index:10010;background:rgba(7,20,34,.42);backdrop-filter:blur(1px)}
+ body.rpysMobileMenuOpen .rpysMobileBackdrop{display:block}
+ .sideSearchWrap{position:sticky!important;top:0!important;z-index:10!important}
+ .nav{width:100%!important;min-width:0!important;min-height:42px!important;margin:2px 0!important;font-size:12px!important}
+ .main{width:100%!important;min-width:0!important;margin:0!important;padding:64px 9px 12px!important;overflow:visible!important}
+ .topbar{position:sticky!important;top:0!important;z-index:100!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:6px!important;background:rgba(247,251,255,.96)!important;backdrop-filter:blur(8px);padding:8px 6px!important;margin:0 0 8px!important;border-radius:10px}
+ .topbar h1,.top h1{font-size:18px!important;line-height:1.15!important;max-width:100%!important}
+ .actions,.toolbar,.simSampleControls,.saySourceBar,.suaControls,.topbar>div{max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+ button,.btn,select,input,textarea{min-height:42px!important;font-size:16px!important}
+ input[type=checkbox],input[type=radio]{min-height:auto!important;transform:scale(1.12)}
+ .panel,.card,.notice,.autoBox,.grid2,.grid3,.cards,.dashGrid3,.dashboardProGrid,.ownerGrid,.rulesGrid,.printCenterGrid,.reportControls,.qualityPanel,.healthPanel{min-width:0!important;max-width:100%!important}
+ .grid2,.grid3,.autoBox,.cards,.dashGrid3,.dashboardProGrid,.ownerGrid,.rulesGrid,.reportControls,.printCenterGrid{grid-template-columns:1fr!important}
+ .tablewrap,.virtualTableWrap,.analysisTrendWrap,.suaTableWrap,.managementHeatmap,.dashboardHeatmap{width:100%!important;max-width:calc(100vw - 18px)!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-x:contain}
+ #polGrid,#acilGrid,#say1Grid,#say2Grid{width:100%!important;max-width:100%!important;min-height:54vh!important;overflow:auto!important}
+ #polGrid table,#acilGrid table,#say1Grid table,#say2Grid table,.schedule,.say{min-width:920px!important;width:max-content!important;max-width:none!important}
+ .tablewrap table{max-width:none}
+ .rpysFixedTools{right:7px!important;bottom:8px!important;z-index:9990!important;max-width:48vw!important}
+ .v24MasterBadge{left:7px!important;right:auto!important;bottom:8px!important;max-width:46vw!important;font-size:8px!important;z-index:9980!important}
+ .autoSaveBadge{right:7px!important;bottom:58px!important;max-width:42vw!important;font-size:8px!important}
+ #loginOverlay{padding:12px!important;align-items:center!important}
+ .loginCard{width:min(430px,96vw)!important;padding:20px!important;border-radius:17px!important}
+ .loginCard h2{font-size:22px!important}.loginField input{font-size:16px!important}
+ .rpysModal{padding:8px!important}.rpysModal>div,.modalCard{max-width:96vw!important;max-height:92dvh!important;overflow:auto!important}
+ .bulkSizeGrid,.validationCards,.fairCards,.profileGrid,.fiiliUnitChecks,.fiiliCalcSettings,.simKpis,.analysisCards,.dashStats3,.managementKpis{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:560px){
+ .main{padding-left:6px!important;padding-right:6px!important}
+ .panel{padding:8px!important;border-radius:10px!important}
+ .bulkSizeGrid,.validationCards,.fairCards,.profileGrid,.fiiliUnitChecks,.fiiliCalcSettings,.simKpis,.analysisCards,.dashStats3,.managementKpis{grid-template-columns:1fr!important}
+ .topbar select,.topbar button{max-width:100%!important}
+ #polGrid table,#acilGrid table,#say1Grid table,#say2Grid table,.schedule,.say{min-width:860px!important}
+}
+</style>`;
+ const MOBILE_JS=`<script id="rpys-mobile-secure-runtime-v302">(()=>{function closeMenu(){document.body.classList.remove('rpysMobileMenuOpen')}function setup(){if(!document.querySelector('.sidebar')||document.getElementById('rpysMobileMenuBtn'))return;let b=document.createElement('button');b.id='rpysMobileMenuBtn';b.className='rpysMobileMenuBtn';b.type='button';b.setAttribute('aria-label','Menüyü aç');b.textContent='☰';b.onclick=()=>document.body.classList.toggle('rpysMobileMenuOpen');let o=document.createElement('div');o.className='rpysMobileBackdrop';o.onclick=closeMenu;document.body.append(o,b);document.querySelectorAll('.sidebar .nav').forEach(n=>n.addEventListener('click',()=>{if(innerWidth<=900)closeMenu()}));addEventListener('resize',()=>{if(innerWidth>900)closeMenu()});}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);else setup()})();<\\/script>`;
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
  function repair(app){
    app=replaceOnce(app,
@@ -41,7 +84,21 @@
    app=replaceOnce(app,'db.ui.lastSayTab=b.dataset.y;save()','db.ui.lastSayTab=b.dataset.y;try{localStorage.setItem("rpys_last_say_tab",b.dataset.y)}catch(_){}');
    app=replaceOnce(app,'db.ui.lastMonth=month.value;save();renderCurrentPage()','db.ui.lastMonth=month.value;try{localStorage.setItem("rpys_last_month",month.value)}catch(_){}renderCurrentPage()');
    app=replaceOnce(app,'setInterval(()=>{if(_storageReady)v24RefreshServerStatus()},5000);','setInterval(()=>{if(_storageReady&&!document.hidden)v24RefreshServerStatus()},60000);');
-   app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.1-TAM-BULUT-WEB').replaceAll('v3.0.0 TAM BULUT','v3.0.1 TAM BULUT WEB');
+   app=replaceOnce(app,'function setUserPassword(id,pw){let u=db.users.find(x=>x.id===id);if(u&&pw){u.password=pw;save()}}',`async function setUserPassword(id,pw){
+  if(!pw)return;
+  if(String(pw).length<8){alert("Şifre en az 8 karakter olmalı.");return}
+  try{
+    let tok=rpysCloudSession();if(!tok)throw new Error("Bulut oturumu gerekli.");
+    let r=await fetch(RPYS_CLOUD_API+"/change-password",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({userId:id,newPassword:pw})});
+    let o={};try{o=await r.json()}catch(_){}if(!r.ok)throw new Error(o.error||"Şifre değiştirilemedi.");
+    if(o.token){try{localStorage.setItem("rpys_cloud_session",o.token);sessionStorage.setItem("rpys_cloud_session",o.token)}catch(_){}}
+    let u=db.users.find(x=>x.id===id);if(u)u.password="__REDACTED__";
+    alert("Şifre güvenli şekilde değiştirildi. Diğer eski oturumlar geçersiz kılındı.");
+  }catch(e){alert(e?.message||"Şifre değiştirilemedi.")}
+}`);
+   if(!app.includes('rpys-mobile-secure-v302'))app=app.replace(/<\/head>/i,MOBILE_CSS+'</head>');
+   if(!app.includes('rpys-mobile-secure-runtime-v302'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
+   app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.2-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.2 MOBILE SECURE');
    return app;
  }
  function validate(app){
@@ -56,11 +113,10 @@
  }
  try{
    fill.style.width='24%';
-   let path='releases/rpys-v3.0.0.html',version='3.0.0';
-   try{const mr=await fetch(BASE+'manifest.json?t='+Date.now(),{cache:'no-store'});if(mr.ok){const m=await mr.json();if(m&&m.path){path=m.path;version=m.version||version}}}catch(_){}
-   status.textContent='RPYS '+version+' buluttan indiriliyor…';fill.style.width='46%';
-   const r=await fetch(BASE+path+'?t='+Date.now(),{cache:'no-store'});
+   status.textContent='RPYS güvenli bulut kaynağından indiriliyor…';fill.style.width='46%';
+   const r=await fetch(APP_SOURCE+'?t='+Date.now(),{cache:'no-store'});
    if(!r.ok)throw new Error('RPYS paketi alınamadı (HTTP '+r.status+')');
+   const version=r.headers.get('x-rpys-version')||'güncel';
    let app=await r.text();
    if(app.length<1000000||!app.includes('RPYS'))throw new Error('Buluttaki RPYS paketi eksik.');
    status.textContent='Sayfa yapısı doğrulanıyor…';fill.style.width='70%';
