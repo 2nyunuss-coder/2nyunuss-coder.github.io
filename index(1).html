@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17365d">
+<title>RPYS Bulut</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;background:#eef4f9;color:#17365d}body{min-height:100vh;display:grid;place-items:center}.card{width:min(600px,92vw);background:#fff;border:1px solid #dbe5ef;border-radius:18px;padding:30px;box-shadow:0 18px 55px #17365d20}.spin{width:42px;height:42px;border:4px solid #dce8f2;border-top-color:#17365d;border-radius:50%;animation:s .8s linear infinite;margin-bottom:16px}@keyframes s{to{transform:rotate(360deg)}}h1{font-size:23px;margin:0 0 8px}p{font-size:13px;color:#64748b;line-height:1.5}.bar{height:9px;background:#e7eef5;border-radius:999px;overflow:hidden;margin:18px 0}.fill{height:100%;width:12%;background:#1f4e78;transition:width .3s}.err{display:none;margin-top:14px;padding:11px;border-radius:9px;background:#fff1f0;border:1px solid #ffc9c5;color:#a61b14;font-size:12px;white-space:pre-wrap}.small{font-size:11px;color:#718399;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="spin"></div>
+<h1>☁ RPYS Bulut</h1>
+<p id="status">En güncel RPYS hazırlanıyor…</p>
+<div class="bar"><div id="fill" class="fill"></div></div>
+<div id="err" class="err"></div>
+<div class="small">Program GitHub Pages üzerinden açılır; ana veri ve kayıtlar Supabase bulutta tutulur.</div>
+</div>
+<script>
+(async()=>{
+ const BASE='https://wiflnajancyomgdtheyr.supabase.co/storage/v1/object/public/rpys-web/';
+ const status=document.getElementById('status'),fill=document.getElementById('fill'),err=document.getElementById('err');
+ const replaceOnce=(s,a,b)=>s.includes(a)?s.replace(a,b):s;
+ function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
+ function repair(app){
+   app=replaceOnce(app,
+     '</div></div></div></div></div></div>\n<div class="panel" id="acilPanel"',
+     '</div></div></div></div></div>\n<div class="panel" id="acilPanel"');
+   app=replaceOnce(app,
+     '</div></div></div></div></div></div>\n</section>\n\n\n<section class="page" id="vardiyalar">',
+     '</div></div></div></div></div>\n</section>\n\n\n<section class="page" id="vardiyalar">');
+   const sig='<div class="sayScreenSignatures"><div><b data-rpys-sig-name="0"></b><span data-rpys-sig-role="0"></span><em>İmza</em></div><div><b data-rpys-sig-name="1"></b><span data-rpys-sig-role="1"></span><em>İmza</em></div><div><b data-rpys-sig-name="2"></b><span data-rpys-sig-role="2"></span><em>İmza</em></div></div>';
+   app=replaceOnce(app,sig+'\n<div class="panel" id="say2Panel"',sig+'\n</div>\n<div class="panel" id="say2Panel"');
+   app=replaceOnce(app,sig+'\n</section>\n\n\n<section class="page" id="goruntuler">',sig+'\n</div>\n</section>\n\n\n<section class="page" id="goruntuler">');
+   app=replaceOnce(app,
+     'title.textContent=b.textContent.replace(/^[^A-Za-zÇĞİÖŞÜçğıöşü]+/,"").trim();save();requestAnimationFrame(()=>renderPage(b.dataset.p))',
+     'title.textContent=b.textContent.replace(/^[^A-Za-zÇĞİÖŞÜçğıöşü]+/,"").trim();try{localStorage.setItem("rpys_last_page",b.dataset.p)}catch(_){}window.scrollTo(0,0);requestAnimationFrame(()=>renderPage(b.dataset.p))');
+   app=replaceOnce(app,'db.ui.lastDutyTab=b.dataset.s;save()','db.ui.lastDutyTab=b.dataset.s;try{localStorage.setItem("rpys_last_duty_tab",b.dataset.s)}catch(_){}');
+   app=replaceOnce(app,'db.ui.lastSayTab=b.dataset.y;save()','db.ui.lastSayTab=b.dataset.y;try{localStorage.setItem("rpys_last_say_tab",b.dataset.y)}catch(_){}');
+   app=replaceOnce(app,'db.ui.lastMonth=month.value;save();renderCurrentPage()','db.ui.lastMonth=month.value;try{localStorage.setItem("rpys_last_month",month.value)}catch(_){}renderCurrentPage()');
+   app=replaceOnce(app,'setInterval(()=>{if(_storageReady)v24RefreshServerStatus()},5000);','setInterval(()=>{if(_storageReady&&!document.hidden)v24RefreshServerStatus()},60000);');
+   app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.1-TAM-BULUT-WEB').replaceAll('v3.0.0 TAM BULUT','v3.0.1 TAM BULUT WEB');
+   return app;
+ }
+ function validate(app){
+   const d=new DOMParser().parseFromString(app,'text/html');
+   const main=d.querySelector('main.main');
+   if(!main)throw new Error('Ana çalışma alanı bulunamadı.');
+   const direct=main.querySelectorAll(':scope > section.page').length;
+   if(direct<40)throw new Error('Sayfa yapısı doğrulanamadı ('+direct+'/40).');
+   const s1=d.getElementById('say1Panel'),s2=d.getElementById('say2Panel'),say=d.getElementById('saymanlik');
+   if(!s1||!s2||!say||s1.parentElement!==say||s2.parentElement!==say)throw new Error('SAY1/SAY2 yapısı doğrulanamadı.');
+   for(const id of ['nobet','vardiyalar','saymanlik','goruntuler','personel','izin']){const el=d.getElementById(id);if(!el||el.parentElement!==main)throw new Error(id+' sayfası yanlış konumda.');}
+ }
+ try{
+   fill.style.width='24%';
+   let path='releases/rpys-v3.0.0.html',version='3.0.0';
+   try{const mr=await fetch(BASE+'manifest.json?t='+Date.now(),{cache:'no-store'});if(mr.ok){const m=await mr.json();if(m&&m.path){path=m.path;version=m.version||version}}}catch(_){}
+   status.textContent='RPYS '+version+' buluttan indiriliyor…';fill.style.width='46%';
+   const r=await fetch(BASE+path+'?t='+Date.now(),{cache:'no-store'});
+   if(!r.ok)throw new Error('RPYS paketi alınamadı (HTTP '+r.status+')');
+   let app=await r.text();
+   if(app.length<1000000||!app.includes('RPYS'))throw new Error('Buluttaki RPYS paketi eksik.');
+   status.textContent='Sayfa yapısı doğrulanıyor…';fill.style.width='70%';
+   app=repair(app);validate(app);
+   fill.style.width='95%';status.textContent='RPYS hazır, açılıyor…';
+   setTimeout(()=>{document.open('text/html','replace');document.write(app);document.close();},70);
+ }catch(e){fail(e)}
+})();
+</script>
+</body>
+</html>
