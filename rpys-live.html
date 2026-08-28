@@ -7,15 +7,15 @@
 <meta http-equiv="pragma" content="no-cache">
 <meta http-equiv="expires" content="0">
 <title>RPYS LIVE</title>
-<style>body{font-family:Segoe UI,Arial,sans-serif;background:#eef4f9;color:#17365d;display:grid;place-items:center;min-height:100vh;margin:0}.c{background:#fff;padding:28px;border-radius:16px;box-shadow:0 12px 40px #17365d22;max-width:520px;width:90%}.s{font-size:13px;color:#64748b}</style>
+<style>body{font-family:Segoe UI,Arial,sans-serif;background:#eef4f9;color:#17365d;display:grid;place-items:center;min-height:100vh;margin:0}.c{background:#fff;padding:28px;border-radius:16px;box-shadow:0 12px 40px #17365d22;max-width:520px;width:90%;text-align:center}.s{font-size:13px;color:#64748b;margin:12px 0 18px}.b{display:inline-block;background:#17365d;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700}</style>
 </head>
 <body>
-<div class="c"><h2>RPYS LIVE</h2><div class="s">Güncel RPYS normal oturum yapısıyla açılıyor…</div></div>
+<div class="c"><h2>RPYS LIVE</h2><div class="s">Güncel RPYS açılıyor… Açılmazsa aşağıdaki düğmeye dokun.</div><a id="go" class="b" href="https://2nyunuss-coder.github.io/?rpys_live=202608290034">RPYS'yi Aç</a></div>
 <script>
 (()=>{
-  const stamp=Date.now();
-  const target='/?rpys_live='+stamp+'#live';
-  location.replace(target);
+ const target='https://2nyunuss-coder.github.io/?rpys_live=202608290034';
+ document.getElementById('go').href=target;
+ setTimeout(()=>{window.location.href=target},400);
 })();
 </script>
 </body>
