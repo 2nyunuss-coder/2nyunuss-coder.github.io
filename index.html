@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17365d">
-<title>RPYS Bulut • LIVE</title>
+<title>RPYS Bulut</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;background:#eef4f9;color:#17365d}body{min-height:100vh;display:grid;place-items:center}.card{width:min(600px,92vw);background:#fff;border:1px solid #dbe5ef;border-radius:18px;padding:30px;box-shadow:0 18px 55px #17365d20}.spin{width:42px;height:42px;border:4px solid #dce8f2;border-top-color:#17365d;border-radius:50%;animation:s .8s linear infinite;margin-bottom:16px}@keyframes s{to{transform:rotate(360deg)}}h1{font-size:23px;margin:0 0 8px}p{font-size:13px;color:#64748b;line-height:1.5}.bar{height:9px;background:#e7eef5;border-radius:999px;overflow:hidden;margin:18px 0}.fill{height:100%;width:12%;background:#1f4e78;transition:width .3s}.err{display:none;margin-top:14px;padding:11px;border-radius:9px;background:#fff1f0;border:1px solid #ffc9c5;color:#a61b14;font-size:12px;white-space:pre-wrap}.small{font-size:11px;color:#718399;margin-top:12px}
 </style>
@@ -16,7 +16,7 @@
 <p id="status">En güncel RPYS hazırlanıyor…</p>
 <div class="bar"><div id="fill" class="fill"></div></div>
 <div id="err" class="err"></div>
-<div class="small">GitHub LIVE açıcı • canlı Supabase kaynağı doğrulanıyor.</div>
+<div class="small">Program GitHub Pages üzerinden açılır; uygulama ve ana veri güvenli Supabase katmanından gelir.</div>
 </div>
 <script>
 (async()=>{
@@ -124,15 +124,11 @@
    const r=await fetch(APP_SOURCE+'?t='+Date.now(),{cache:'no-store'});
    if(!r.ok)throw new Error('RPYS paketi alınamadı (HTTP '+r.status+')');
    const version=r.headers.get('x-rpys-version')||'güncel';
-   document.title='RPYS '+version+' LIVE';
    let app=await r.text();
    if(app.length<1000000||!app.includes('RPYS'))throw new Error('Buluttaki RPYS paketi eksik.');
    status.textContent='Sayfa yapısı doğrulanıyor…';fill.style.width='70%';
    app=repair(app);validate(app);
-   app=app.replaceAll('v3.0.3-MOBILE-SECURE','v'+version+'-LIVE').replaceAll('v3.0.3 MOBILE SECURE','v'+version+' LIVE');
-   const forceFix=`<style id="rpys-live-force-style">#rpysLiveVersionBadge{position:fixed;left:5px;bottom:5px;z-index:2147483647;background:#17365d;color:white;padding:4px 8px;border-radius:8px;font:700 10px/1.2 Segoe UI,Arial;box-shadow:0 2px 8px #0004}[id="dutySuitableListV2413"].rpysForceHidden{display:none!important}</style><script id="rpys-live-force-3053">(()=>{const V=${JSON.stringify(version)};const N=s=>String(s??'').toLocaleUpperCase('tr-TR').replace(/\\s+/g,' ').trim();let explicit=false,ctx=null;const S=(f,d)=>{try{return f()}catch(_){return d}};function boxes(){return [...document.querySelectorAll('[id="dutySuitableListV2413"]')]}function box(){const a=boxes();a.slice(1).forEach(x=>x.remove());return a[0]||null}function hide(){const b=box();if(b&&!explicit){b.classList.add('rpysForceHidden');b.style.setProperty('display','none','important')}}function show(){const b=box();if(b){b.classList.remove('rpysForceHidden');b.style.setProperty('display','block','important')}}function col(c){return c?S(()=>dutyColumnByKey(c.dataset.type,c.dataset.col),null):null}function pDone(pid){const v=Number(S(()=>grandMetricTotal('portable',pid),NaN));if(Number.isFinite(v))return v;return 0}function pTarget(pid){let v=Number(S(()=>netManual('portable',pid)?.obligation,0)||0);if(v>0)return v;v=Number(S(()=>db?.portableObligation?.[pid],0)||0);return v}function render(){if(!explicit)return;const b=box(),c=ctx||window.dutyContextCellV2413;if(!b||!c)return;const dc=col(c);if(!dc)return;const arr=S(()=>suitablePeopleForDutyV2413(),[])||[];const isP=N(dc.unit)==='RUTİN PORTABL';const rows=arr.map(x=>{const p=x.p||x.person||x,pid=Number(p?.id||0);let done=0,target=0;if(isP){done=pDone(pid);target=pTarget(pid)}else{done=Number(S(()=>grandMetricTotal('gunduz',pid),0)||0);target=Number(S(()=>netManual('gunduz',pid)?.obligation,0)||0)}const diff=target-done;const idle=Number(x.idle)>=900?'Bu birimde daha önce hiç çalışmadı':Number.isFinite(Number(x.idle))?Number(x.idle)+' gündür bu birimde çalışmadı':'';const gap=Number.isFinite(Number(x.gap))?'Genel: '+Number(x.gap)+' gündür hiçbir birimde mesaiye gelmedi':'';return '<button class="suitablePersonV2413" data-rpys-person="'+pid+'" style="'+S(()=>personColorStyle(pid,false),'')+'"><b>'+String(p?.name||'')+'</b><span>Yapılan/Hedef: '+done+'/'+(target||'—')+' • Fark: '+diff+(idle?' • '+idle:'')+(gap?' • '+gap:'')+'</span></button>'}).join('');b.innerHTML='<div class="suitableHeadV2413">'+Number(c.dataset.day)+'. gün • '+String(dc.unit||'')+'<br><small>'+String(dc.shift||'')+'</small></div>'+rows;show()}function install(){window.renderSuitableDutyPeopleV2413=render;if(!document.getElementById('rpysLiveVersionBadge')){const d=document.createElement('div');d.id='rpysLiveVersionBadge';d.textContent='LIVE '+V;document.body.appendChild(d)}if(!explicit)hide()}document.addEventListener('contextmenu',e=>{const c=e.target.closest('.dropDutyCell');if(c){ctx=c;window.dutyContextCellV2413=c;explicit=false;setTimeout(hide,0);setTimeout(hide,80);setTimeout(hide,200)}},true);document.addEventListener('click',e=>{if(e.target.closest('[id="dutySuitableListV2413"]'))return;const a=e.target.closest('button,.btn,a,[role="button"],li');const t=N(a?.textContent||'');if(t.includes('UYGUN KİŞİLER')){e.preventDefault();e.stopPropagation();try{e.stopImmediatePropagation()}catch(_){}explicit=true;const c=ctx||window.dutyContextCellV2413;if(c)ctx=c;const menu=a.closest('#dutyContextMenu,#cellContextMenu,.contextMenu,.cellMenu');if(menu)menu.style.display='none';setTimeout(render,0);return}if(!e.target.closest('.dropDutyCell')){explicit=false;hide()}},true);new MutationObserver(()=>{clearTimeout(window.__rpysLiveMo);window.__rpysLiveMo=setTimeout(install,30)}).observe(document.body,{childList:true,subtree:true});install();setInterval(install,700)})();<\/script>`;
-   app=app.replace(/<\/body>/i,forceFix+'</body>');
-   fill.style.width='95%';status.textContent='RPYS '+version+' LIVE hazır, açılıyor…';
+   fill.style.width='95%';status.textContent='RPYS hazır, açılıyor…';
    setTimeout(()=>{document.open('text/html','replace');document.write(app);document.close();},70);
  }catch(e){fail(e)}
 })();
