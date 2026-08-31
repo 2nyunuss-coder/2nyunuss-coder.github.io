@@ -1,0 +1,2 @@
+'use strict';
+(()=>{const base=document.createElement('script');base.src='./v07.js';base.onload=()=>{const assistant=document.createElement('script');assistant.src='./v08-assistant.js';document.head.appendChild(assistant)};base.onerror=()=>{const box=document.querySelector('#appMsg')||document.querySelector('#authMsg');if(box){box.textContent='YEA V0.8 temel dosyası yüklenemedi. Sayfayı yenileyin.';box.classList.remove('hidden')}};document.head.appendChild(base)})();
