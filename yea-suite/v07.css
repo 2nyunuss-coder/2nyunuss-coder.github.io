@@ -1,0 +1,8 @@
+.sixStats{grid-template-columns:repeat(6,1fr)}
+.formGrid.two{grid-template-columns:1fr 2fr}
+.financeItem,.vehicleItem{border:1px solid #233754;background:#091528;color:#eef7ff;border-radius:13px;padding:12px}
+.moneyIncome{color:#9fe0ba}.moneyExpense{color:#ffb2bc}.moneyBalance{color:#a9d5ff}.amount{font-size:17px;font-weight:900}
+.kpiGood{color:#9fe0ba}.kpiWarn{color:#ffd795}.summaryButtons{flex-wrap:wrap}
+@media(max-width:1050px){.sixStats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:650px){.sixStats,.formGrid.two{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.sixStats,.formGrid.two{grid-template-columns:1fr}}
