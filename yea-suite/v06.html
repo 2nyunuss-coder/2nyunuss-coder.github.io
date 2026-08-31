@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#07101f" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="YEA" />
+<title>YEA Suite V0.6</title>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="./icon.svg" />
+<link rel="stylesheet" href="./v06.css" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://bjieodqaujiqhnfxqgei.supabase.co; style-src 'self'; script-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+</head>
+<body>
+<main id="authView" class="wrap authWrap">
+  <header>
+    <div><span class="eyebrow">YEA SUITE • V0.6 CLOUD</span><h1>Güvenli giriş</h1><p>YEA verileri RPYS’den tamamen ayrı tutulur.</p></div>
+    <div class="cloud"><i></i>YEA Bulut hazır</div>
+  </header>
+  <section class="guard"><b>🔒 RPYS İzolasyon Koruması</b><span>Bu giriş ve veritabanı yalnızca YEA Suite içindir.</span></section>
+  <div id="authMsg" class="msg hidden"></div>
+  <form id="authForm" class="authCard">
+    <label>E-posta<input id="email" type="email" autocomplete="email" required /></label>
+    <label>Şifre<input id="password" type="password" minlength="8" autocomplete="current-password" required /></label>
+    <div class="actions"><button type="submit">Giriş yap</button><button id="signUp" type="button" class="ghost">Hesap oluştur</button></div>
+    <span class="tiny">Şifre en az 8 karakter olmalı. Oturum bu cihazda güvenli oturum belirteci olarak saklanır.</span>
+  </form>
+</main>
+
+<main id="appView" class="wrap hidden">
+  <header>
+    <div><span class="eyebrow">YEA SUITE • V0.6 CLOUD</span><h1>Tek merkez, ayrı sistemler.</h1><p>Görevler, projeler, belgeler ve radyoloji yönetimi; gereksiz dosya depolaması yok.</p></div>
+    <div class="cloud"><i></i>YEA Bulut bağlı</div>
+  </header>
+  <section class="guard"><b>🔒 RPYS İzolasyon Koruması</b><span>RPYS yalnızca dış bağlantı olarak açılır; YEA veritabanı RPYS’ye yazmaz.</span></section>
+  <nav class="tabs" id="tabs">
+    <button data-tab="home" class="active">Ana Sayfa</button>
+    <button data-tab="tasks">Görevler</button>
+    <button data-tab="projects">Projeler</button>
+    <button data-tab="radiology">Radyoloji</button>
+    <button data-tab="docs">Belgeler</button>
+    <button data-tab="summary">Akıllı Özet</button>
+    <button data-tab="settings">Ayarlar</button>
+  </nav>
+  <div id="appMsg" class="msg hidden"></div>
+
+  <section data-page="home">
+    <div class="stats">
+      <article><small>Açık görev</small><strong id="openCount">0</strong></article>
+      <article><small>Bugün</small><strong id="todayCount">0</strong></article>
+      <article><small>Aktif proje</small><strong id="projectCount">0</strong></article>
+      <article><small>Bu ay istem</small><strong id="monthRequestCount">0</strong></article>
+    </div>
+    <div class="grid">
+      <article class="card"><span class="icon">🏥</span><h3>RPYS</h3><p>Mevcut RPYS’yi değiştirmeden yeni sekmede aç.</p><a href="https://2nyunuss-coder.github.io/" target="_blank" rel="noopener noreferrer">RPYS’yi Aç ↗</a></article>
+      <article class="card"><span class="icon">✅</span><h3>Görevler</h3><p>Öncelik, son tarih ve kısa notla günlük işleri takip et.</p><button data-go="tasks">Modülü Aç</button></article>
+      <article class="card"><span class="icon">🧩</span><h3>Projeler</h3><p>Projeleri yüzde ilerleme, sonraki adım ve hedef tarihle takip et.</p><button data-go="projects">Modülü Aç</button></article>
+      <article class="card"><span class="icon">📊</span><h3>Radyoloji Yönetimi</h3><p>Aylık birim hasta/istem sayıları ve cihaz kesinti günlerini kompakt biçimde kaydet.</p><button data-go="radiology">Modülü Aç</button></article>
+      <article class="card"><span class="icon">📄</span><h3>Belgeler</h3><p>Tutanak, üst yazı, teknik şartname ve faaliyet notu şablonları.</p><button data-go="docs">Modülü Aç</button></article>
+      <article class="card"><span class="icon">✦</span><h3>Akıllı Özet</h3><p>Ücretsiz yerel analiz; görev ve projelerinden öncelik özeti çıkarır.</p><button data-go="summary">Özeti Aç</button></article>
+      <article class="card"><span class="icon">📦</span><h3>Yedek</h3><p>YEA kayıtlarını tek JSON dosyası olarak cihazına indir.</p><button id="exportBackup">Yedeği İndir</button></article>
+      <article class="card"><span class="icon">📱</span><h3>Telefona Ekle</h3><p>YEA Suite ana ekranda uygulama gibi açılabilir.</p><button data-go="settings">Kurulum Bilgisi</button></article>
+    </div>
+  </section>
+
+  <section data-page="tasks" class="panel hidden">
+    <div class="sectionHead"><div><h2>Görevler</h2><p>Günlük ve yakın tarihli işleri küçük kayıtlarla yönet.</p></div></div>
+    <form id="taskForm">
+      <div class="formGrid three"><input id="taskTitle" maxlength="180" placeholder="Yeni görev…" required /><select id="taskPriority"><option value="1">Yüksek öncelik</option><option value="2" selected>Normal</option><option value="3">Düşük öncelik</option></select><input id="taskDue" type="datetime-local" /></div>
+      <div class="formGrid one"><input id="taskNotes" maxlength="500" placeholder="Kısa not (isteğe bağlı)" /></div>
+      <div class="formActions"><button>Görevi Ekle</button></div>
+    </form>
+    <div id="taskList" class="list"></div>
+  </section>
+
+  <section data-page="projects" class="panel hidden">
+    <div class="sectionHead"><div><h2>Projeler</h2><p>Bir sonraki adımı görünür tut; uzun açıklamalar yerine kısa ve eyleme dönük kayıt kullan.</p></div></div>
+    <form id="projectForm">
+      <div class="formGrid four"><input id="projectTitle" maxlength="180" placeholder="Proje adı" required /><select id="projectCategory"><option value="work">İş</option><option value="personal">Kişisel</option><option value="software">Yazılım</option><option value="vehicle">Araç</option><option value="education">Eğitim</option><option value="other">Diğer</option></select><input id="projectProgress" type="number" min="0" max="100" step="5" value="0" /><input id="projectDue" type="date" /></div>
+      <div class="formGrid one"><input id="projectNext" maxlength="500" placeholder="Sonraki somut adım" /></div>
+      <div class="formActions"><button id="projectSaveBtn">Projeyi Ekle</button><button id="projectCancelEdit" type="button" class="ghost hidden">Düzenlemeyi İptal</button></div>
+    </form>
+    <div id="projectList" class="list"></div>
+  </section>
+
+  <section data-page="radiology" class="panel hidden">
+    <div class="sectionHead split"><div><h2>Radyoloji Yönetimi</h2><p>RPYS’den bağımsız aylık yönetim verisi. İlk sayı hasta, ikinci sayı istem olarak tutulabilir.</p></div><div class="monthPicker"><label>Görüntülenen ay<input id="radViewMonth" type="month" /></label></div></div>
+    <div class="miniStats">
+      <article><small>Hasta</small><strong id="radPatients">0</strong></article>
+      <article><small>İstem</small><strong id="radRequests">0</strong></article>
+      <article><small>Kesinti günü</small><strong id="radOutage">0</strong></article>
+      <article><small>Dolu birim</small><strong id="radFilled">0/8</strong></article>
+    </div>
+    <form id="radiologyForm">
+      <div class="formGrid four"><select id="radUnit"><option>Poliklinik Röntgen</option><option>Acil Röntgen</option><option>BT</option><option>Skopi</option><option>Portable</option><option>Mamografi</option><option>DEXA</option><option>USG</option></select><input id="radPatient" type="number" min="0" value="0" placeholder="Hasta" /><input id="radRequest" type="number" min="0" value="0" placeholder="İstem" /><input id="radOutageInput" type="number" min="0" step="0.5" value="0" placeholder="Kesinti günü" /></div>
+      <div class="formGrid one"><input id="radNote" maxlength="1000" placeholder="Kısa not / arıza açıklaması (isteğe bağlı)" /></div>
+      <div class="formActions"><button>Ay/Birim Kaydını Güncelle</button><button id="exportRadCsv" type="button" class="ghost">Bu Ayı CSV İndir</button></div>
+    </form>
+    <div id="radTrend" class="trendBox">Karşılaştırma için veri bekleniyor.</div>
+    <div id="radiologyList" class="list"></div>
+  </section>
+
+  <section data-page="docs" class="panel hidden">
+    <div class="sectionHead"><div><h2>Belge Taslakları</h2><p>Metin taslakları 100 KB ile sınırlı; Word/PDF gibi büyük dosyalar burada tutulmaz.</p></div></div>
+    <div class="templateBar"><select id="templateSelect"><option value="free">Serbest taslak</option><option value="tutanak">Tutanak</option><option value="ustyazi">Üst yazı</option><option value="sartname">Teknik şartname</option><option value="faaliyet">Faaliyet notu</option></select><button id="applyTemplate" type="button">Şablonu Uygula</button></div>
+    <form id="draftForm" class="formGrid one"><input id="draftTitle" maxlength="180" placeholder="Belge başlığı" required /><textarea id="draftBody" placeholder="Taslak metin…"></textarea><span class="tiny"><span id="draftBytes">0</span> / 102.400 bayt</span><div class="formActions"><button id="draftSaveBtn">Taslağı Kaydet</button><button id="draftCancelEdit" type="button" class="ghost hidden">Düzenlemeyi İptal</button></div></form>
+    <div id="draftList" class="list"></div>
+  </section>
+
+  <section data-page="summary" class="panel hidden">
+    <div class="sectionHead"><div><h2>Akıllı Özet</h2><p>Ücretsiz ve yerel hesaplama; veriyi başka bir AI servisine göndermez.</p></div></div>
+    <div class="formActions"><button id="summaryToday">Bugünü Özetle</button><button id="summaryPriority" class="ghost">Öncelikleri Çıkar</button><button id="summaryRadiology" class="ghost">Radyoloji Özeti</button></div>
+    <div id="summaryResult" class="aiResult">Henüz özet oluşturulmadı.</div>
+  </section>
+
+  <section data-page="settings" class="panel hidden">
+    <h2>Ayarlar</h2>
+    <div class="setting"><b>Kompakt depolama</b><span>Açık</span></div>
+    <div class="setting"><b>AI geçmişi</b><span>Kapalı</span></div>
+    <div class="setting"><b>Dosya depolama</b><span>Kapalı</span></div>
+    <div class="setting"><b>RPYS bağlantısı</b><span>Salt bağlantı</span></div>
+    <div class="setting"><b>YEA kayıtları</b><span id="usageRecords">0 görev • 0 taslak • 0 proje • 0 radyoloji</span></div>
+    <div class="setting"><b>Yaklaşık metin verisi</b><span id="usageBytes">0 B</span></div>
+    <div class="installTip">iPhone/iPad: Safari’de Paylaş → Ana Ekrana Ekle. Android/Chrome: tarayıcı menüsünden “Uygulamayı yükle / Ana ekrana ekle”.</div>
+    <div class="formActions"><button id="exportBackupSettings">Yedek İndir</button><button id="logout" class="danger">Çıkış yap</button></div>
+  </section>
+  <footer>YEA Suite V0.6 • RPYS’den bağımsız • Kompakt depolama</footer>
+</main>
+<script src="./v06.js" defer></script>
+</body>
+</html>
