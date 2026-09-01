@@ -1,18 +1,16 @@
-# RPYS Stable 3.1.36
+# RPYS Stable 3.1.37 Recovery
 
-Kararlı dağıtım tarihi: 1 Eylül 2026
+Kararlı/kurtarma dağıtım tarihi: 1 Eylül 2026
 
-- Uygulama sürümü: **3.1.36-stable**
+- Uygulama sürümü: **3.1.37-recovery**
 - Dağıtım motoru: **6.1.1**
 - Canlı kaynak: Supabase `rpys-app-source`
 - Veri koruması: monoton revizyon, stale write reddi, şüpheli büyük state küçülmesi koruması ve otomatik snapshot.
-- SDS / STD Görüntüleme Hizmetleri modülü aylık veri girişi, 2.1–2.8 değerlendirme/sorgu alanları, aylık arşiv ve kaynak tutarsızlığı uyarılarını korur. Resmi sabit toplantı metinleri ve imza metinleri veri alanlarından ayrıdır.
-- **390.6A Hastane Excel okuyucu:** hastane MR/BT raporunun Branş, Doktor, Poliklinik/Acil/Klinik MR ve BT sütunlarını doğrudan tanır. `GENEL TOPLAM` satırı hekim verisi olarak ikinci kez sayılmaz; hesaplanan satır toplamlarıyla doğrulama amacıyla kullanılır. Fark varsa onay engellenir. `Doktor Seçiniz!` gibi hekimi seçilmemiş istemler sessizce silinmez, kontrol uyarısı olarak gösterilir.
-- Aynı Excel dosyasının tekrar yüklenmesi çift sayım üretmez; önceki aynı dosya kayıtları değiştirilir. Onay sonrası MR/BT için Poliklinik, Acil, Klinik ve toplam değerler SDS aylık kaydına işlenir; USG ve diğer elle girilen alanlar korunur.
-- **390.6B Word/OOXML motoru:** resmi DOCX şablonunun `word/document.xml` içeriğini istemci tarafında işler. Belge gövdesini tek hücreye sıkıştıran dış tablo yapısı açılarak normal sayfa akışına taşınır. MR/BT hekim-branş tablosu güncel Excel kayıtlarından yeniden oluşturulur; ilgili MR/BT toplamları, ay bilgisi ve veriyle değişen seçili açıklamalar güncellenir. Hedef dışındaki sabit evrak metinleri değiştirilmez.
-- **390.6C Tam Evrak:** SDS içinde `Tam Evrak` sekmesi vardır. Resmi Word şablonu bir kez yüklenip RPYS bulut durumunda SHA-256 ile saklanır. `Evrakı Oluştur` ile güncel DOCX üretilir ve Word sayfaları sayfa kırımlarıyla ekranda render edilir. `Word İndir` ve `Yazdır / PDF` işlemleri vardır.
-- Yerel kaynak DOCX üzerinde dış tablo açma testi, daha önce 2–3 sayfada sıkışan içeriğin **22 sayfalık** normal belge akışına açıldığını doğrulamıştır. Canlı tarayıcı görsel DOM testi ayrı olarak kullanıcı ekranında doğrulanacaktır.
-- Canlı SDS yükleme sırası: `388.1`, `389.1`, `390.6A`, `390.6B`, `390.6C`.
-- Canlı HTTP doğrulaması: Excel okuyucu, Word motoru, Tam Evrak arayüzü ve ana `rpys-app-source` ayrı ayrı HTTP **200** dönmüştür. `rpys-app-source` yanıt başlıkları `X-RPYS-Version: 3.1.36-stable` ve `X-RPYS-Engine: 6.1.1` olarak doğrulanmıştır.
+- Kurtarma sırasında `RPYS_MAIN` revizyon **680** ayrıca `KURTARMA ÖNCESİ SABİT YEDEK • r680` etiketiyle snapshot olarak sabitlenmiştir.
+- Bulut doğrulaması: 35 personel, 161 izin/rapor, toplam 3.051 görev kaydı ve Eylül 2026 için 359 görev kaydı mevcuttur. r678 ile r680 arasında görev ve izin verilerinde fark yoktur.
+- Önceki `rpys-stable-bundle` tek istekte çok sayıda Edge Function çağırdığı için Supabase trace rate-limit'e girip HTTP 500 üretebiliyordu. Bu durum veri silinmiş gibi boş/eksik ekran oluşturabiliyordu.
+- **3.1.37 kurtarma yükleyicisi:** tek toplu bundle çağrısı kaldırıldı. Çekirdek yamalar tarayıcı tarafından sırayla ve ayrı isteklerle yüklenir. 332.1 yamasındaki bilinen sözdizimi hatası yükleme sırasında güvenli metin düzeltmesiyle çalıştırılır.
+- Ana kaynak HTTP 200 ile doğrulanmıştır; `X-RPYS-Version: 3.1.37-recovery`, `X-RPYS-Engine: 6.1.1`, `X-RPYS-Bundle: direct-sequential-recovery`. Eski `rpys-stable-bundle` çağrısı ana HTML'den kaldırılmıştır.
+- SDS / STD özellikleri korunur: 388.1, 389.1, 390.6A Hastane Excel okuyucu, 390.6B Word/OOXML motoru, 390.6C Tam Evrak.
 
-Eski Edge Function yamaları rollback/audit amacıyla saklanır. SDS bileşenleri eski kararlı paket zincirindeki bir hata SDS'yi engellemesin diye `rpys-app-source` tarafından ayrıca doğrudan yüklenir.
+Bu kurtarma sürümünde veri geri yükleme yapılmamıştır; çünkü bulut görev/izin verileri sağlam ve son snapshotlarla tutarlıdır. Düzeltme yalnız çalışma/yükleme katmanına uygulanmıştır.
