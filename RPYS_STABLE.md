@@ -1,41 +1,65 @@
-# RPYS Stable 3.1.39 — Cache Integrity + SDS Evrak Seçimi
+# RPYS Stable 3.1.39 — Cache Integrity + SDS Görüntüleme Hotfix
 
-Kararlı dağıtım tarihi: 1 Eylül 2026
+Kararlı/hotfix tarihi: 1 Eylül 2026
 
-- Uygulama sürümü: **3.1.39-stable**
+- Ana uygulama sürümü: **3.1.39-stable**
 - Dağıtım motoru: **6.1.1**
 - Canlı kaynak: Supabase `rpys-app-source`
-- Veri koruması: monoton revizyon, stale write reddi, şüpheli büyük state küçülmesi koruması ve otomatik snapshot.
-- Son veri bütünlüğü doğrulaması: **35 personel, 3.051 ana görev, Eylül 2026 için 359 görev, 161 izin/rapor**. 3.1.39 deployu görev/personel/izin verisini değiştirmemiştir.
+- Ana çalışma verisi korunur: monoton revizyon, stale-write reddi, şüpheli state küçülmesi koruması, snapshot ve v391 cache integrity.
+- SDS hotfix öncesi **r740** ayrıca `SDS USG+MRBT BİRLEŞİK OKUYUCU ÖNCESİ • r740` etiketiyle snapshot **#355** olarak sabitlendi.
+- Son veri bütünlüğü: **35 personel, 3.051 ana görev, Eylül 2026 için 359 görev, 161 izin/rapor**. SDS düzeltmeleri bu alanları değiştirmedi.
 
 ## v391 Cache Integrity — korunuyor
 
 - Bulut/yerel MASTER veri yüklendiğinde türetilmiş görev/personel cache'leri geçersiz kılınır.
-- `assignmentsMonth()` cache'i seçili ay, bulut revizyonu, kayıt zamanı, runtime boot zamanı, toplam görev sayısı, o ayın ham görev sayısı ve personel sayısı ile denetlenir.
+- `assignmentsMonth()` cache'i ay, bulut revizyonu, kayıt zamanı, runtime boot zamanı, toplam/aylık görev sayısı ve personel sayısıyla denetlenir.
 - Ham görev varken görev görünümü 0 dönerse catastrophic-empty-cache koruması cache'i yeniden kurup Saymanlık/Nöbet ekranını tekrar render eder.
-- Bu katman yalnız render/cache davranışını değiştirir; `db.assign`, izin, personel veya 6.1.1 dağıtım motoru verisine yazmaz.
+- Bu katman `db.assign`, izin, personel veya 6.1.1 dağıtım motoru verisine yazmaz.
 
-## SDS / STD — 392.1 Evrak Branş/Hekim Seçimi
+## SDS birleşik Excel okuyucu — `__SDS390E_V10`
 
-- Dosyalardan okunan istem verileri **MR / BT / USG** için ayrı ayrı değerlendirilir.
-- Her cihaz için **Poliklinik / Acil / Klinik** grupları ayrı gösterilir.
-- Her grupta branşlar istem toplamına göre **büyükten küçüğe** sıralanır; tüm branşlar görülebilir.
-- Kullanıcı evrakta olmasını istediği branşları kutucukla seçer; her cihaz/kaynak grubunda en fazla **5 branş** seçilebilir.
-- Seçili branş açıldığında o branştaki hekimler istem sayısına göre büyükten küçüğe sıralanır; branş başına en fazla **5 hekim** seçilebilir.
-- `İlk 5 branşı seç`, `İlk 5 hekimi seç`, grup temizleme ve tüm seçimleri temizleme kısayolları vardır; otomatik seçim zorunlu değildir.
-- Seçimler ay bazında `db.sds.months[YYYY-MM].wordSelections` altında saklanır; başka ayın seçimini ezmez.
-- Dosya silinir veya satırlar değişirse artık mevcut olmayan branş/hekim seçimleri otomatik temizlenir.
-- Word üretimi 392.1 ile sarılmıştır; resmi Word şablonundaki `en fazla isteyen branşlar/hekimlerimiz` veri alanlarına **yalnız kullanıcının işaretlediği branş ve hekimler** yazılır. Seçim yapılmamış bir veri alanında eski aya ait isimlerin kalmaması için `Seçim yapılmadı` gösterilir.
-- Hekim listesinde branş bilgisi hekim adıyla birlikte taşınır; böylece Acil gibi ayrı branş cümlesi bulunmayan bölümlerde de seçilen branş/hekim ilişkisi korunur.
-- Mevcut Ağustos 2026 dosyasında sıralama mantığı canlı veride doğrulandı. Örnek Poliklinik BT: **Üroloji 351 → Genel Cerrahi 256 → Göğüs Hastalıkları 215 → Beyin ve Sinir Cerrahisi 152 → İç Hastalıkları 148**.
-- 392.1 JavaScript kodu `node --check` ile doğrulandı. Canlı `rpys-lint385?v=3921` ucu HTTP **200** döndü.
-- Ana RPYS kaynağı HTTP **200** ile doğrulandı: `X-RPYS-Version: 3.1.39-stable`, `X-RPYS-Engine: 6.1.1`, `X-RPYS-Bundle: direct-sequential-cache-integrity-sds-selection`.
+- Eski özel MR/BT okuyucunun tüm Excel `change` olayını yakalayıp USG dosyasını `MR/BT hekim satırı bulunamadı` hatasıyla engellemesi giderildi.
+- Yeni okuyucu **MR + BT + USG** verilerini tek akışta okur.
+- Bir Excel çalışma kitabındaki **tüm sayfalar** taranır. Önerilen tek dosya düzeni: `MR-BT` sayfası + `USG` sayfası.
+- Ayrı MR/BT ve USG dosyaları da sırayla yüklenebilir; yalnız yeni dosyada bulunan modaliteler değiştirilir, diğer cihaz verileri korunur.
+- Yeni birleşik dosya MR/BT/USG içeriyorsa önceki aynı modalite satırları otomatik değiştirilir; eski dosyayla çift sayım oluşmaz.
+- Başlık satırı ilk satırda olmak zorunda değildir; ilk 100 satır taranır.
+- `Branş/Bölüm`, `Doktor/Hekim/Uzman`, Poliklinik/Acil/Klinik ve MR/BT/USG sütunları tanınır. USG adlı ayrı sayfada sade `Poliklinik / Acil / Klinik / Toplam` sütunları da desteklenir.
+- `Doktor Seçiniz! / Hekim Seçiniz!` satırları **detailRows'a eklenmez**, hekim/branş sıralamasına, temiz toplamlara ve Word evrakına katılmaz.
+- Kaynak `GENEL TOPLAM` yalnız bu dışlanan satırlar nedeniyle temiz toplamdan farklıysa hata değil açıklamalı veri-kalite uyarısı gösterilir. Açıklanamayan fark varsa onay engellenir.
+- Canlı `rpys-patch390` ucu DB-backed sürümlü script olarak servis edilir ve HTTP **200** ile `__SDS390E_V10` döndürdüğü doğrulandı.
 
-## Önceki SDS düzeltmeleri korunur
+## Ağustos `Doktor Seçiniz` temizliği
 
-- Temmuz ve Ağustos SDS kayıtları ayrıdır. Ağustos kaydı `prevYm=2026-07` ile Temmuz → Ağustos karşılaştırmasını kullanır.
-- Temmuz MR/BT: Poliklinik **MR 5542 / BT 1978**, Acil **MR 706 / BT 3692**, Klinik **MR 178 / BT 754**, toplam **MR 6426 / BT 6424**.
-- Ağustos MR/BT: Poliklinik **MR 4861 / BT 1543**, Acil **MR 728 / BT 3521**, Klinik **MR 159 / BT 699**, toplam **MR 5748 / BT 5763**. Ağustos kaydında Excel'den gelen **266** hekim/branş kırılımı bulunur.
-- SDS canlı parçaları: 388.1, 389.1, **390.8A** Hastane Excel okuyucu, **390.7B** Word/OOXML karşılaştırma motoru, **392.1** Evrak Branş/Hekim Seçimi, 390.6C Tam Evrak.
+- Eski Ağustos MR/BT importunda `Acil Tıp / Doktor Seçiniz! / Acil BT / 1 istem` bulundu.
+- Bu kayıt kullanıcı talebiyle mevcut Ağustos SDS verisinden de çıkarıldı.
+- Ağustos detailRows: **266 → 265** gerçek satır.
+- Ağustos Acil BT temiz değeri: **3.520**.
+- Ağustos temiz BT toplamı: **5.762**. Kaynak rapor `GENEL TOPLAM` değeri **5.763** olup aradaki 1, dışlanan `Doktor Seçiniz!` kaydıdır; bu bilgi SDS uyarılarında korunur.
+- Ağustos MR değerleri değişmedi: Poliklinik **4.861**, Acil **728**, Klinik **159**, toplam **5.748**.
 
-Bu sürümde RPYS ana çalışma verisi ve 6.1.1 dağıtım motoru korunmuş; yalnız SDS dosya analizinden Word evrakına giden branş/hekim seçim akışı eklenmiştir.
+## SDS evrak branş/hekim seçimi — `__SDS392_SELECTION_V4`
+
+- MR / BT / USG ve Poliklinik / Acil / Klinik grupları ayrı gösterilir.
+- Branşlar istem toplamına göre **büyükten küçüğe** sıralanır; kullanıcı evraka girecek en fazla **5 branşı** kutucukla seçer.
+- Her branş altında yalnız o branştaki **en yüksek 3 hekim** büyükten küçüğe gösterilir ve branş başına en fazla **3 hekim** seçilebilir.
+- `İlk 5 branşı seç` ve `İlk 3 hekimi seç` kısayolları bulunur.
+- `Doktor Seçiniz / Hekim Seçiniz` kayıtları seçim listesine ve branş toplamına hiç alınmaz.
+- Word üretiminde resmi şablonun veri alanlarına yalnız kullanıcının işaretlediği branş/hekimler yazılır.
+- Canlı `rpys-lint385` ucu HTTP **200** ile `__SDS392_SELECTION_V4` döndürdüğü doğrulandı.
+
+## 2.8 iki aylık değerlendirme
+
+- Ağustos evrağında 2.8 bölümündeki performans kıyasları **Haziran → Temmuz yerine Temmuz → Ağustos** olarak üretilir.
+- MR, BT ve USG için Poliklinik/Klinik/Acil `en çok istem yapan hekim` önceki ay ve bu ay kayıtları güncellenir.
+- MR randevu süresi kıyası gerçek önceki ay ve seçili ay değerlerini kullanır.
+- BT toplam kıyası Word çekirdeğinde gerçek `prevYm` ve seçili ay toplamlarını kullanır.
+- Tarihsel olay cümleleri aylık karşılaştırma sanılarak değiştirilmez. Örneğin `Haziran ayında kurumumuzda göreve başlayan Radyoloji Dr. Tunç Burak BENKAYA` ifadesi kaynak tarihsel bilgi olarak korunur.
+
+## Ay güvenliği
+
+- Temmuz ve Ağustos SDS kayıtları ayrıdır. Ağustos `prevYm=2026-07` kullanır.
+- Temmuz MR/BT resmi değerleri korunur: Poliklinik **MR 5542 / BT 1978**, Acil **MR 706 / BT 3692**, Klinik **MR 178 / BT 754**, toplam **MR 6426 / BT 6424**.
+- Ağustos karşılaştırmaları Temmuz verisini önceki ay olarak kullanır; Haziran sabit değerleri yeni aya taşınmaz.
+
+Bu hotfix ana RPYS uygulama verisini ve 6.1.1 dağıtım motorunu değiştirmez; SDS dosya okuma, veri temizleme, evrak seçimi ve iki-aylık Word karşılaştırma katmanını düzeltir.
