@@ -1,35 +1,41 @@
-# RPYS Stable 3.1.38 — Cache Integrity Root Fix
+# RPYS Stable 3.1.39 — Cache Integrity + SDS Evrak Seçimi
 
 Kararlı dağıtım tarihi: 1 Eylül 2026
 
-- Uygulama sürümü: **3.1.38-stable**
+- Uygulama sürümü: **3.1.39-stable**
 - Dağıtım motoru: **6.1.1**
 - Canlı kaynak: Supabase `rpys-app-source`
 - Veri koruması: monoton revizyon, stale write reddi, şüpheli büyük state küçülmesi koruması ve otomatik snapshot.
-- Kök cache düzeltmesi öncesinde güncel RPYS verisi ayrıca **`KÖK CACHE DÜZELTME ÖNCESİ • r686`** etiketiyle snapshot olarak sabitlenmiştir (snapshot id 302; snapshot oluşturulduğu anda bulut revizyonu 689'a ilerlemişti).
-- Son veri bütünlüğü doğrulaması: **35 personel, 3.051 ana görev, Eylül 2026 için 359 görev, 161 izin/rapor**. 3.1.38 deployu bu verileri değiştirmemiştir.
+- Son veri bütünlüğü doğrulaması: **35 personel, 3.051 ana görev, Eylül 2026 için 359 görev, 161 izin/rapor**. 3.1.39 deployu görev/personel/izin verisini değiştirmemiştir.
 
-## Kök sorun
+## v391 Cache Integrity — korunuyor
 
-Saymanlık ve bazı görev görünümleri `db.assign` verisini doğrudan göstermiyordu; `assignmentsMonth()` tarafından üretilen `_assignCache`, `_peopleCache`, `_allAssignCache` ve `_calcCache` türetilmiş önbelleklerini kullanıyordu. Uygulama açılırken ilk render bulut verisi gelmeden gerçekleşirse boş aylık görev önbelleği oluşabiliyor; sonrasında Supabase MASTER verisi başarıyla 3.051 görev ile yüklense bile eski boş cache bazı açılışlarda kullanılmaya devam edebiliyordu. Sonuç: izin/rapor hücreleri görünürken görev hücreleri boş, puantaj ve birim toplamları 0 görünebiliyordu. Veri gerçekte silinmiyordu.
+- Bulut/yerel MASTER veri yüklendiğinde türetilmiş görev/personel cache'leri geçersiz kılınır.
+- `assignmentsMonth()` cache'i seçili ay, bulut revizyonu, kayıt zamanı, runtime boot zamanı, toplam görev sayısı, o ayın ham görev sayısı ve personel sayısı ile denetlenir.
+- Ham görev varken görev görünümü 0 dönerse catastrophic-empty-cache koruması cache'i yeniden kurup Saymanlık/Nöbet ekranını tekrar render eder.
+- Bu katman yalnız render/cache davranışını değiştirir; `db.assign`, izin, personel veya 6.1.1 dağıtım motoru verisine yazmaz.
 
-## 3.1.38 kalıcı düzeltmesi — v391 Cache Integrity
+## SDS / STD — 392.1 Evrak Branş/Hekim Seçimi
 
-- `repairCoreData()` artık çalışma verisi her yenilendiğinde tüm türetilmiş görev/personel cache'lerini geçersiz kılan koruma katmanıyla sarılır. Böylece Supabase/yerel MASTER yüklenir yüklenmez eski boş cache kullanılamaz.
-- `assignmentsMonth()` cache'i artık **seçili ay + bulut revizyonu + son kayıt zamanı + runtime boot zamanı + toplam görev sayısı + o ayın ham görev sayısı + personel sayısı** imzasıyla denetlenir. İmza değişirse cache otomatik temizlenir.
-- Açılışın ilk 20 saniyesinde, pencere yeniden odaklandığında ve sekme tekrar görünür olduğunda cache sağlık kontrolü çalışır.
-- Seçili ayda en az 5 ham görev bulunmasına rağmen `assignmentsMonth()` 0 görev döndürürse sistem bunu **catastrophic-empty-cache** olarak algılar, cache'i tekrar kurar ve Saymanlık/Nöbet ekranını otomatik yeniden render eder.
-- Bu koruma yalnız türetilmiş önbellek/render katmanını değiştirir; `db.assign`, izinlar, personel, puantaj kayıtları veya 6.1.1 dağıtım motoru verisine yazmaz.
-- Canlı ana kaynak HTTP **200** ile doğrulandı: `X-RPYS-Version: 3.1.38-stable`, `X-RPYS-Engine: 6.1.1`, `X-RPYS-Bundle: direct-sequential-cache-integrity`.
-- Canlı HTML içinde `rpys-cache-integrity-v391` bulunduğu ve SDS yükleyici etiketlerinin `390.8A` / `390.7B` olarak geldiği doğrulandı.
-- v391 cache guard JavaScript kodu ayrıca `node --check` sözdizimi testinden geçti.
+- Dosyalardan okunan istem verileri **MR / BT / USG** için ayrı ayrı değerlendirilir.
+- Her cihaz için **Poliklinik / Acil / Klinik** grupları ayrı gösterilir.
+- Her grupta branşlar istem toplamına göre **büyükten küçüğe** sıralanır; tüm branşlar görülebilir.
+- Kullanıcı evrakta olmasını istediği branşları kutucukla seçer; her cihaz/kaynak grubunda en fazla **5 branş** seçilebilir.
+- Seçili branş açıldığında o branştaki hekimler istem sayısına göre büyükten küçüğe sıralanır; branş başına en fazla **5 hekim** seçilebilir.
+- `İlk 5 branşı seç`, `İlk 5 hekimi seç`, grup temizleme ve tüm seçimleri temizleme kısayolları vardır; otomatik seçim zorunlu değildir.
+- Seçimler ay bazında `db.sds.months[YYYY-MM].wordSelections` altında saklanır; başka ayın seçimini ezmez.
+- Dosya silinir veya satırlar değişirse artık mevcut olmayan branş/hekim seçimleri otomatik temizlenir.
+- Word üretimi 392.1 ile sarılmıştır; resmi Word şablonundaki `en fazla isteyen branşlar/hekimlerimiz` veri alanlarına **yalnız kullanıcının işaretlediği branş ve hekimler** yazılır. Seçim yapılmamış bir veri alanında eski aya ait isimlerin kalmaması için `Seçim yapılmadı` gösterilir.
+- Hekim listesinde branş bilgisi hekim adıyla birlikte taşınır; böylece Acil gibi ayrı branş cümlesi bulunmayan bölümlerde de seçilen branş/hekim ilişkisi korunur.
+- Mevcut Ağustos 2026 dosyasında sıralama mantığı canlı veride doğrulandı. Örnek Poliklinik BT: **Üroloji 351 → Genel Cerrahi 256 → Göğüs Hastalıkları 215 → Beyin ve Sinir Cerrahisi 152 → İç Hastalıkları 148**.
+- 392.1 JavaScript kodu `node --check` ile doğrulandı. Canlı `rpys-lint385?v=3921` ucu HTTP **200** döndü.
+- Ana RPYS kaynağı HTTP **200** ile doğrulandı: `X-RPYS-Version: 3.1.39-stable`, `X-RPYS-Engine: 6.1.1`, `X-RPYS-Bundle: direct-sequential-cache-integrity-sds-selection`.
 
-## Önceki kurtarma ve SDS düzeltmeleri korunur
+## Önceki SDS düzeltmeleri korunur
 
-- Eski tek `rpys-stable-bundle` çağrısı kaldırılmış durumda; çekirdek yamalar tarayıcı tarafından sırayla yüklenir. 332.1 yamasındaki bilinen sözdizimi bozukluğu yükleme sırasında güvenli biçimde düzeltilir.
 - Temmuz ve Ağustos SDS kayıtları ayrıdır. Ağustos kaydı `prevYm=2026-07` ile Temmuz → Ağustos karşılaştırmasını kullanır.
 - Temmuz MR/BT: Poliklinik **MR 5542 / BT 1978**, Acil **MR 706 / BT 3692**, Klinik **MR 178 / BT 754**, toplam **MR 6426 / BT 6424**.
 - Ağustos MR/BT: Poliklinik **MR 4861 / BT 1543**, Acil **MR 728 / BT 3521**, Klinik **MR 159 / BT 699**, toplam **MR 5748 / BT 5763**. Ağustos kaydında Excel'den gelen **266** hekim/branş kırılımı bulunur.
-- SDS canlı parçaları: 388.1, 389.1, **390.8A** Hastane Excel okuyucu, **390.7B** Word/OOXML karşılaştırma motoru, 390.6C Tam Evrak.
+- SDS canlı parçaları: 388.1, 389.1, **390.8A** Hastane Excel okuyucu, **390.7B** Word/OOXML karşılaştırma motoru, **392.1** Evrak Branş/Hekim Seçimi, 390.6C Tam Evrak.
 
-Bu sürümde amaç yalnız hatayı görünürde gidermek değil, bulut veri yükleme sırası ile türetilmiş görev cache'leri arasındaki yarış durumunu sistemik olarak ortadan kaldırmaktır.
+Bu sürümde RPYS ana çalışma verisi ve 6.1.1 dağıtım motoru korunmuş; yalnız SDS dosya analizinden Word evrakına giden branş/hekim seçim akışı eklenmiştir.
