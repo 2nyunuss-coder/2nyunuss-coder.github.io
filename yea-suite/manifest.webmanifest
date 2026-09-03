@@ -1,11 +1,11 @@
 {
-  "name": "YEA Suite",
+  "name": "YEA Suite Desktop",
   "short_name": "YEA",
-  "start_url": "./v12.html",
+  "start_url": "./v13.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#07101f",
-  "theme_color": "#07101f",
-  "description": "YEA Suite kişisel yönetim merkezi",
+  "theme_color": "#0b4ea2",
+  "description": "YEA Suite Windows benzeri kişisel yönetim masaüstü",
   "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
