@@ -8,5 +8,6 @@ RPYS Cep, ana RPYS uygulamasını değiştirmeden telefon ve tabletler için ayr
 - GitHub Pages yolu: `/mobile/`
 - iOS ve Android ana ekrana ekleme desteği bulunur.
 - Alt menü yalnız mevcut RPYS sayfa düğmelerini tetikler.
+- Giriş tamamlanmadan otomatik sekme açılmaz; alt menüde yalnız kullanıcının yetkili olduğu modüller görünür.
 
 Mobil katman yüklenemezse ana RPYS sürümü çalışmaya devam eder.
