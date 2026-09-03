@@ -9,8 +9,11 @@
   const retry = document.getElementById('retry');
   const buttons = [...document.querySelectorAll('.nav-btn')];
   let ready = false;
+  let authenticated = false;
+  let restoredForSession = false;
   let checks = 0;
   let readinessTimer;
+  let sessionTimer;
 
   function setOnlineState() {
     document.body.classList.toggle('is-offline', !navigator.onLine);
@@ -44,7 +47,7 @@
     ready = true;
     clearInterval(readinessTimer);
     loading.style.display = 'none';
-    restoreLastPage();
+    startSessionSync();
   }
 
   function showFailure(message) {
@@ -68,10 +71,75 @@
 
   function startReadinessCheck() {
     ready = false;
+    authenticated = false;
+    restoredForSession = false;
     checks = 0;
     clearInterval(readinessTimer);
+    clearInterval(sessionTimer);
     readinessTimer = setInterval(checkReady, 500);
     checkReady();
+  }
+
+  function loginIsVisible(doc) {
+    const overlay = doc.getElementById('loginOverlay');
+    if (!overlay) return false;
+    try { return frame.contentWindow.getComputedStyle(overlay).display !== 'none'; }
+    catch (_) { return overlay.style.display !== 'none'; }
+  }
+
+  function canOpenPage(doc, page) {
+    if (loginIsVisible(doc)) return false;
+    try {
+      const checker = frame.contentWindow.userCan;
+      if (typeof checker === 'function') return Boolean(checker(page));
+    } catch (_) {}
+    const target = findPageButton(doc, page);
+    return Boolean(target && target.style.display !== 'none' && !target.hidden);
+  }
+
+  function firstAllowedPage(doc) {
+    const preferred = ['dashboard', 'nobet', 'saymanlik', 'izin'];
+    const preferredPage = preferred.find((page) => canOpenPage(doc, page));
+    if (preferredPage) return preferredPage;
+    const first = [...doc.querySelectorAll('.sidebar .nav[data-p]')]
+      .find((button) => canOpenPage(doc, button.dataset.p));
+    return first ? first.dataset.p : null;
+  }
+
+  function syncQuickNavigation(doc) {
+    let visibleCount = 1;
+    buttons.forEach((button) => {
+      if (!button.dataset.page) return;
+      const allowed = canOpenPage(doc, button.dataset.page);
+      button.hidden = !allowed;
+      if (allowed) visibleCount += 1;
+    });
+    document.querySelector('.bottom-nav').style.setProperty('--nav-count', String(visibleCount));
+  }
+
+  function syncSession() {
+    const doc = getInnerDocument();
+    if (!ready || !doc) return;
+    const signedIn = !loginIsVisible(doc);
+    if (!signedIn) {
+      authenticated = false;
+      restoredForSession = false;
+      buttons.forEach((button) => { if (button.dataset.page) button.hidden = true; });
+      document.querySelector('.bottom-nav').style.setProperty('--nav-count', '1');
+      return;
+    }
+    authenticated = true;
+    syncQuickNavigation(doc);
+    if (!restoredForSession) {
+      restoredForSession = true;
+      restoreLastPage();
+    }
+  }
+
+  function startSessionSync() {
+    clearInterval(sessionTimer);
+    sessionTimer = setInterval(syncSession, 500);
+    syncSession();
   }
 
   function findPageButton(doc, page) {
@@ -86,13 +154,9 @@
 
   function openPage(page, remember = true) {
     const doc = getInnerDocument();
-    if (!ready || !doc) return;
+    if (!ready || !authenticated || !doc || !canOpenPage(doc, page)) return;
     const target = findPageButton(doc, page);
     if (!target) {
-      if (page === 'dashboard') {
-        const first = doc.querySelector('.sidebar .nav[data-p]');
-        if (first) first.click();
-      }
       return;
     }
     target.click();
@@ -106,12 +170,15 @@
   function restoreLastPage() {
     let page = 'dashboard';
     try { page = localStorage.getItem('rpys_cep_last_page') || page; } catch (_) {}
-    setTimeout(() => openPage(page, false), 120);
+    const doc = getInnerDocument();
+    if (!doc) return;
+    if (!canOpenPage(doc, page)) page = firstAllowedPage(doc);
+    if (page) setTimeout(() => openPage(page, false), 120);
   }
 
   function toggleInnerMenu() {
     const doc = getInnerDocument();
-    if (!ready || !doc) return;
+    if (!ready || !authenticated || !doc) return;
     const menuButton = doc.getElementById('rpysMobileMenuBtn') || doc.querySelector('.rpysMobileMenuBtn');
     if (menuButton) menuButton.click();
   }
