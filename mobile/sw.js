@@ -1,4 +1,4 @@
-const CACHE = 'rpys-cep-shell-v1';
+const CACHE = 'rpys-cep-shell-v2';
 const SHELL = ['./', './index.html', './mobile.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {
