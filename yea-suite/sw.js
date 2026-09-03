@@ -1,5 +1,5 @@
-const CACHE='yea-suite-v10';
-const CORE=['./v10.html','./v10-bootstrap.js','./v10-core.js','./v10.css','./v09.html','./v09.js','./v09-decision.js','./v08-assistant.js','./v07.js','./v06.css','./v07.css','./v08.css','./v09.css','./manifest.webmanifest','./icon.svg'];
+const CACHE='yea-suite-v11';
+const CORE=['./v11.html','./v11-bootstrap.js','./v11-core.js','./v11.css','./v10-bootstrap.js','./v10-core.js','./v10.css','./v09.html','./v09.js','./v09-decision.js','./v08-assistant.js','./v07.js','./v06.css','./v07.css','./v08.css','./v09.css','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',event=>{
@@ -7,7 +7,7 @@ self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
   if(url.origin!==self.location.origin)return;
   if(event.request.mode==='navigate'){
-    event.respondWith(fetch(event.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put('./v10.html',copy));return r}).catch(()=>caches.match('./v10.html')));
+    event.respondWith(fetch(event.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put('./v11.html',copy));return r}).catch(()=>caches.match('./v11.html')));
     return;
   }
   event.respondWith(caches.match(event.request).then(hit=>hit||fetch(event.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(event.request,copy));return r})));
