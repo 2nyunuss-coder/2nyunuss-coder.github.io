@@ -1,7 +1,7 @@
 {
   "name": "YEA Suite Desktop",
   "short_name": "YEA",
-  "start_url": "./v14.html",
+  "start_url": "./v15.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#07101f",
