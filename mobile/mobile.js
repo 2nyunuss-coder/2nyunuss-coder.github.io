@@ -39,6 +39,8 @@
   async function readPhoto(id) { const db=await mediaDb(),value=await new Promise((resolve,reject)=>{const req=db.transaction('photos').objectStore('photos').get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});db.close();return value; }
 
   function getInnerDocument() { try { return frame.contentDocument || frame.contentWindow.document; } catch (_) { return null; } }
+  function hasStoredCloudSession() { try { return Boolean(localStorage.getItem('rpys_cloud_session') || sessionStorage.getItem('rpys_cloud_session')); } catch (_) { return false; } }
+  function openOfflineCache() { if(navigator.onLine||!snapshot||!hasStoredCloudSession())return false;ready=false;setAuthenticated(true);loading.style.display='none';renderAll();return true; }
   function loginIsVisible(doc) { const overlay=doc?.getElementById('loginOverlay'); if(!overlay) return false; try { return frame.contentWindow.getComputedStyle(overlay).display !== 'none'; } catch (_) { return overlay.style.display !== 'none'; } }
   function findPageButton(doc, page) { return doc.querySelector(`.sidebar .nav[data-p="${page}"]`) || doc.querySelector(`[data-p="${page}"]`) || doc.querySelector(`a[href="#${page}"]`); }
   function canOpenPage(doc, page) { if(!doc || loginIsVisible(doc)) return false; try { const checker=frame.contentWindow.userCan; if(typeof checker==='function') return Boolean(checker(page)); } catch (_) {} const target=findPageButton(doc,page); return Boolean(target && target.style.display!=='none' && !target.hidden); }
@@ -82,8 +84,8 @@
 
   function finishLoading(doc) { injectMobileSafety(doc); ready=true; checks=0; clearInterval(readinessTimer); loading.style.display='none'; startSessionSync(); }
   function showFailure(message) { clearInterval(readinessTimer); loadingText.textContent='RPYS Cep açılamadı.'; loader.style.display='none'; errorBox.style.display='block'; retry.style.display='block'; errorBox.textContent=message; }
-  function checkReady() { checks+=1; const doc=getInnerDocument(); if(doc?.querySelector('main.main') && doc.querySelector('.sidebar')) return finishLoading(doc); if(checks>120) showFailure('Bağlantıyı kontrol edip Tekrar Dene düğmesine basın.'); }
-  function startReadinessCheck() { ready=false; authenticated=false; checks=0; clearInterval(readinessTimer); clearInterval(sessionTimer); readinessTimer=setInterval(checkReady,500); checkReady(); }
+  function checkReady() { checks+=1; const doc=getInnerDocument(); if(doc?.querySelector('main.main') && doc.querySelector('.sidebar')) return finishLoading(doc); if(checks>120){if(openOfflineCache())clearInterval(readinessTimer);else showFailure('Bağlantıyı kontrol edip Tekrar Dene düğmesine basın.');} }
+  function startReadinessCheck() { ready=false; authenticated=false; checks=0; clearInterval(readinessTimer); clearInterval(sessionTimer);openOfflineCache();readinessTimer=setInterval(checkReady,500);checkReady(); }
 
   function setAuthenticated(on) {
     authenticated=on; document.body.classList.toggle('authenticated',on);
@@ -98,7 +100,7 @@
   }
   function startSessionSync() { clearInterval(sessionTimer); sessionTimer=setInterval(syncSession,1000); syncSession(); }
 
-  function setOnlineState() { document.body.classList.toggle('is-offline',!navigator.onLine); updateSyncBadge(); if(navigator.onLine) flushQueue(); }
+  function setOnlineState() { document.body.classList.toggle('is-offline',!navigator.onLine); updateSyncBadge(); if(navigator.onLine){flushQueue();if(!ready){loading.style.display='grid';frame.src=`../?rpys_mobile_shell=1&t=${Date.now()}`;startReadinessCheck();}}else openOfflineCache(); }
   function updateSyncBadge() { const queued=loadJson(QUEUE_KEY,[]).length,badge=$('#syncBadge'); badge.className='sync-badge '+(!navigator.onLine?'offline':queued?'pending':''); badge.querySelector('span').textContent=!navigator.onLine?'Çevrimdışı':queued?`${queued} bekliyor`:'Bağlı'; }
   function queueAction(action) { const q=loadJson(QUEUE_KEY,[]); q.push({...action,queuedAt:new Date().toISOString()}); saveJson(QUEUE_KEY,q); updateSyncBadge(); }
   function flushQueue() { const b=bridge(),q=loadJson(QUEUE_KEY,[]); if(!navigator.onLine||!b||!q.length)return; const left=[]; q.forEach(item=>{try{if(item.kind==='request')b.createRequest(item.payload);else if(item.kind==='device')b.createDevice(item.payload)}catch(_){left.push(item)}}); saveJson(QUEUE_KEY,left); updateSyncBadge(); if(left.length!==q.length){snapshot=safeSnapshot()||snapshot;renderAll();} }
