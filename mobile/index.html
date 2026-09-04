@@ -3,59 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#12385f">
+  <meta name="theme-color" content="#102f50">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="RPYS Cep">
-  <meta name="description" content="RPYS'nin telefon ve tabletler için güvenli mobil erişim katmanı.">
+  <meta name="description" content="RPYS'nin telefon ve tabletler için güvenli mobil çalışma merkezi.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./mobile.css">
   <title>RPYS Cep</title>
-  <style>
-    :root{color-scheme:light;--navy:#12385f;--blue:#1e5b91;--ink:#15324c;--muted:#64788b;--line:#d7e3ed;--bg:#edf4f9;--safe-bottom:env(safe-area-inset-bottom,0px)}
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink)}
-    button{font:inherit}
-    .app-frame{position:fixed;inset:0 0 calc(66px + var(--safe-bottom));width:100%;height:calc(100dvh - 66px - var(--safe-bottom));border:0;background:var(--bg)}
-    .loading{position:fixed;inset:0 0 calc(66px + var(--safe-bottom));z-index:3;display:grid;place-items:center;padding:24px;background:linear-gradient(150deg,#f7fbfe,#e7f1f8)}
-    .loading-card{width:min(390px,92vw);padding:26px 22px;border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:0 20px 60px #12385f20;text-align:center}
-    .mark{display:grid;place-items:center;width:62px;height:62px;margin:0 auto 16px;border-radius:18px;background:linear-gradient(145deg,var(--navy),var(--blue));color:#fff;font-size:20px;font-weight:900;letter-spacing:-1px;box-shadow:0 10px 24px #12385f35}
-    .loading h1{margin:0 0 8px;font-size:23px;letter-spacing:-.4px}.loading p{margin:0;color:var(--muted);font-size:15px;line-height:1.5}
-    .loader{width:38px;height:38px;margin:20px auto 0;border:4px solid #dce8f1;border-top-color:var(--blue);border-radius:50%;animation:turn .8s linear infinite}@keyframes turn{to{transform:rotate(360deg)}}
-    .error{display:none;margin-top:18px;padding:12px;border:1px solid #f2b9b6;border-radius:12px;background:#fff1f0;color:#92241f;font-size:14px;line-height:1.4}
-    .retry{display:none;width:100%;min-height:46px;margin-top:12px;border:0;border-radius:12px;background:var(--navy);color:#fff;font-weight:800}
-    .bottom-nav{position:fixed;z-index:10;left:0;right:0;bottom:0;height:calc(66px + var(--safe-bottom));display:grid;grid-template-columns:repeat(var(--nav-count,5),1fr);padding:5px 4px var(--safe-bottom);border-top:1px solid #cbd9e5;background:rgba(255,255,255,.96);box-shadow:0 -8px 25px #12385f12;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-    .nav-btn{min-width:0;border:0;border-radius:12px;background:transparent;color:#65798c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:750;line-height:1}
-    .nav-btn .icon{font-size:21px;line-height:1}.nav-btn.active{background:#e6f0f8;color:var(--navy)}.nav-btn[hidden]{display:none!important}
-    .offline{position:fixed;z-index:20;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:none;padding:8px 13px;border-radius:999px;background:#8b2c25;color:#fff;font-size:12px;font-weight:800;box-shadow:0 6px 18px #0002;white-space:nowrap}
-    body.is-offline .offline{display:block}
-    @media(min-width:800px){.bottom-nav{left:50%;right:auto;width:520px;transform:translateX(-50%);bottom:12px;height:68px;padding:5px;border:1px solid #cbd9e5;border-radius:20px;box-shadow:0 12px 35px #12385f25}.app-frame{inset:0;height:100dvh}.loading{inset:0}.nav-btn{font-size:12px}}
-  </style>
 </head>
 <body>
-  <div id="offline" class="offline" role="status">İnternet bağlantısı yok</div>
+  <div id="offline" class="connection-pill" role="status">Çevrimdışı • son güvenli görünüm</div>
   <section id="loading" class="loading" aria-live="polite">
     <div class="loading-card">
-      <div class="mark" aria-hidden="true">RPYS</div>
+      <div class="mark" aria-hidden="true">R</div>
+      <p class="eyebrow">RADYOLOJİ PERSONEL YÖNETİM SİSTEMİ</p>
       <h1>RPYS Cep hazırlanıyor</h1>
       <p id="loadingText">Güncel ve güvenli RPYS açılıyor…</p>
       <div id="loader" class="loader" aria-hidden="true"></div>
       <div id="error" class="error"></div>
-      <button id="retry" class="retry" type="button">Tekrar Dene</button>
+      <button id="retry" class="primary wide" type="button">Tekrar Dene</button>
     </div>
   </section>
-
   <iframe id="rpysFrame" class="app-frame" title="RPYS uygulaması" src="../?rpys_mobile_shell=1"></iframe>
-
-  <nav class="bottom-nav" aria-label="RPYS Cep menüsü">
-    <button class="nav-btn active" type="button" data-page="dashboard"><span class="icon">⌂</span><span>Ana Sayfa</span></button>
-    <button class="nav-btn" type="button" data-page="nobet"><span class="icon">▦</span><span>Nöbet</span></button>
-    <button class="nav-btn" type="button" data-page="saymanlik"><span class="icon">∑</span><span>Saymanlık</span></button>
-    <button class="nav-btn" type="button" data-page="izin"><span class="icon">✓</span><span>İzin</span></button>
-    <button class="nav-btn" type="button" data-action="menu"><span class="icon">☰</span><span>Menü</span></button>
-  </nav>
-
+  <main id="mobileApp" class="mobile-app" hidden>
+    <header class="app-header">
+      <div><p class="eyebrow">RPYS CEP</p><h1 id="viewTitle">Bugün</h1></div>
+      <div class="header-actions"><span id="syncBadge" class="sync-badge"><i></i><span>Bağlı</span></span><button id="refresh" class="icon-button" type="button" aria-label="Yenile">↻</button></div>
+    </header>
+    <section id="view-today" class="view active" data-title="Bugün">
+      <article class="hero"><p id="heroDate">Bugün</p><h2 id="heroGreeting">İyi çalışmalar</h2><div class="hero-stats"><div><b id="todayCount">0</b><span>görev</span></div><div><b id="awayCount">0</b><span>izinli</span></div><div><b id="warningCount">0</b><span>uyarı</span></div></div></article>
+      <div class="section-heading"><div><span>CANLI PLAN</span><h2>Bugün kim nerede?</h2></div><button type="button" data-open-page="nobet">Listeyi aç</button></div>
+      <div id="todayList" class="stack"></div>
+      <div class="section-heading"><div><span>KONTROL</span><h2>Akıllı uyarılar</h2></div><button type="button" data-tab="alerts">Tümü</button></div>
+      <div id="alertPreview" class="stack"></div>
+    </section>
+    <section id="view-alerts" class="view" data-title="Uyarılar">
+      <div class="summary-strip"><div><b id="criticalCount">0</b><span>Kritik</span></div><div><b id="missingCount">0</b><span>Mükellefi eksik</span></div><div><b id="lowFairCount">0</b><span>Düşük adalet</span></div></div>
+      <div class="filter-row" role="group" aria-label="Uyarı filtresi"><button class="chip active" data-alert-filter="all">Tümü</button><button class="chip" data-alert-filter="high">Kritik</button><button class="chip" data-alert-filter="fair">Adalet</button></div>
+      <div id="alertList" class="stack"></div>
+    </section>
+    <section id="view-requests" class="view" data-title="Talepler">
+      <article class="info-card"><b>Onay akışı</b><p>İzin, nöbet değişimi ve diğer talepleri kaydet. Yönetici aynı ekrandan sonuçlandırabilir.</p></article>
+      <form id="requestForm" class="form-card"><label>Talep türü<select id="requestType" required><option value="İzin">İzin</option><option value="Nöbet değişimi">Nöbet değişimi</option><option value="Görevlendirme">Görevlendirme</option><option value="Diğer">Diğer</option></select></label><label>Tarih<input id="requestDate" type="date" required></label><label class="full">Açıklama<textarea id="requestDetail" maxlength="500" rows="3" placeholder="Talebin ayrıntısını yazın" required></textarea></label><button class="primary full" type="submit">Talebi Gönder</button></form>
+      <div class="section-heading"><div><span>KAYITLAR</span><h2>Talepler</h2></div></div><div id="requestList" class="stack"></div>
+    </section>
+    <section id="view-device" class="view" data-title="Cihaz Teslim">
+      <article class="info-card"><b>Mobil teslim tutanağı</b><p>Cihaz ve teslim alan bilgisini kaydet. Fotoğraf yalnız bu telefonda güvenli ek olarak tutulur.</p></article>
+      <form id="deviceForm" class="form-card"><label>Cihaz / demirbaş<input id="deviceName" maxlength="120" placeholder="Örn. Taşınabilir dedektör" required></label><label>Teslim alan<input id="deviceRecipient" maxlength="120" placeholder="Ad soyad" required></label><label>Tarih ve saat<input id="deviceDate" type="datetime-local" required></label><label>Durum<select id="deviceCondition"><option>Sağlam</option><option>Kontrollü teslim</option><option>Arızalı</option></select></label><label class="full">Not<textarea id="deviceNote" maxlength="500" rows="2" placeholder="Seri no, aksesuar veya açıklama"></textarea></label><label class="photo-field full"><span>Fotoğraf ekle</span><input id="devicePhoto" type="file" accept="image/*" capture="environment"><small id="photoStatus">İsteğe bağlı • yalnız bu cihazda saklanır</small></label><button class="primary full" type="submit">Teslim Kaydı Oluştur</button></form>
+      <div class="section-heading"><div><span>SON İŞLEMLER</span><h2>Cihaz kayıtları</h2></div></div><div id="deviceList" class="stack"></div>
+    </section>
+    <section id="view-more" class="view" data-title="Daha Fazla">
+      <div class="quick-grid"><button data-open-page="nobet"><span>▦</span><b>Nöbet Düzenle</b><small>Canlı RPYS planı</small></button><button data-open-page="saymanlik"><span>∑</span><b>Saymanlık</b><small>Mesai ve raporlar</small></button><button data-open-page="izin"><span>✓</span><b>İzinler</b><small>İzin kayıtları</small></button><button data-open-page="analiz"><span>◫</span><b>Analiz</b><small>Kontrol merkezi</small></button><button data-open-page="rapor"><span>▤</span><b>Raporlar</b><small>Çıktı ve özetler</small></button><button id="openFullRpys"><span>☰</span><b>Tam RPYS</b><small>Tüm modüller</small></button></div>
+      <article class="assistant-card"><div class="assistant-head"><div class="assistant-mark">Y</div><div><span>YEA MOBİL ASİSTAN</span><h2>RPYS verisine sor</h2></div></div><div id="assistantAnswer" class="assistant-answer">“Bugün kim nerede?”, “Mükellefi eksik kim?” veya “En çok BT yapan kim?” diye sorabilirsin.</div><form id="assistantForm" class="assistant-form"><input id="assistantInput" maxlength="160" placeholder="Sorunu yaz…" autocomplete="off"><button type="submit">Sor</button></form><div class="suggestions"><button data-question="Bugün kim nerede?">Bugün kim nerede?</button><button data-question="Mükellefi eksik kim?">Mükellefi eksik kim?</button><button data-question="En çok BT yapan kim?">En çok BT yapan kim?</button></div></article>
+      <article class="status-card"><div><b>Çevrimdışı koruma</b><span id="offlineDetail">Son görünüm bu telefonda saklanıyor.</span></div><button id="exportMobile" type="button">Mobil kayıtları indir</button></article>
+    </section>
+  </main>
+  <button id="closeWorkspace" class="close-workspace" type="button" hidden>‹ RPYS Cep'e dön</button>
+  <nav id="bottomNav" class="bottom-nav" aria-label="RPYS Cep menüsü" hidden><button class="nav-btn active" type="button" data-tab="today"><span>⌂</span><small>Bugün</small></button><button class="nav-btn" type="button" data-tab="alerts"><span>!</span><small>Uyarılar</small></button><button class="nav-btn" type="button" data-tab="requests"><span>✓</span><small>Talepler</small></button><button class="nav-btn" type="button" data-tab="device"><span>▣</span><small>Cihaz</small></button><button class="nav-btn" type="button" data-tab="more"><span>•••</span><small>Daha</small></button></nav>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./mobile.js" defer></script>
 </body>
 </html>
