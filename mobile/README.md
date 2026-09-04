@@ -1,13 +1,13 @@
-# RPYS Cep v1
+# RPYS Cep v2
 
-RPYS Cep, ana RPYS uygulamasını değiştirmeden telefon ve tabletler için ayrı bir erişim katmanı sağlar.
+Ana RPYS uygulamasına dokunmadan çalışan mobil çalışma merkezi.
 
-- Canlı çekirdek: RPYS 3.1.48
-- Dağıtım motoru: 6.1.1
-- Ana RPYS ve Supabase kayıtlarına ek yama yazmaz.
-- GitHub Pages yolu: `/mobile/`
-- iOS ve Android ana ekrana ekleme desteği bulunur.
-- Alt menü yalnız mevcut RPYS sayfa düğmelerini tetikler.
-- Giriş tamamlanmadan otomatik sekme açılmaz; alt menüde yalnız kullanıcının yetkili olduğu modüller görünür.
+- Canlı “Bugün kim nerede?” görünümü
+- Akıllı uyarı ve adalet özeti
+- Yetkiye bağlı nöbet, saymanlık, izin, analiz ve rapor geçişleri
+- Bulutla eşitlenen talep/onay ve cihaz teslim kayıtları
+- Telefonda yerel tutulan isteğe bağlı cihaz fotoğrafı
+- Son güvenli görünüm ve çevrimdışı kayıt kuyruğu
+- RPYS verisini yanıtlayan yerel YEA hızlı asistanı
 
-Mobil katman yüklenemezse ana RPYS sürümü çalışmaya devam eder.
+Mobil kayıtlar ana veriye yalnız `rpysMobileV2` alanında eklenir. Nöbet, izin ve saymanlık veri yapıları mobil katman tarafından doğrudan değiştirilmez; düzenleme için mevcut RPYS modülü açılır.
