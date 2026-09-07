@@ -24,6 +24,7 @@
   let alertFilter = 'all';
   let toastTimer;
   let lastSnapshotAt = 0;
+  let queueSync = null;
 
   function loadJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || '') || fallback; } catch (_) { return fallback; } }
   function saveJson(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {} }
@@ -58,6 +59,7 @@
       const clean=(v,n=500)=>String(v??'').replace(/[<>]/g,'').trim().slice(0,n);
       const clone=v=>JSON.parse(JSON.stringify(v));
       const auth=()=>{if(!currentUser)throw new Error('Oturum gerekli.');return currentUser};
+      const writer=()=>{const u=auth();if(u.role==='viewer')throw new Error('Bu hesap yalnız görüntüleme yapabilir.');return u};
       const store=()=>{if(!db.rpysMobileV2||typeof db.rpysMobileV2!=='object')db.rpysMobileV2={version:2,requests:[],devices:[]};if(!Array.isArray(db.rpysMobileV2.requests))db.rpysMobileV2.requests=[];if(!Array.isArray(db.rpysMobileV2.devices))db.rpysMobileV2.devices=[];return db.rpysMobileV2};
       const id=()=>crypto.randomUUID?crypto.randomUUID():'m-'+Date.now()+'-'+Math.random().toString(36).slice(2);
       const commit=label=>{try{if(typeof logAction==='function')logAction(label)}catch(_){}save()};
@@ -71,8 +73,27 @@
           if(can('adalet'))try{fair=(typeof fairnessStats==='function'?fairnessStats():[]).map(x=>({person:x.p?.name||'',personId:x.p?.id,total:Number(x.total||0),required:Number(x.muk||0),missing:Number(x.missing||0),over:Number(x.over||0),score:Number(x.score??100)}))}catch(_){}
           let leaves=(db.leaves||[]).filter(l=>l.start<=td&&l.end>=td).map(l=>({personId:l.personId,person:(typeof getPersonById==='function'?getPersonById(l.personId)?.name:'')||'',type:l.type||'İzin',start:l.start,end:l.end}));
           const s=store();return clone({generatedAt:new Date().toISOString(),today:td,selectedMonth:typeof ym==='function'?ym():td.slice(0,7),user:{username:u.username||'',role:u.role||'',isManager:manager()},permissions:{dashboard:can('dashboard'),nobet:can('nobet'),saymanlik:can('saymanlik'),izin:can('izin'),analiz:can('analiz'),adalet:can('adalet'),raporlar:can('raporlar'),ayarlar:can('ayarlar')},assignments,leaves,issues,fairness:fair,requests:s.requests.slice(-200).reverse(),devices:s.devices.slice(-200).reverse()})},
-        createRequest(input){const u=auth(),s=store(),r={id:clean(input.id,80)||id(),type:clean(input.type,80),date:clean(input.date,10),detail:clean(input.detail),status:'pending',createdBy:clean(u.username,80),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(!r.type||!r.date||!r.detail)throw new Error('Talep bilgileri eksik.');const old=s.requests.find(x=>String(x.id)===r.id);if(old)return clone(old);s.requests.push(r);if(s.requests.length>500)s.requests.splice(0,s.requests.length-500);commit('Mobil talep oluşturuldu: '+r.type);return clone(r)},
-        createDevice(input){const u=auth(),s=store(),r={id:clean(input.id,80)||id(),name:clean(input.name,120),recipient:clean(input.recipient,120),date:clean(input.date,30),condition:clean(input.condition,60),note:clean(input.note),hasLocalPhoto:!!input.hasLocalPhoto,status:'open',createdBy:clean(u.username,80),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(!r.name||!r.recipient||!r.date)throw new Error('Teslim bilgileri eksik.');const old=s.devices.find(x=>String(x.id)===r.id);if(old)return clone(old);s.devices.push(r);if(s.devices.length>500)s.devices.splice(0,s.devices.length-500);commit('Mobil cihaz teslim kaydı: '+r.name);return clone(r)},
+        createRequest(input){const u=writer(),s=store(),r={id:clean(input.id,80)||id(),type:clean(input.type,80),date:clean(input.date,10),detail:clean(input.detail),status:'pending',createdBy:clean(u.username,80),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(!r.type||!r.date||!r.detail)throw new Error('Talep bilgileri eksik.');const old=s.requests.find(x=>String(x.id)===r.id);if(old)return clone(old);s.requests.push(r);if(s.requests.length>500)s.requests.splice(0,s.requests.length-500);commit('Mobil talep oluşturuldu: '+r.type);return clone(r)},
+        createDevice(input){const u=writer(),s=store(),r={id:clean(input.id,80)||id(),name:clean(input.name,120),recipient:clean(input.recipient,120),date:clean(input.date,30),condition:clean(input.condition,60),note:clean(input.note),hasLocalPhoto:!!input.hasLocalPhoto,status:'open',createdBy:clean(u.username,80),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(!r.name||!r.recipient||!r.date)throw new Error('Teslim bilgileri eksik.');const old=s.devices.find(x=>String(x.id)===r.id);if(old)return clone(old);s.devices.push(r);if(s.devices.length>500)s.devices.splice(0,s.devices.length-500);commit('Mobil cihaz teslim kaydı: '+r.name);return clone(r)},
+        async confirmRecords(items){
+          const u=writer();
+          if(!items.length||items.some(x=>x.owner!==u.username))return [];
+          if(typeof saveNowV245!=='function'||typeof v24FetchJson!=='function'||!_storageReady||!_v24ServerOnline)return [];
+          saveNowV245({label:'Mobil bekleyen kayıtları eşitle'});
+          await _storageWriteChain;
+          await _v24SaveChain;
+          if(!currentUser||currentUser.username!==u.username)return [];
+          const remote=await v24FetchJson('/api/state');
+          if(!remote.hasState)return [];
+          const data=remote.data?.rpysMobileV2||{};
+          return items.filter(item=>{
+            const records=item.kind==='request'?data.requests:item.kind==='device'?data.devices:null;
+            const r=Array.isArray(records)&&records.find(x=>String(x.id)===String(item.payload.id));
+            if(!r||r.createdBy!==u.username)return false;
+            const fields=item.kind==='request'?{type:80,date:10,detail:500}:{name:120,recipient:120,date:30,condition:60,note:500};
+            return Object.entries(fields).every(([k,n])=>String(r[k]||'')===clean(item.payload[k],n));
+          }).map(x=>x.payload.id);
+        },
         setStatus(kind,recordId,status){auth();if(!manager())throw new Error('Bu işlem için yönetici yetkisi gerekli.');const s=store(),arr=kind==='request'?s.requests:s.devices,r=arr.find(x=>String(x.id)===String(recordId));if(!r)throw new Error('Kayıt bulunamadı.');const allowed=kind==='request'?['approved','rejected','pending']:['open','completed'];if(!allowed.includes(status))throw new Error('Geçersiz durum.');r.status=status;r.updatedAt=new Date().toISOString();r.reviewedBy=currentUser.username||'';commit('Mobil kayıt durumu güncellendi: '+status);return clone(r)}
       };window.dispatchEvent(new CustomEvent('rpys-mobile-bridge-ready'));})();`;
     doc.body.appendChild(script);
@@ -80,7 +101,7 @@
   }
 
   function bridge() { try { return frame.contentWindow.__RPYS_MOBILE_V2__ || null; } catch (_) { return null; } }
-  function safeSnapshot() { const b=bridge(); if(!b) return null; try { const data=b.snapshot(); saveJson(CACHE_KEY,data); return data; } catch (_) { return null; } }
+  function safeSnapshot() { const b=bridge(); if(!b) return null; try { const data=withPendingRecords(b.snapshot()); saveJson(CACHE_KEY,data); return data; } catch (_) { return null; } }
 
   function finishLoading(doc) { injectMobileSafety(doc); ready=true; checks=0; clearInterval(readinessTimer); loading.style.display='none'; startSessionSync(); }
   function showFailure(message) { clearInterval(readinessTimer); loadingText.textContent='RPYS Cep açılamadı.'; loader.style.display='none'; errorBox.style.display='block'; retry.style.display='block'; errorBox.textContent=message; }
@@ -102,8 +123,53 @@
 
   function setOnlineState() { document.body.classList.toggle('is-offline',!navigator.onLine); updateSyncBadge(); if(navigator.onLine){flushQueue();if(!ready){loading.style.display='grid';frame.src=`../?rpys_mobile_shell=1&t=${Date.now()}`;startReadinessCheck();}}else openOfflineCache(); }
   function updateSyncBadge() { const queued=loadJson(QUEUE_KEY,[]).length,badge=$('#syncBadge'); badge.className='sync-badge '+(!navigator.onLine?'offline':queued?'pending':''); badge.querySelector('span').textContent=!navigator.onLine?'Çevrimdışı':queued?`${queued} bekliyor`:'Bağlı'; }
-  function queueAction(action) { const q=loadJson(QUEUE_KEY,[]); q.push({...action,queuedAt:new Date().toISOString()}); saveJson(QUEUE_KEY,q); updateSyncBadge(); }
-  function flushQueue() { const b=bridge(),q=loadJson(QUEUE_KEY,[]); if(!navigator.onLine||!b||!q.length)return; const left=[]; q.forEach(item=>{try{if(item.kind==='request')b.createRequest(item.payload);else if(item.kind==='device')b.createDevice(item.payload)}catch(_){left.push(item)}}); saveJson(QUEUE_KEY,left); updateSyncBadge(); if(left.length!==q.length){snapshot=safeSnapshot()||snapshot;renderAll();} }
+  function readQueue() { const q=loadJson(QUEUE_KEY,[]);return Array.isArray(q)?q:[]; }
+  function writeQueue(q) { localStorage.setItem(QUEUE_KEY,JSON.stringify(q)); }
+  function queueAction(action) {
+    const q=readQueue();
+    if(!q.some(x=>x.kind===action.kind&&x.payload?.id===action.payload.id))q.push({...action,queuedAt:new Date().toISOString()});
+    try { writeQueue(q); } catch (_) { throw new Error('Cihaza kaydedilemedi. Formdaki bilgileri koruyup cihazda yer açın.'); }
+    updateSyncBadge();
+  }
+  function withPendingRecords(data) {
+    if(!data)return data;
+    readQueue().filter(x=>x.owner&&x.owner===data.user?.username).forEach(item=>{
+      const key=item.kind==='request'?'requests':item.kind==='device'?'devices':null;
+      if(!key||!item.payload)return;
+      if(!Array.isArray(data[key]))data[key]=[];
+      const old=data[key].find(x=>x.id===item.payload.id);
+      if(old){old.queued=true;return;}
+      data[key].unshift({...item.payload,status:item.kind==='request'?'pending':'open',createdBy:item.owner,createdAt:item.queuedAt,queued:true});
+    });
+    return data;
+  }
+  function flushQueue() {
+    if(queueSync)return queueSync;
+    const b=bridge();
+    if(!navigator.onLine||!authenticated||!b||typeof b.confirmRecords!=='function')return Promise.resolve();
+    let owner;
+    try{owner=b.snapshot().user?.username;}catch(_){return Promise.resolve();}
+    const batch=readQueue().filter(x=>x.owner===owner&&owner&&['request','device'].includes(x.kind)&&x.payload?.id).slice(0,50);
+    if(!batch.length)return Promise.resolve();
+    queueSync=(async()=>{
+      const attempted=[];
+      for(const item of batch){
+        try{
+          if(b.snapshot().user?.username!==owner)break;
+          if(item.kind==='request')b.createRequest(item.payload);else b.createDevice(item.payload);
+          attempted.push(item);
+        }catch(_){/* Preserve rejected or invalid entries for review/export. */}
+      }
+      const confirmed=new Set(await b.confirmRecords(attempted));
+      if(confirmed.size){
+        // Re-read: a new form submission may have arrived while awaiting the server.
+        writeQueue(readQueue().filter(x=>!(x.owner===owner&&attempted.some(a=>a.kind===x.kind&&a.payload.id===x.payload?.id)&&confirmed.has(x.payload?.id))));
+      }
+    })().catch(()=>{/* No server confirmation: keep the durable queue. */}).finally(()=>{
+      queueSync=null;updateSyncBadge();snapshot=safeSnapshot()||snapshot;renderAll();
+    });
+    return queueSync;
+  }
 
   function renderAll() { if(!snapshot)return; renderPermissionLinks(); renderToday(); renderAlerts(); renderRequests(); renderDevices(); updateSyncBadge(); $('#offlineDetail').textContent=`Son güvenli görünüm: ${new Date(snapshot.generatedAt||Date.now()).toLocaleString('tr-TR')}`; }
   function renderPermissionLinks() { $$('[data-open-page]').forEach(el=>{const page=el.dataset.openPage,perms=snapshot?.permissions||{};el.hidden=Object.prototype.hasOwnProperty.call(perms,page)&&perms[page]===false;}); }
@@ -127,14 +193,24 @@
 
   function statusLabel(status) { return ({pending:'Bekliyor',approved:'Onaylandı',rejected:'Reddedildi',open:'Açık',completed:'Tamamlandı'})[status]||status; }
   function managerActions(kind,r) { if(!snapshot?.user?.isManager)return ''; if(kind==='request'&&r.status==='pending')return `<div class="record-actions"><button data-status="approved" data-kind="request" data-id="${esc(r.id)}">Onayla</button><button data-status="rejected" data-kind="request" data-id="${esc(r.id)}">Reddet</button></div>`; if(kind==='device'&&r.status==='open')return `<div class="record-actions"><button data-status="completed" data-kind="device" data-id="${esc(r.id)}">Teslimi Kapat</button></div>`; return ''; }
-  function renderRequests() { const records=snapshot?.requests||[]; $('#requestList').innerHTML=records.length?records.map(r=>`<article class="record-card"><div class="card-body"><b>${esc(r.type)} • ${esc(trDate(r.date))}</b><p>${esc(r.detail)}<br>${esc(r.createdBy)} • ${esc(new Date(r.createdAt).toLocaleString('tr-TR'))}</p>${managerActions('request',r)}</div><span class="record-status ${esc(r.status)}">${statusLabel(r.status)}</span></article>`).join(''):'<div class="empty">Henüz talep yok.</div>'; }
-  function renderDevices() { const records=snapshot?.devices||[]; $('#deviceList').innerHTML=records.length?records.map(r=>`<article class="record-card"><div class="card-body"><b>${esc(r.name)} → ${esc(r.recipient)}</b><p>${esc(r.condition)} • ${esc(new Date(r.date).toLocaleString('tr-TR'))}${r.note?`<br>${esc(r.note)}`:''}${r.hasLocalPhoto?' • Fotoğraf eklendi':''}</p><div class="record-actions">${r.hasLocalPhoto?`<button data-photo="${esc(r.id)}">Fotoğrafı Aç</button>`:''}</div>${managerActions('device',r)}</div><span class="record-status ${esc(r.status)}">${statusLabel(r.status)}</span></article>`).join(''):'<div class="empty">Henüz cihaz teslim kaydı yok.</div>'; }
+  function renderRequests() { const records=snapshot?.requests||[]; $('#requestList').innerHTML=records.length?records.map(r=>`<article class="record-card"><div class="card-body"><b>${esc(r.type)} • ${esc(trDate(r.date))}</b><p>${esc(r.detail)}<br>${esc(r.createdBy)} • ${esc(new Date(r.createdAt).toLocaleString('tr-TR'))}</p>${managerActions('request',r)}</div><span class="record-status ${esc(r.status)}">${r.queued?'Bulut onayı bekliyor':statusLabel(r.status)}</span></article>`).join(''):'<div class="empty">Henüz talep yok.</div>'; }
+  function renderDevices() { const records=snapshot?.devices||[]; $('#deviceList').innerHTML=records.length?records.map(r=>`<article class="record-card"><div class="card-body"><b>${esc(r.name)} → ${esc(r.recipient)}</b><p>${esc(r.condition)} • ${esc(new Date(r.date).toLocaleString('tr-TR'))}${r.note?`<br>${esc(r.note)}`:''}${r.hasLocalPhoto?' • Fotoğraf eklendi':''}</p><div class="record-actions">${r.hasLocalPhoto?`<button data-photo="${esc(r.id)}">Fotoğrafı Aç</button>`:''}</div>${managerActions('device',r)}</div><span class="record-status ${esc(r.status)}">${r.queued?'Bulut onayı bekliyor':statusLabel(r.status)}</span></article>`).join(''):'<div class="empty">Henüz cihaz teslim kaydı yok.</div>'; }
 
   function showTab(tab) { $$('.view').forEach(v=>v.classList.toggle('active',v.id===`view-${tab}`)); $$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); const view=$(`#view-${tab}`); $('#viewTitle').textContent=view?.dataset.title||'RPYS Cep'; try{localStorage.setItem('rpys_cep_tab_v2',tab)}catch(_){} window.scrollTo({top:0,behavior:'smooth'}); }
   function openPage(page) { const doc=getInnerDocument(); if(!authenticated||!doc||!canOpenPage(doc,page)){toast('Bu modül için yetkiniz yok.');return;} const target=findPageButton(doc,page); if(!target){toast('Modül bulunamadı.');return;} target.click(); document.body.classList.add('workspace'); closeWorkspace.hidden=false; frame.style.visibility='visible'; frame.style.pointerEvents='auto'; frame.focus(); }
   function closeFullWorkspace() { document.body.classList.remove('workspace'); closeWorkspace.hidden=true; frame.style.visibility=''; frame.style.pointerEvents=''; snapshot=safeSnapshot()||snapshot; renderAll(); }
 
-  function createRecord(kind,payload) { payload={id:payload.id||makeId(),...payload};const b=bridge(); if(navigator.onLine&&b){const rec=kind==='request'?b.createRequest(payload):b.createDevice(payload); snapshot=safeSnapshot()||snapshot;renderAll();return rec;} queueAction({kind,payload}); const local={...payload,status:kind==='request'?'pending':'open',createdBy:snapshot?.user?.username||'Bu cihaz',createdAt:new Date().toISOString(),queued:true}; const key=kind==='request'?'requests':'devices'; snapshot[key]=[local,...(snapshot[key]||[])];saveJson(CACHE_KEY,snapshot);renderAll();return local; }
+  function createRecord(kind,payload) {
+    const owner=snapshot?.user?.username;
+    if(!authenticated||!owner)throw new Error('Kayıt için oturum açın.');
+    if(snapshot?.user?.role==='viewer')throw new Error('Bu hesap yalnız görüntüleme yapabilir.');
+    if(kind==='request'&&(!payload.type?.trim()||!payload.date||!payload.detail?.trim()))throw new Error('Talep bilgileri eksik.');
+    if(kind==='device'&&(!payload.name?.trim()||!payload.recipient?.trim()||!payload.date))throw new Error('Teslim bilgileri eksik.');
+    payload={...payload,id:payload.id||makeId()};
+    queueAction({kind,payload,owner});
+    snapshot=withPendingRecords(snapshot);saveJson(CACHE_KEY,snapshot);renderAll();flushQueue();
+    return {...payload,queued:true};
+  }
   function updateStatus(button) { const b=bridge(); if(!b)return toast('Bağlantı kurulunca tekrar deneyin.'); try{b.setStatus(button.dataset.kind,button.dataset.id,button.dataset.status);snapshot=safeSnapshot()||snapshot;renderAll();toast('Durum güncellendi.');}catch(err){toast(err.message||'İşlem tamamlanamadı.');} }
 
   function assistantAnswer(question) {
@@ -147,8 +223,8 @@
     return 'Bu mobil sürümde RPYS verisiyle ilgili “bugün kim nerede”, “izinli kim”, “mükellefi eksik kim”, “uyarılar” ve “en çok BT yapan kim” sorularını yanıtlayabilirim.';
   }
 
-  $('#requestForm').addEventListener('submit',e=>{e.preventDefault();try{createRecord('request',{type:$('#requestType').value,date:$('#requestDate').value,detail:$('#requestDetail').value});e.target.reset();$('#requestDate').value=localDate();toast('Talep kaydedildi.');}catch(err){toast(err.message||'Talep kaydedilemedi.');}});
-  $('#deviceForm').addEventListener('submit',async e=>{e.preventDefault();try{const file=$('#devicePhoto').files[0],rec=createRecord('device',{id:makeId(),name:$('#deviceName').value,recipient:$('#deviceRecipient').value,date:$('#deviceDate').value,condition:$('#deviceCondition').value,note:$('#deviceNote').value,hasLocalPhoto:Boolean(file)});if(file)await savePhoto(rec.id,file);e.target.reset();$('#deviceDate').value=localDateTime();$('#photoStatus').textContent='İsteğe bağlı • yalnız bu cihazda saklanır';toast('Cihaz teslimi kaydedildi.');}catch(err){toast(err.message||'Kayıt oluşturulamadı.');}});
+  $('#requestForm').addEventListener('submit',e=>{e.preventDefault();try{createRecord('request',{type:$('#requestType').value,date:$('#requestDate').value,detail:$('#requestDetail').value});e.target.reset();$('#requestDate').value=localDate();toast('Talep cihazda saklandı; bulut onayı bekleniyor.');}catch(err){toast(err.message||'Talep kaydedilemedi.');}});
+  $('#deviceForm').addEventListener('submit',async e=>{e.preventDefault();try{const file=$('#devicePhoto').files[0],rec=createRecord('device',{id:makeId(),name:$('#deviceName').value,recipient:$('#deviceRecipient').value,date:$('#deviceDate').value,condition:$('#deviceCondition').value,note:$('#deviceNote').value,hasLocalPhoto:Boolean(file)});if(file)await savePhoto(rec.id,file);e.target.reset();$('#deviceDate').value=localDateTime();$('#photoStatus').textContent='İsteğe bağlı • yalnız bu cihazda saklanır';toast('Teslim cihazda saklandı; bulut onayı bekleniyor.');}catch(err){toast(err.message||'Kayıt oluşturulamadı.');}});
   $('#devicePhoto').addEventListener('change',e=>{$('#photoStatus').textContent=e.target.files[0]?`${e.target.files[0].name} seçildi • cihazda kalır`:'İsteğe bağlı • yalnız bu cihazda saklanır';});
   $('#assistantForm').addEventListener('submit',e=>{e.preventDefault();const q=$('#assistantInput').value.trim();if(!q)return;$('#assistantAnswer').textContent=assistantAnswer(q);$('#assistantInput').value='';});
   $$('.suggestions [data-question]').forEach(b=>b.addEventListener('click',()=>{$('#assistantAnswer').textContent=assistantAnswer(b.dataset.question);}));
@@ -159,7 +235,7 @@
   $('#openFullRpys').addEventListener('click',()=>{const doc=getInnerDocument();const page=['dashboard','nobet','saymanlik','izin'].find(p=>canOpenPage(doc,p));if(page)openPage(page);else toast('Açılabilir modül bulunamadı.');});
   closeWorkspace.addEventListener('click',closeFullWorkspace);
   $('#refresh').addEventListener('click',()=>{snapshot=safeSnapshot()||snapshot;renderAll();toast('Güncellendi.');});
-  $('#exportMobile').addEventListener('click',()=>{const data={exportedAt:new Date().toISOString(),requests:snapshot?.requests||[],devices:snapshot?.devices||[]},blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`RPYS_CEP_KAYITLARI_${localDate()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
+  $('#exportMobile').addEventListener('click',()=>{const data={exportedAt:new Date().toISOString(),pending:readQueue(),requests:snapshot?.requests||[],devices:snapshot?.devices||[]},blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`RPYS_CEP_KAYITLARI_${localDate()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
   retry.addEventListener('click',()=>{loadingText.textContent='Güncel ve güvenli RPYS açılıyor…';loader.style.display='block';errorBox.style.display='none';retry.style.display='none';frame.src=`../?rpys_mobile_shell=1&t=${Date.now()}`;startReadinessCheck();});
   window.addEventListener('online',setOnlineState);window.addEventListener('offline',setOnlineState);frame.addEventListener('load',startReadinessCheck);
   $('#requestDate').value=localDate();$('#deviceDate').value=localDateTime();setOnlineState();if(snapshot)renderAll();startReadinessCheck();
