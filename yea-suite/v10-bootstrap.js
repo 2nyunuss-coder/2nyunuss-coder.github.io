@@ -1,8 +1,9 @@
 'use strict';
 (async()=>{
   try{
-    const r=await fetch('./v09.html',{cache:'no-store'}); if(!r.ok) throw new Error('V0.9 tabanı alınamadı.');
-    const text=await r.text(); const old=new DOMParser().parseFromString(text,'text/html');
+    const controller=new AbortController(),fetchTimeout=setTimeout(()=>controller.abort(),30000);
+    let text;
+    try{const r=await fetch('./v09.html',{cache:'no-store',signal:controller.signal});if(!r.ok)throw new Error('V0.9 tabanı alınamadı.');text=await r.text();}finally{clearTimeout(fetchTimeout)} const old=new DOMParser().parseFromString(text,'text/html');
     old.querySelectorAll('script').forEach(s=>s.remove());
     old.querySelectorAll('link[rel="stylesheet"]').forEach(l=>{if(!document.querySelector(`link[href="${l.getAttribute('href')}"]`)){document.head.appendChild(l.cloneNode(true));}});
     document.body.innerHTML=old.body.innerHTML;
@@ -29,6 +30,6 @@
     const homeGrid=document.querySelector('[data-page="home"] .grid');
     homeGrid?.insertAdjacentHTML('afterbegin','<article class="card"><span class="icon">☀️</span><h3>Bugün</h3><p>Geciken, bugün ve yaklaşan işleri tek ekranda gör.</p><button data-go="today">Bugünü Aç</button></article><article class="card"><span class="icon">📅</span><h3>Takvim</h3><p>Görev, proje, araç ve rutinleri aylık izle.</p><button data-go="calendar">Takvimi Aç</button></article>');
     const s=document.createElement('script'); s.src='./v09.js'; document.head.appendChild(s);
-    const wait=()=>{ if(typeof refreshData==='function' && typeof assistantAnswerFor==='function' && typeof decisionCriticalTaskRows==='function'){const x=document.createElement('script');x.src='./v10-core.js';document.head.appendChild(x);} else setTimeout(wait,40);}; wait();
-  }catch(e){document.body.innerHTML='<main class="wrap"><div class="msg">YEA V1.0 açılamadı: '+String(e.message||e)+'</div></main>'}
+    window.YeaBoot.waitUntil(()=>typeof refreshData==='function' && typeof assistantAnswerFor==='function' && typeof decisionCriticalTaskRows==='function',()=>{const x=document.createElement('script');x.src='./v10-core.js';document.head.appendChild(x);});
+  }catch(e){window.YeaBoot.fail()}
 })();

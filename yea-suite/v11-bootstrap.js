@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
   const base=document.createElement('script');base.src='./v10-bootstrap.js';document.head.appendChild(base);
-  const wait=()=>{if(typeof renderV10==='function'&&document.querySelector('#appView')&&document.querySelector('#calendarGrid'))setup();else setTimeout(wait,40)};
+  const wait=()=>window.YeaBoot.waitUntil(()=>typeof renderV10==='function'&&document.querySelector('#appView')&&document.querySelector('#calendarGrid'),setup);
   function setup(){
     if(window.__YEA_V11_BOOTED)return;window.__YEA_V11_BOOTED=true;
     document.title='YEA Suite V1.1';

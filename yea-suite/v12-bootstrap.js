@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
   const base=document.createElement('script');base.src='./v11-bootstrap.js';document.head.appendChild(base);
-  const wait=()=>{if(typeof renderV10==='function'&&typeof buildDailyPlanV11==='function'&&document.querySelector('#appView')&&document.querySelector('#v11PlanResult'))setup();else setTimeout(wait,45)};
+  const wait=()=>window.YeaBoot.waitUntil(()=>typeof renderV10==='function'&&typeof buildDailyPlanV11==='function'&&document.querySelector('#appView')&&document.querySelector('#v11PlanResult'),setup);
   function setup(){
     if(window.__YEA_V12_BOOTED)return;window.__YEA_V12_BOOTED=true;
     document.title='YEA Suite V1.2';

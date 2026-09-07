@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
   const base=document.createElement('script');base.src='./v12-bootstrap.js';document.head.appendChild(base);
-  const wait=()=>{if(window.__YEA_V12_BOOTED&&typeof goto==='function'&&document.querySelector('#appView')&&document.querySelector('#tabs'))setup();else setTimeout(wait,50)};
+  const wait=()=>window.YeaBoot.waitUntil(()=>window.__YEA_V12_BOOTED&&typeof goto==='function'&&document.querySelector('#appView')&&document.querySelector('#tabs'),setup);
   function setup(){
     if(window.__YEA_V13_BOOTED)return;window.__YEA_V13_BOOTED=true;
     document.title='YEA Suite V1.3 Desktop';
