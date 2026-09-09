@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'yea-suite-';
-const CACHE = CACHE_PREFIX + 'v16-r1';
-const CORE = ['./', './index.html', './boot-guard.js', './v10.html', './v16.html','./v16-bootstrap.js','./v16-core.js','./v16.css','./v15.html','./v15-bootstrap.js','./v15-core.js','./v15.css','./v14.html','./v14-bootstrap.js','./v14-core.js','./v14.css','./v13.html','./v13-bootstrap.js','./v13-core.js','./v13-fix.js','./v13.css','./v12.html','./v12-bootstrap.js','./v12-core.js','./v12.css','./v11.html','./v11-bootstrap.js','./v11-core.js','./v11.css','./v10-bootstrap.js','./v10-core.js','./v10.css','./v09.html','./v09.js','./v09-decision.js','./v08-assistant.js','./v07.js','./v06.css','./v07.css','./v08.css','./v09.css','./manifest.webmanifest','./icon.svg'];
+const CACHE = CACHE_PREFIX + 'v17-r1';
+const CORE = ['./', './index.html', './boot-guard.js', './v10.html', './v17.html','./v17-bootstrap.js','./v17-core.js','./v17.css','./history-parser.js','./v16.html','./v16-bootstrap.js','./v16-core.js','./v16.css','./v15.html','./v15-bootstrap.js','./v15-core.js','./v15.css','./v14.html','./v14-bootstrap.js','./v14-core.js','./v14.css','./v13.html','./v13-bootstrap.js','./v13-core.js','./v13-fix.js','./v13.css','./v12.html','./v12-bootstrap.js','./v12-core.js','./v12.css','./v11.html','./v11-bootstrap.js','./v11-core.js','./v11.css','./v10-bootstrap.js','./v10-core.js','./v10.css','./v09.html','./v09.js','./v09-decision.js','./v08-assistant.js','./v07.js','./v06.css','./v07.css','./v08.css','./v09.css','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));
@@ -28,7 +28,7 @@ self.addEventListener('fetch', event => {
       const hit = await cache?.match(request);
       if (hit) return hit;
       if (request.mode === 'navigate' && (url.pathname === scope.pathname || url.pathname === scope.pathname + 'index.html')) {
-        const page = await cache?.match('./v16.html');
+        const page = await cache?.match('./v17.html');
         if (page) return page;
       }
       return new Response('Bağlantı yok. İnternete bağlanıp tekrar deneyin.', {
