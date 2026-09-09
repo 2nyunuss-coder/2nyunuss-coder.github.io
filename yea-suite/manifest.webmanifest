@@ -1,11 +1,11 @@
 {
   "name": "YEA Suite Desktop",
   "short_name": "YEA",
-  "start_url": "./v16.html",
+  "start_url": "./v17.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#07101f",
   "theme_color": "#0b4ea2",
-  "description": "YEA Suite Windows benzeri kişisel yönetim masaüstü",
+  "description": "YEA Suite kişisel yönetim ve geçmiş radyoloji istatistik masaüstü",
   "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
