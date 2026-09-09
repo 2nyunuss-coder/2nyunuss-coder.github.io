@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#091020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="YEA Oyun Odası: dokunmatik kontrollü altı özgün mini oyun.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'">
+  <title>YEA · Oyun Odası</title>
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./arcade.css">
+  <script src="./engine.js" defer></script>
+  <script src="./arcade.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="../v18.html#pocket" aria-label="YEA Suite'ye dön">YEA<span>OYUN ODASI</span></a><button id="sound" class="icon-button" aria-label="Oyun sesini aç" aria-pressed="false">Ses kapalı</button></header>
+  <main>
+    <section id="lobby">
+      <div class="lobby-head"><div><span class="eyebrow">KISA BİR MOLA</span><h1>Hangisini oynayalım?</h1></div><span class="count-badge">6 oyun</span></div>
+      <p class="intro">Bir oyun seç. Bölümleri tamamla, kendi rekorunu geç.</p>
+      <div id="game-list" class="game-list"></div>
+      <div class="local-note"><span>İlerleme bu cihazda saklanır.</span><button id="export-progress">İlerlemeyi yedekle</button><label class="text-button">Yedeği aç<input type="file" id="import-progress" accept="application/json,.json" hidden></label></div>
+      <p id="storage-message" class="notice" role="status"></p>
+      <p class="credits">Özgün mini oyunlar · Reklam ve uygulama içi satın alma yok</p>
+    </section>
+    <section id="play" hidden aria-labelledby="game-title">
+      <div class="play-head"><button id="back" class="icon-button" aria-label="Oyun listesine dön">← Oyunlar</button><div><h1 id="game-title"></h1><span id="level-label"></span></div><button id="pause" class="icon-button" aria-label="Oyunu duraklat">Ⅱ</button></div>
+      <div id="hud" class="hud"></div>
+      <div class="stage-wrap"><div id="stage"></div><div id="overlay" class="overlay" hidden><div class="result-card"><span id="result-symbol">Ⅱ</span><h2 id="result-title"></h2><p id="result-text"></p><div id="result-actions"></div></div></div></div>
+      <p id="instruction" class="instruction"></p>
+      <div id="controls" class="controls"></div>
+      <div class="play-foot"><button id="restart" class="secondary">↻ Yeniden başla</button><button id="help" class="secondary">Nasıl oynanır?</button><button id="undo" class="secondary" hidden>↶ Geri al</button></div>
+      <p id="game-message" class="notice" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+</body>
+</html>
