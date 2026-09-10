@@ -99,6 +99,18 @@
    app=replaceOnce(app,
      'async function poll(){if(reloading||document.hidden||!auth||!api)return;',
      'async function poll(){if(reloading||document.hidden||!auth||!api||_saveTimerV245||Date.now()-_saveQueuedAtV245<5000)return;');
+   // Saymanlık sütunundaki kişi geçici olarak pasif görünse bile aylık puantajı ve manuel düzenlemesi çalışsın.
+   // Aktif kadro + seçili ay SAY1/SAY2 kadrosu + o ay görevi bulunan kişiler birlikte hesaplanır.
+   app=replaceOnce(app,
+     'function totals(){\n  let ck="totals|"+ym();if(_calcCache[ck])return _calcCache[ck];\n  let as=assignmentsMonth(),out=currentPeople().map(p=>{',
+     'function saymanlikPeopleForTotals(){\n  let out=[],seen=new Set(),add=p=>{if(!p||seen.has(String(p.id)))return;seen.add(String(p.id));out.push(p)};\n  currentPeople().forEach(add);\n  let roster=ensureSayRoster(ym());[...(roster.say1||[]),...(roster.say2||[])].map(getPersonById).forEach(add);\n  assignmentsMonth().forEach(a=>add(a.person));\n  return out\n}\nfunction totals(){\n  let ck="totals|"+ym();if(_calcCache[ck])return _calcCache[ck];\n  let as=assignmentsMonth(),out=saymanlikPeopleForTotals().map(p=>{');
+   // Geçmiş ad/boşluk varyasyonlarında görevi kişi kimliği üzerinden eşleştir.
+   app=replaceOnce(app,
+     'let arr=assignmentsMonth().filter(a=>a.person.name===personName&&a.day===d);',
+     'let pid=personIdByName(personName),arr=assignmentsMonth().filter(a=>Number(a.person.id)===Number(pid)&&a.day===d);');
+   app=replaceOnce(app,
+     'let p=(db.staff||[]).find(x=>x.name===personName);if(!p)return [];',
+     'let p=getPersonById(personIdByName(personName));if(!p)return [];');
    app=replaceOnce(app,'setInterval(()=>{if(_storageReady)v24RefreshServerStatus()},5000);','setInterval(()=>{if(_storageReady&&!document.hidden)v24RefreshServerStatus()},60000);');
    app=replaceOnce(app,'function setUserPassword(id,pw){let u=db.users.find(x=>x.id===id);if(u&&pw){u.password=pw;save()}}',`async function setUserPassword(id,pw){
   if(!pw)return;
