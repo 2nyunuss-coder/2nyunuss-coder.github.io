@@ -1,0 +1,1 @@
+{"name":"yea-arcade-scene-tests","private":true,"version":"1.9.0","description":"Optional local test dependencies; not distributed in the application","devDependencies":{"three":"0.160.0","cannon":"0.6.2"}}

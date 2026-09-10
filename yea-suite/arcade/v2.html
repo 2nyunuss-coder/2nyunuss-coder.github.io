@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="tr"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a30"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="YEA Oyun">
+<meta name="description" content="YEA Oyun: altı özgün 3D oyun, 122 bölüm, dokunmatik kontrol ve çevrimdışı oyun.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net; object-src 'none'; base-uri 'none'">
+<title>YEA Oyun · 3D Koleksiyon</title>
+<link rel="icon" href="./app-icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="./icons/icon-180.png"><link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./app3d.css"><link rel="stylesheet" href="../install.css">
+<script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/build/three.min.js" integrity="sha384-qOkzR5Ke/XkQxuGVJ9hpFEpDlcoLtWwVYhnJf06cLIZa2vaIptSqaubivErzmD5O" crossorigin="anonymous" defer></script><script src="https://cdn.jsdelivr.net/gh/schteppe/cannon.js@v0.6.2/build/cannon.min.js" integrity="sha384-I+vlbhtggPtDgOcGQ3rwhQl9JEO7qonTByw9baD7Vlc+1bJdn2ucktJAsbo3nmGA" crossorigin="anonymous" defer></script><script src="./engine.js" defer></script><script src="./castle3d.js" defer></script><script src="./world3d.js" defer></script><script src="./app3d.js" defer></script><script src="../install.js" defer></script>
+</head><body data-app="arcade">
+<header class="topbar"><a class="brand" href="./v2.html"><span class="brand-mark">Y</span><span>YEA <b>OYUN</b></span></a><div class="top-actions"><button id="install-app" class="icon-button">Telefona kur</button><button id="sound" class="icon-button" aria-pressed="false" aria-label="Oyun sesini aç">Ses kapalı</button></div></header>
+<main>
+<section id="lobby">
+  <div class="lobby-heading"><div><span class="eyebrow">SENİN OYUN KOLEKSİYONUN</span><h1>Oynamaya hazır.</h1></div><span class="edition">3D</span></div>
+  <div id="game-list" class="game-list" aria-label="Oyun seçimi"></div>
+  <p id="loading" class="notice" role="status">Oyun sahneleri hazırlanıyor…</p>
+  <div class="collection-foot"><p>122 bölüm <span>·</span> Reklamsız <span>·</span> Satın alma yok</p><a href="../v19.html#pocket">YEA Suite’yi aç ↗</a></div>
+  <details class="backup"><summary>İlerlemem ve yedeklerim</summary><p>Tamamladığın bölümler ve rekorların bu cihazda saklanır. Başka cihaza geçmeden yedek al.</p><button id="export-progress">Yedeği indir</button><label class="file-button">Yedeği aç<input id="import-progress" type="file" accept=".json,application/json" hidden></label></details>
+  <p id="storage-message" class="notice" role="status"></p>
+</section>
+<section id="play" hidden aria-labelledby="game-title">
+  <div class="play-head"><button id="back" class="icon-button" aria-label="Oyun listesine dön">← Oyunlar</button><div><h1 id="game-title"></h1><span id="level-label"></span></div><button id="pause" class="icon-button" aria-label="Duraklat">Ⅱ</button></div>
+  <div id="hud" class="hud"></div>
+  <div class="stage-wrap"><div id="stage"></div><div class="scene-tools"><button id="camera" aria-label="Kamera açısını değiştir">Kamera ↻</button><button id="quality" aria-pressed="true">Gölge açık</button></div><div id="overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="result-card"><span id="result-symbol"></span><h2 id="result-title"></h2><p id="result-text"></p><div id="result-actions"></div></div></div></div>
+  <p id="instruction" class="instruction"></p><div id="controls" class="controls"></div>
+  <div class="play-foot"><button id="restart">↻ Baştan</button><button id="undo" hidden>↶ Geri al</button><button id="help">Nasıl oynanır?</button></div><p id="game-message" class="notice" role="status" aria-live="polite"></p>
+</section>
+</main><div id="toast" class="toast" role="status" hidden></div>
+<noscript>Oyunları açmak için tarayıcında JavaScript etkin olmalı.</noscript>
+</body></html>

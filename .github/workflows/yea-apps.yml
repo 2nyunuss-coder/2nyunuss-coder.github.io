@@ -1,0 +1,52 @@
+name: YEA Android applications
+on:
+  push:
+    branches: [main, 'yea-3d-apps-*']
+    paths: ['native/android/**', 'yea-suite/arcade/**', 'yea-suite/install.*', '.github/workflows/yea-apps.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build the two installable development APKs
+        working-directory: native/android
+        run: gradle --no-daemon :app:assembleSuiteDebug :app:assembleArcadeDebug
+      - name: Verify APK contents
+        run: |
+          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/v2.html
+          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/world3d.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YEA-Android-1.9.0
+          path: native/android/app/build/outputs/apk/*/debug/*.apk
+          retention-days: 30
+  release:
+    if: github.ref == 'refs/heads/main'
+    needs: android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: YEA-Android-1.9.0
+          path: apks
+      - name: Publish personal-use Android test packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mv apks/suite/debug/app-suite-debug.apk YEA-Suite-1.9.0.apk
+          mv apks/arcade/debug/app-arcade-debug.apk YEA-Oyun-1.9.0.apk
+          gh release create "yea-apps-1.9.0-${GITHUB_RUN_NUMBER}" YEA-Suite-1.9.0.apk YEA-Oyun-1.9.0.apk --target "$GITHUB_SHA" --prerelease --title 'YEA Android 1.9.0 — Deneme sürümü' --notes 'İki ayrı Android uygulaması. YEA Oyun altı 3D oyun içerir; 3D motorları dış kaynaktan yüklendiği için internet gerekir. YEA Suite mevcut çevrimiçi hesabına bağlanır. Android 8+ gerekir. Geliştirme imzalı deneme APKlarıdır; Play Store sürümü değildir. Tarayıcı ve uygulama oyun kayıtları ayrıdır; yedek dışa/içe aktarımı kullanın. Gelecek kurulumdan önce oyun yedeğinizi alın. RPYS dosyaları bu uygulamaların parçası değildir.'

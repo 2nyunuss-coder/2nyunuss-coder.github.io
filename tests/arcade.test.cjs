@@ -37,11 +37,14 @@ test('territory enforces source ownership and in-flight strength',()=>{
 test('all six games are registered with independent constructors and bounded levels',()=>{
   assert.equal(E.catalog.length,6);assert.equal(new Set(E.catalog.map(g=>g.id)).size,6);for(const g of E.catalog){const m=new g.Model(1);assert.equal(m.status,'playing');assert(g.levels>=10&&g.levels<=30);assert(Number.isFinite(m.score()));}
 });
-test('service worker cache references all exist, including mobile and all arcade assets',()=>{
+test('suite shell remains complete while the arcade has its own offline worker',()=>{
   const root=path.resolve(__dirname,'../yea-suite'),source=fs.readFileSync(path.join(root,'sw.js'),'utf8');
   const context=vm.createContext({self:{addEventListener(){}}});vm.runInContext(source,context);const entries=vm.runInContext('CORE',context);
   for(const entry of entries)assert(fs.existsSync(path.join(root,entry.split('?')[0])),`missing ${entry}`);
-  for(const entry of ['v18.html','v18-mobile.js','arcade/engine.js','arcade/arcade.js'])assert(entries.includes('./'+entry));
+  for(const entry of ['v18.html','v18-mobile.js','v19.html'])assert(entries.includes('./'+entry));
+  assert(!entries.some(entry=>entry.startsWith('./arcade/')));
+  const gameContext=vm.createContext({self:{addEventListener(){}}});vm.runInContext(fs.readFileSync(path.join(root,'arcade/sw.js'),'utf8'),gameContext);const gameEntries=vm.runInContext('CORE',gameContext);
+  for(const entry of ['v2.html','engine.js','world3d.js','app3d.js'])assert(gameEntries.includes('./'+entry));
 });
 test('new entry points reference existing local resources and contain no inline executable handlers',()=>{
   const root=path.resolve(__dirname,'../yea-suite');for(const name of ['v18.html','arcade/index.html']){const file=path.join(root,name),html=fs.readFileSync(file,'utf8');assert(!/\son\w+=/i.test(html));for(const m of html.matchAll(/(?:src|href)="(\.\/?[^"#]+)"/g)){assert(fs.existsSync(path.resolve(path.dirname(file),m[1].split('?')[0])),`missing ${m[1]}`);}}

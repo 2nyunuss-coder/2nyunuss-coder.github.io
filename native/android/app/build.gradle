@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.yea.mobile'
+    compileSdk 35
+    defaultConfig { minSdk 26; targetSdk 35; versionCode 190; versionName '1.9.0' }
+    buildFeatures { buildConfig true }
+    flavorDimensions += 'product'
+    productFlavors {
+        suite { dimension 'product'; applicationId 'com.yea.suite'; resValue 'string','app_name','YEA Suite'; buildConfigField 'boolean','ARCADE','false' }
+        arcade { dimension 'product'; applicationId 'com.yea.arcade'; resValue 'string','app_name','YEA Oyun'; buildConfigField 'boolean','ARCADE','true' }
+    }
+    buildTypes { debug { debuggable true } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    sourceSets { main.assets.srcDir layout.buildDirectory.dir('game-assets') }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
+tasks.register('copyGameAssets', Copy) {
+    from('../../../yea-suite') {
+        include 'arcade/v2.html','arcade/engine.js','arcade/world3d.js','arcade/castle3d.js','arcade/app3d.js','arcade/app3d.css','arcade/app-icon.svg','arcade/manifest.webmanifest','arcade/icons/**','install.js','install.css'
+        into 'yea-suite'
+    }
+    into layout.buildDirectory.dir('game-assets')
+}
+tasks.named('preBuild').configure { dependsOn 'copyGameAssets' }
