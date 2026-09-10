@@ -90,6 +90,15 @@
    app=replaceOnce(app,'db.ui.lastDutyTab=b.dataset.s;save()','db.ui.lastDutyTab=b.dataset.s;try{localStorage.setItem("rpys_last_duty_tab",b.dataset.s)}catch(_){}');
    app=replaceOnce(app,'db.ui.lastSayTab=b.dataset.y;save()','db.ui.lastSayTab=b.dataset.y;try{localStorage.setItem("rpys_last_say_tab",b.dataset.y)}catch(_){}');
    app=replaceOnce(app,'db.ui.lastMonth=month.value;save();renderCurrentPage()','db.ui.lastMonth=month.value;try{localStorage.setItem("rpys_last_month",month.value)}catch(_){}renderCurrentPage()');
+   // Saymanlık manuel puantajı prompt kapanınca oluşan focus/poll yarışından koru.
+   // Değeri gecikmeli kuyruğa bırakmak yerine aynı anda yerel RPYSDB + bulut kuyruğuna yaz.
+   app=replaceOnce(app,
+     'save();renderAll()\n}\nfunction resetAllPuantajOverrides(){',
+     'saveNowV245({label:"Saymanlık manuel puantaj değişikliği"});renderAll()\n}\nfunction resetAllPuantajOverrides(){');
+   // Aktif bir yerel kayıt varken başka cihaz revizyonu sayfayı yenileyip yeni değeri ezmesin.
+   app=replaceOnce(app,
+     'async function poll(){if(reloading||document.hidden||!auth||!api)return;',
+     'async function poll(){if(reloading||document.hidden||!auth||!api||_saveTimerV245||Date.now()-_saveQueuedAtV245<5000)return;');
    app=replaceOnce(app,'setInterval(()=>{if(_storageReady)v24RefreshServerStatus()},5000);','setInterval(()=>{if(_storageReady&&!document.hidden)v24RefreshServerStatus()},60000);');
    app=replaceOnce(app,'function setUserPassword(id,pw){let u=db.users.find(x=>x.id===id);if(u&&pw){u.password=pw;save()}}',`async function setUserPassword(id,pw){
   if(!pw)return;

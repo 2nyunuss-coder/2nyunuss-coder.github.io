@@ -30,7 +30,7 @@
       </section>`);
     const start=document.querySelector('#v13StartMenu .v13StartApps');if(start&&!document.querySelector('#v17StartHistory'))start.insertAdjacentHTML('beforeend','<button id="v17StartHistory" type="button">📚 Geçmiş İstatistik</button>');
     const taskbar=document.querySelector('#v13Taskbar');if(taskbar&&!document.querySelector('#v17TaskHistory'))taskbar.querySelector('.v13TaskbarSpacer')?.insertAdjacentHTML('beforebegin','<button id="v17TaskHistory" type="button" title="Geçmiş İstatistik">📚</button>');
-    const x=document.createElement('script');x.src='./v17-core.js';x.onload=()=>{const q=document.createElement('script');q.src='./history-query.js';q.onload=()=>{const pro=document.createElement('script');pro.src='./history-pro.js';document.head.appendChild(pro);};document.head.appendChild(q);};document.head.appendChild(x);
+    const x=document.createElement('script');x.src='./v17-core.js?hp=2';x.onload=()=>{const q=document.createElement('script');q.src='./history-query.js';q.onload=()=>{const pro=document.createElement('script');pro.src='./history-pro.js';document.head.appendChild(pro);};document.head.appendChild(q);};document.head.appendChild(x);
   }
   wait();
 })();

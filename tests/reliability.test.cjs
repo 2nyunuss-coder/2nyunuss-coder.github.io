@@ -105,6 +105,12 @@ test('YEA: recurring task search returns a correctly labelled result',()=>{
  const c=vm.createContext({normText:s=>s.toLocaleLowerCase('tr-TR'),tasks:[],projects:[],drafts:[],vehicles:[],finance:[],radiology:[],recurring:[{title:'Haftalık kontrol',notes:'Cuma'}]});
  vm.runInContext(code.slice(start,end),c);const found=c.searchV10('kontrol');assert.equal(found.length,1);assert.equal(found[0].type,'Tekrar');assert.equal(found[0].title,'Haftalık kontrol');assert.equal(found[0].tab,'recurring');
 });
+test('RPYS: manual timesheet totals save before focus polling can reload the page',()=>{
+ const html=source('index.html');
+ assert.match(html,/saveNowV245\(\{label:\"Saymanlık manuel puantaj değişikliği\"\}\);renderAll\(\)/);
+ assert.match(html,/async function poll\(\)\{if\(reloading\|\|document\.hidden\|\|!auth\|\|!api\|\|_saveTimerV245\|\|Date\.now\(\)-_saveQueuedAtV245<5000\)return;/);
+ assert.doesNotMatch(html,/Saymanlık manuel puantaj değişikliği[\s\S]{0,120}save\(\);renderAll\(\)/);
+});
 test('All shipped JavaScript files parse successfully',()=>{
  for(const folder of ['mobile','yea-suite'])for(const file of fs.readdirSync(path.join(root,folder)).filter(x=>x.endsWith('.js')))new vm.Script(source(folder+'/'+file),{filename:folder+'/'+file});
 });
