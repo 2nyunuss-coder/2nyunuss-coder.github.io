@@ -111,6 +111,14 @@ test('RPYS: manual timesheet totals save before focus polling can reload the pag
  assert.match(html,/async function poll\(\)\{if\(reloading\|\|document\.hidden\|\|!auth\|\|!api\|\|_saveTimerV245\|\|Date\.now\(\)-_saveQueuedAtV245<5000\)return;/);
  assert.doesNotMatch(html,/Saymanlık manuel puantaj değişikliği[\s\S]{0,120}save\(\);renderAll\(\)/);
 });
+test('RPYS: Saymanlık totals include rostered staff and match duties by person id',()=>{
+ const html=source('index.html');
+ assert.match(html,/function saymanlikPeopleForTotals\(\)/);
+ assert.match(html,/\[\.\.\.\(roster\.say1\|\|\[\]\),\.\.\.\(roster\.say2\|\|\[\]\)\]\.map\(getPersonById\)\.forEach\(add\)/);
+ assert.match(html,/out=saymanlikPeopleForTotals\(\)\.map\(p=>\{/);
+ assert.match(html,/Number\(a\.person\.id\)===Number\(pid\)&&a\.day===d/);
+ assert.match(html,/getPersonById\(personIdByName\(personName\)\)/);
+});
 test('All shipped JavaScript files parse successfully',()=>{
  for(const folder of ['mobile','yea-suite'])for(const file of fs.readdirSync(path.join(root,folder)).filter(x=>x.endsWith('.js')))new vm.Script(source(folder+'/'+file),{filename:folder+'/'+file});
 });
