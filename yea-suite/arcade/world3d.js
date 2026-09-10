@@ -39,7 +39,7 @@
     pick(object,data){object.traverse(o=>{if(o.isMesh){o.userData.pick=data;this.pickables.push(o);}});return object;}
     build_castle(){
       this.focus.set(0,1.8,1);this.camera.position.set(11,9.4,17);this.camera.lookAt(this.focus);
-      this.ground(0x48bace,90,90);this.add(cylinder(8.2,8.6,.9,0xd6bd8e,0,-.55,0,64));this.add(cylinder(8.2,8.1,.22,0x89bd81,0,-.04,0,64));
+      this.ground(0x48bace,90,90);this.add(cylinder(8.2,8.6,.9,0xd6bd8e,0,-.55,0,64));this.add(cylinder(8.2,8.1,.22,0x89bd81,0,-.04,0,64));this.add(cylinder(1.7,2.1,.55,0xdfc694,0,.08,10.5,40));
       const tones=[0xffdfb2,0xf1bf82,0xffe4ba,0xeac497,0xf8d5a3];const stone=tones.map(c=>mat(c,.75));
       this.model.blocks.forEach((b,i)=>{const o=box(b.w,b.h,b.d,stone[b.tower]);o.position.copy(b.body.position);o.quaternion.copy(b.body.quaternion);this.add(this.pick(o,{block:i}));this.objects.set(b,o);if(i%12===0){const inset=box(b.w*.3,b.h*.55,.012,0x584d53,0,0,b.d/2+.01);o.add(inset);}});
       for(const tower of [0,1]){const top=this.model.blocks.filter(b=>b.tower===tower).sort((a,b)=>b.body.position.y-a.body.position.y)[0],holder=this.objects.get(top);holder.add(cylinder(.035,.035,1.35,0x9e785c,0,.82,0));holder.add(box(.65,.4,.025,tower===0?palette.red:palette.blue,.31,1.25,0));}
@@ -59,7 +59,7 @@
       this.chips=new T.Group();this.add(this.chips);for(let i=0;i<35;i++){const o=box(.055,.018,.12,0xd79c61);o.visible=false;this.chips.add(o);}
     }
     build_hole(){
-      this.camera.position.set(0,17,12);this.camera.lookAt(0,0,0);this.ground(0x6387ae,22,22);
+      this.camera.position.set(0,19.2,13.5);this.camera.lookAt(0,0,0);this.ground(0x6387ae,22,22);
       const uniforms={holeAt:{value:new T.Vector2(0,0)},holeSize:{value:.4}};this.holeUniforms=uniforms;
       const floorMat=mat(0xf6e5c8,.78);floorMat.onBeforeCompile=shader=>{Object.assign(shader.uniforms,uniforms);shader.vertexShader='varying vec3 holeWorld;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nholeWorld=(modelMatrix*vec4(position,1.0)).xyz;');shader.fragmentShader='varying vec3 holeWorld; uniform vec2 holeAt; uniform float holeSize;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif(distance(holeWorld.xz,holeAt)<holeSize)discard;');};
       const floor=mesh(new T.PlaneGeometry(13,13),floorMat);floor.rotation.x=-PI/2;floor.position.y=.02;this.add(floor);
