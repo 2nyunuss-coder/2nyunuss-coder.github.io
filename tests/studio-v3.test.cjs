@@ -34,6 +34,6 @@ test('new scenes keep finite volumetric geometry and a mobile draw-call budget',
 });
 test('versioned entry, offline worker and Android asset whitelist include studio modules',()=>{
   const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'yea-suite/arcade/v3.html'),'utf8'),gradle=fs.readFileSync(path.join(root,'native/android/app/build.gradle'),'utf8'),sw=fs.readFileSync(path.join(root,'yea-suite/arcade/sw.js'),'utf8');
-  for(const name of ['app3d-v4.js','studio-models-v3.js','studio-worlds-v3.js','studio-v3.css']){assert.ok(html.includes(name));assert.ok(gradle.includes(name));assert.ok(sw.includes(name));assert.ok(fs.existsSync(path.join(root,'yea-suite/arcade',name)));}
+  for(const name of ['app3d-v5.js','studio-models-v3.js','studio-worlds-v3.js','studio-v3.css']){assert.ok(html.includes(name));assert.ok(gradle.includes(name));assert.ok(sw.includes(name));assert.ok(fs.existsSync(path.join(root,'yea-suite/arcade',name)));}
   assert.ok(!gradle.includes('vendor/'));assert.ok(html.includes('integrity="sha384-'));assert.ok(html.includes('id="studio-panel"'));assert.ok(html.includes('id="joystick"'));
 });

@@ -20,7 +20,7 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     private static final String SITE="2nyunuss-coder.github.io";
     private static final String LOCAL="appassets.androidplatform.net";
-    private static final String GAME="https://"+LOCAL+"/assets/yea-suite/arcade/v4.html";
+    private static final String GAME="https://"+LOCAL+"/assets/yea-suite/arcade/v5.html";
     private static final String SUITE="https://"+SITE+"/yea-suite/v19.html#pocket";
     private WebView web;
     private ProgressBar loading;

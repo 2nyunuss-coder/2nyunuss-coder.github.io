@@ -48,6 +48,6 @@ test('all six remastered scenes preserve 3D picking and camera navigation',()=>{
 });
 test('updated entries, worker and native application package the input, music and scene changes',()=>{
   const root=path.resolve(__dirname,'..'),arcade=path.join(root,'yea-suite/arcade'),gradle=fs.readFileSync(path.join(root,'native/android/app/build.gradle'),'utf8'),sw=fs.readFileSync(path.join(arcade,'sw.js'),'utf8');
-  for(const page of ['v2.html','v3.html','v4.html']){const html=fs.readFileSync(path.join(arcade,page),'utf8');for(const n of ['worlds-v4.js','input-v4.js','audio-v4.js','app3d-v4.js','arcade-v4.css']){assert.ok(html.includes(n));assert.ok(gradle.includes(n));assert.ok(sw.includes(n));assert.ok(fs.existsSync(path.join(arcade,n)));}assert.ok(html.includes('id="orbit"'));assert.ok(html.includes('id="audio-volume"'));}
-  assert.ok(!gradle.includes('vendor/'));const app=fs.readFileSync(path.join(arcade,'app3d-v4.js'),'utf8');assert.ok(!/addEventListener\('blur'.*pause\(/.test(app));assert.ok(app.includes('bindLifecycle(window,document'));
+  for(const page of ['v2.html','v3.html','v4.html']){const html=fs.readFileSync(path.join(arcade,page),'utf8');for(const n of ['worlds-v4.js','input-v4.js','audio-v4.js','app3d-v5.js','arcade-v4.css']){assert.ok(html.includes(n));assert.ok(gradle.includes(n));assert.ok(sw.includes(n));assert.ok(fs.existsSync(path.join(arcade,n)));}assert.ok(html.includes('id="orbit"'));assert.ok(html.includes('id="audio-volume"'));}
+  assert.ok(!gradle.includes('vendor/'));const app=fs.readFileSync(path.join(arcade,'app3d-v5.js'),'utf8');assert.ok(!/addEventListener\('blur'.*pause\(/.test(app));assert.ok(app.includes('bindLifecycle(window,document'));
 });

@@ -1,0 +1,12 @@
+/* More room for the horizon and the close-up object; other four games stay square. */
+#play[data-game=hole] #stage,#play[data-game=wood] #stage{aspect-ratio:4/5}
+#play[data-game=hole],#play[data-game=wood]{max-width:560px}
+[data-game=hole] .scene-label{background:#173c3bd9;border-color:#bcf5de55}
+[data-game=wood] .scene-label{background:#343a32d9;border-color:#f3ddb866}
+[data-game=hole] .scene-tools #orbit,[data-game=wood] .scene-tools #orbit{font-size:12px}
+[data-game=hole] .scene-tools button,[data-game=wood] .scene-tools button{min-height:44px}
+[data-game=hole] .joystick{background:#102d3945;border:2px solid #e0fff4bb;box-shadow:0 5px 20px #10263133}
+[data-game=hole] .joystick i{background:#c1ffe0c9;border-color:#f5fff9}
+[data-game=wood] .design-preview{width:61px;height:82px;background:#23352fd9}
+@media(max-width:420px){[data-game=hole] .scene-label,[data-game=wood] .scene-label{top:10px;left:10px;padding:6px 9px;max-width:72%}[data-game=wood] .design-preview{width:47px;height:64px}[data-game=hole] .scene-tools,[data-game=wood] .scene-tools{gap:4px}[data-game=hole] .scene-tools button,[data-game=wood] .scene-tools button{padding:6px 7px;font-size:12px}}
+@media(min-width:701px) and (max-height:850px){#play[data-game=hole] .stage-wrap,#play[data-game=wood] .stage-wrap{max-width:430px}}
