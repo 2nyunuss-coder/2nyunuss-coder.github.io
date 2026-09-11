@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
     namespace 'com.yea.mobile'
     compileSdk 35
-    defaultConfig { minSdk 26; targetSdk 35; versionCode 190; versionName '1.9.0' }
+    defaultConfig { minSdk 26; targetSdk 35; versionCode 191; versionName '1.9.1' }
     buildFeatures { buildConfig true }
     flavorDimensions += 'product'
     productFlavors {
@@ -16,7 +16,7 @@ android {
 dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
 tasks.register('copyGameAssets', Copy) {
     from('../../../yea-suite') {
-        include 'arcade/v2.html','arcade/engine.js','arcade/world3d.js','arcade/castle3d.js','arcade/app3d.js','arcade/app3d.css','arcade/app-icon.svg','arcade/manifest.webmanifest','arcade/icons/**','install.js','install.css'
+        include 'arcade/v2.html','arcade/v3.html','arcade/engine.js','arcade/world3d.js','arcade/castle3d.js','arcade/app3d.js','arcade/app3d-v3.js','arcade/studio-models-v3.js','arcade/studio-worlds-v3.js','arcade/studio-v3.css','arcade/app3d.css','arcade/app-icon.svg','arcade/manifest.webmanifest','arcade/icons/**','install.js','install.css'
         into 'yea-suite'
     }
     into layout.buildDirectory.dir('game-assets')

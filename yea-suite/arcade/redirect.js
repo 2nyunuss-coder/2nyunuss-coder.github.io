@@ -1,2 +1,2 @@
 'use strict';
-location.replace('./v2.html'+location.search+location.hash);
+location.replace('./v3.html'+location.search+location.hash);
