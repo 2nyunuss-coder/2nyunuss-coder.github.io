@@ -20,7 +20,7 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     private static final String SITE="2nyunuss-coder.github.io";
     private static final String LOCAL="appassets.androidplatform.net";
-    private static final String GAME="https://"+LOCAL+"/assets/yea-suite/arcade/v3.html";
+    private static final String GAME="https://"+LOCAL+"/assets/yea-suite/arcade/v4.html";
     private static final String SUITE="https://"+SITE+"/yea-suite/v19.html#pocket";
     private WebView web;
     private ProgressBar loading;
@@ -82,7 +82,7 @@ public class MainActivity extends Activity {
     }
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);pausedForPicker=false;if(request==41&&fileCallback!=null){fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result,data));fileCallback=null;}if(request==42){byte[] bytes=pendingExport;pendingExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&bytes!=null){try(OutputStream out=getContentResolver().openOutputStream(data.getData())){if(out==null)throw new java.io.IOException();out.write(bytes);notice("Dosya kaydedildi.");}catch(Exception e){notice("Dosya kaydedilemedi.");}}}}
     @Override public void onBackPressed(){if(web.canGoBack()){web.goBack();return;}new AlertDialog.Builder(this).setTitle("Uygulamadan çıkılsın mı?").setMessage("Tamamlanan oyun bölümleri saklanır.").setPositiveButton("Çık",(d,w)->finish()).setNegativeButton("Kal",null).show();}
-    @Override protected void onPause(){super.onPause();if(web!=null){web.evaluateJavascript("window.dispatchEvent(new Event('blur'))",null);if(!pausedForPicker)web.onPause();}CookieManager.getInstance().flush();}
+    @Override protected void onPause(){super.onPause();if(web!=null){web.evaluateJavascript("window.dispatchEvent(new Event('yea:background'));"+(BuildConfig.ARCADE?"":"window.dispatchEvent(new Event('blur'));"),null);if(!pausedForPicker)web.onPause();}CookieManager.getInstance().flush();}
     @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
     @Override protected void onDestroy(){if(web!=null){web.removeJavascriptInterface("YeaNative");web.destroy();}super.onDestroy();}
 }

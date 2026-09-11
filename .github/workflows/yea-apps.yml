@@ -24,11 +24,13 @@ jobs:
         run: gradle --no-daemon :app:assembleSuiteDebug :app:assembleArcadeDebug
       - name: Verify APK contents
         run: |
-          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/v3.html
-          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/studio-worlds-v3.js
+          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/v4.html
+          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/worlds-v4.js
+          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/audio-v4.js
+          unzip -l native/android/app/build/outputs/apk/arcade/debug/app-arcade-debug.apk | grep assets/yea-suite/arcade/input-v4.js
       - uses: actions/upload-artifact@v4
         with:
-          name: YEA-Android-1.9.1
+          name: YEA-Android-1.9.2
           path: native/android/app/build/outputs/apk/*/debug/*.apk
           retention-days: 30
   release:
@@ -40,13 +42,13 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: YEA-Android-1.9.1
+          name: YEA-Android-1.9.2
           path: apks
       - name: Publish personal-use Android test packages
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          mv apks/suite/debug/app-suite-debug.apk YEA-Suite-1.9.1.apk
-          mv apks/arcade/debug/app-arcade-debug.apk YEA-Oyun-1.9.1.apk
-          gh release create "yea-apps-1.9.1-${GITHUB_RUN_NUMBER}" YEA-Suite-1.9.1.apk YEA-Oyun-1.9.1.apk --target "$GITHUB_SHA" --prerelease --title 'YEA Android 1.9.1 — Deneme sürümü' --notes 'İki ayrı Android uygulaması. YEA Oyun altı 3D oyun içerir. Studio 3: Ahşap Atölyesinde 12 form, pürüzsüzleştirme ve cila; Yutan Halkada 3 çevre, nesne fiziği ve joystick kontrolü; 3D motorları dış kaynaktan yüklendiği için internet gerekir. YEA Suite mevcut çevrimiçi hesabına bağlanır. Android 8+ gerekir. Geliştirme imzalı deneme APKlarıdır; Play Store sürümü değildir. Tarayıcı ve uygulama oyun kayıtları ayrıdır; yedek dışa/içe aktarımı kullanın. Gelecek kurulumdan önce oyun yedeğinizi alın. RPYS dosyaları bu uygulamaların parçası değildir.'
+          mv apks/suite/debug/app-suite-debug.apk YEA-Suite-1.9.2.apk
+          mv apks/arcade/debug/app-arcade-debug.apk YEA-Oyun-1.9.2.apk
+          gh release create "yea-apps-1.9.2-${GITHUB_RUN_NUMBER}" YEA-Suite-1.9.2.apk YEA-Oyun-1.9.2.apk --target "$GITHUB_SHA" --prerelease --title 'YEA Android 1.9.2 — Deneme sürümü' --notes 'İki ayrı Android uygulaması. YEA Oyun altı 3D oyun içerir. Sürüm 4: dokunma sırasında gereksiz duraklama düzeltildi; altı sahada gelişmiş 3B parçalar ve serbest kamera; her oyuna özgün müzik, ses düzeyi ve efekt kontrolü; 3D motorları dış kaynaktan yüklendiği için internet gerekir. YEA Suite mevcut çevrimiçi hesabına bağlanır. Android 8+ gerekir. Geliştirme imzalı deneme APKlarıdır; Play Store sürümü değildir. Tarayıcı ve uygulama oyun kayıtları ayrıdır; yedek dışa/içe aktarımı kullanın. Gelecek kurulumdan önce oyun yedeğinizi alın. RPYS dosyaları bu uygulamaların parçası değildir.'
