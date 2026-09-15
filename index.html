@@ -23,6 +23,7 @@
  const APP_SOURCE='https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-app-source';
  const status=document.getElementById('status'),fill=document.getElementById('fill'),err=document.getElementById('err');
  const replaceOnce=(s,a,b)=>s.includes(a)?s.replace(a,b):s;
+ const insertBeforeFinalBody=(html,content)=>{const i=html.toLowerCase().lastIndexOf('</body>');return i<0?html+content:html.slice(0,i)+content+html.slice(i)};
  const MOBILE_CSS=`<style id="rpys-mobile-secure-v303">
 .rpysMobileMenuBtn,.rpysMobileBackdrop{display:none}
 @media(max-width:900px){
@@ -127,7 +128,7 @@
 }`);
    if(!app.includes('rpys-mobile-secure-v303'))app=app.replace(/<\/head>/i,MOBILE_CSS+'</head>');
    if(!app.includes('rpys-mobile-secure-runtime-v303'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
-   if(!app.includes('rpys-fiili-print-isolation-v1'))app=app.replace(/<\/body>/i,FIILI_PRINT_JS+'</body>');
+   if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
  }
