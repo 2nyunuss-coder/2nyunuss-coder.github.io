@@ -119,6 +119,15 @@ test('RPYS: Saymanlık totals include rostered staff and match duties by person 
  assert.match(html,/Number\(a\.person\.id\)===Number\(pid\)&&a\.day===d/);
  assert.match(html,/getPersonById\(personIdByName\(personName\)\)/);
 });
+test('RPYS: Fiilî Hizmet print controls cannot be classified as Saymanlık',()=>{
+ const html=source('index.html');
+ assert.match(html,/rpys-fiili-print-isolation-v1/);
+ assert.match(html,/selector=\"#fiilihizmet\"/);
+ assert.match(html,/removeAttribute\(\"data-rpys383print\"\)/);
+ assert.match(html,/selector\+\" \.rpys332Print\"/);
+ assert.match(html,/typeof printFiiliDocument===\"function\"\)printFiiliDocument\(\)/);
+ assert.doesNotMatch(html,/rpys-fiili-print-isolation-v1[\s\S]{0,1500}stablePrintSay\(/);
+});
 test('All shipped JavaScript files parse successfully',()=>{
  for(const folder of ['mobile','yea-suite'])for(const file of fs.readdirSync(path.join(root,folder)).filter(x=>x.endsWith('.js')))new vm.Script(source(folder+'/'+file),{filename:folder+'/'+file});
 });
