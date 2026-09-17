@@ -108,8 +108,25 @@ test('YEA: recurring task search returns a correctly labelled result',()=>{
 test('RPYS: manual timesheet totals save before focus polling can reload the page',()=>{
  const html=source('index.html');
  assert.match(html,/saveNowV245\(\{label:\"Saymanlık manuel puantaj değişikliği\"\}\);renderAll\(\)/);
- assert.match(html,/async function poll\(\)\{if\(reloading\|\|document\.hidden\|\|!auth\|\|!api\|\|_saveTimerV245\|\|Date\.now\(\)-_saveQueuedAtV245<5000\)return;/);
+ assert.match(html,/window\.__RPYS_LAST_USER_EDIT_V395__/);
+ assert.match(html,/_saveTimerV245\|\|_savePending\|\|Date\.now\(\)-editAt<45000/);
  assert.doesNotMatch(html,/Saymanlık manuel puantaj değişikliği[\s\S]{0,120}save\(\);renderAll\(\)/);
+});
+test('RPYS: signed duty and payroll documents have durable numbered archives',()=>{
+ const html=source('index.html'),runtime=source('rpys-runtime-v395.js');
+ assert.match(html,/rpys-data-safety-archive-loader-v395/);
+ assert.match(html,/insertBeforeFinalBody\(app,DATA_SAFETY_ARCHIVE_JS\)/);
+ assert.match(html,/__RPYS_ARCHIVE_PRINT_DOCUMENT_V395__/);
+ assert.match(runtime,/signedDocumentArchive/);
+ assert.match(runtime,/NÖB/);
+ assert.match(runtime,/SAY/);
+ assert.match(runtime,/Son İmzalatılanlar/);
+ assert.match(runtime,/CompressionStream/);
+ assert.match(runtime,/printedMeta\(doc\)/);
+ assert.match(runtime,/archiveCss\(meta\.orientation\)/);
+ assert.match(runtime,/saveNowV245\(\{label:\"Son imzalatılan arşivi • \"\+number\}\)/);
+ assert.match(runtime,/v24FetchJson\(\"\/api\/snapshot\"/);
+ new vm.Script(runtime,{filename:'rpys-runtime-v395.js'});
 });
 test('RPYS: Saymanlık totals include rostered staff and match duties by person id',()=>{
  const html=source('index.html');
