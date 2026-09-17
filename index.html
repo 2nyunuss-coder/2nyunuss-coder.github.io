@@ -75,6 +75,7 @@
 </style>`;
  const MOBILE_JS='<script id="rpys-mobile-secure-runtime-v303">(()=>{function closeMenu(){document.body.classList.remove("rpysMobileMenuOpen")}function setup(){if(!document.querySelector(".sidebar")||document.getElementById("rpysMobileMenuBtn"))return;let b=document.createElement("button");b.id="rpysMobileMenuBtn";b.className="rpysMobileMenuBtn";b.type="button";b.setAttribute("aria-label","Menüyü aç");b.textContent="☰";b.onclick=()=>document.body.classList.toggle("rpysMobileMenuOpen");let o=document.createElement("div");o.className="rpysMobileBackdrop";o.onclick=closeMenu;document.body.append(o,b);document.querySelectorAll(".sidebar .nav").forEach(n=>n.addEventListener("click",()=>{if(innerWidth<=900)closeMenu()}));addEventListener("resize",()=>{if(innerWidth>900)closeMenu()});}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup);else setup()})();<'+ '/script>';
  const FIILI_PRINT_JS='<script id="rpys-fiili-print-isolation-v1">(()=>{const selector="#fiilihizmet";function repairFiiliPrintButtons(){let section=document.querySelector(selector);if(!section)return;section.querySelectorAll("[data-rpys383print=\\"say\\"]").forEach(b=>b.removeAttribute("data-rpys383print"));section.querySelectorAll(".rpys332Print").forEach(b=>{b.dataset.rpysFiiliPrint="1";b.title="Fiilî Hizmet belgesini yazdır"})}document.addEventListener("click",e=>{let b=e.target.closest?.(selector+" .rpys332Print");if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(typeof printFiiliDocument==="function")printFiiliDocument()},true);new MutationObserver(repairFiiliPrintButtons).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-rpys383print"]});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",repairFiiliPrintButtons);else repairFiiliPrintButtons();setTimeout(repairFiiliPrintButtons,2500)})();<'+ '/script>';
+ const DATA_SAFETY_ARCHIVE_JS='<script id="rpys-data-safety-archive-loader-v395" src="/rpys-runtime-v395.js?v=20260917-1"><'+ '/script>';
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
  function repair(app){
    app=replaceOnce(app,
@@ -97,10 +98,14 @@
    app=replaceOnce(app,
      'save();renderAll()\n}\nfunction resetAllPuantajOverrides(){',
      'saveNowV245({label:"Saymanlık manuel puantaj değişikliği"});renderAll()\n}\nfunction resetAllPuantajOverrides(){');
-   // Aktif bir yerel kayıt varken başka cihaz revizyonu sayfayı yenileyip yeni değeri ezmesin.
+   // Kullanıcı yazarken, yerel kayıt veya bulut kuyruğu tamamlanmadan uzak revizyon sayfayı yenileyip veriyi ezmesin.
    app=replaceOnce(app,
      'async function poll(){if(reloading||document.hidden||!auth||!api)return;',
-     'async function poll(){if(reloading||document.hidden||!auth||!api||_saveTimerV245||Date.now()-_saveQueuedAtV245<5000)return;');
+     'async function poll(){let editAt=Math.max(Number(_saveQueuedAtV245||0),Number(window.__RPYS_LAST_USER_EDIT_V395__||0));if(reloading||document.hidden||!auth||!api||_saveTimerV245||_savePending||Date.now()-editAt<45000)return;');
+   // Arşiv, ekrandaki yaklaşık görünüm yerine yazıcıya gönderilen gerçek belge gövdesini alsın.
+   app=replaceOnce(app,
+     'function stablePrintDocument(title,body,orientation="portrait"){',
+     'function stablePrintDocument(title,body,orientation="portrait"){\n  try{window.__RPYS_ARCHIVE_PRINT_DOCUMENT_V395__?.({title,body,orientation})}catch(_){}');
    // Saymanlık sütunundaki kişi geçici olarak pasif görünse bile aylık puantajı ve manuel düzenlemesi çalışsın.
    // Aktif kadro + seçili ay SAY1/SAY2 kadrosu + o ay görevi bulunan kişiler birlikte hesaplanır.
    app=replaceOnce(app,
@@ -129,6 +134,7 @@
    if(!app.includes('rpys-mobile-secure-v303'))app=app.replace(/<\/head>/i,MOBILE_CSS+'</head>');
    if(!app.includes('rpys-mobile-secure-runtime-v303'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
    if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
+   if(!app.includes('rpys-data-safety-archive-loader-v395'))app=insertBeforeFinalBody(app,DATA_SAFETY_ARCHIVE_JS);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
  }
