@@ -108,9 +108,41 @@ test('YEA: recurring task search returns a correctly labelled result',()=>{
 test('RPYS: manual timesheet totals save before focus polling can reload the page',()=>{
  const html=source('index.html');
  assert.match(html,/saveNowV245\(\{label:\"Saymanlık manuel puantaj değişikliği\"\}\);renderAll\(\)/);
- assert.match(html,/window\.__RPYS_LAST_USER_EDIT_V395__/);
- assert.match(html,/_saveTimerV245\|\|_savePending\|\|Date\.now\(\)-editAt<45000/);
+ assert.match(html,/window\.__RPYS_LAST_USER_EDIT_V396__/);
+ assert.match(html,/_saveTimerV245\|\|_savePending\|\|Date\.now\(\)-editAt<60000/);
  assert.doesNotMatch(html,/Saymanlık manuel puantaj değişikliği[\s\S]{0,120}save\(\);renderAll\(\)/);
+});
+test('RPYS: every first edit invalidates stale caches before delayed rendering',()=>{
+ const html=source('index.html'),runtime=source('rpys-runtime-v396.js');
+ assert.match(html,/function save\(opts=\{\}\)\{\\n  window\.__RPYS_LAST_USER_EDIT_V396__=Date\.now\(\);_assignCache=\{\};_allAssignCache=null;_calcCache=\{\};_peopleCache=null;/);
+ assert.match(html,/function saveNowV245\(opts=\{\}\)\{\\n  window\.__RPYS_LAST_USER_EDIT_V396__=Date\.now\(\);_assignCache=\{\};_allAssignCache=null;_calcCache=\{\};_peopleCache=null;/);
+ assert.match(runtime,/function invalidateCaches\(\)/);
+ assert.match(runtime,/markEdit\(\);invalidateCaches\(\);return base\.apply/);
+ assert.match(runtime,/__RPYS_LAST_USER_EDIT_V396__/);
+ new vm.Script(runtime,{filename:'rpys-runtime-v396.js'});
+});
+test('RPYS: inactive personnel move last and leave active operating lists',()=>{
+ const html=source('index.html'),runtime=source('rpys-runtime-v396.js');
+ assert.match(html,/staffForPeopleV396=db\.staff\.slice\(\)\.sort/);
+ assert.match(html,/personStatusAt\(a,date\)==="Aktif"\?0:1/);
+ assert.match(html,/lPerson\.innerHTML=currentPeople\(\)\.slice\(\)\.sort/);
+ assert.match(html,/return db\.staff\.filter\(p=>p\.status==="Aktif"\|\|personHasMonthData\(p,mk\)\)/);
+ assert.match(html,/p\.active=p\.status==='Aktif'/);
+ assert.match(html,/saveNowV245\(\{label:'Personel durum değişikliği'\}\);renderAll\(\)/);
+ assert.match(runtime,/eligibleSayPeople/);
+ assert.match(runtime,/reconcileSayRoster/);
+});
+test('RPYS: context menus are deduplicated and expose date-specific suitable personnel',()=>{
+ const html=source('index.html'),runtime=source('rpys-runtime-v396.js');
+ assert.match(html,/rpys-data-integrity-personnel-loader-v396/);
+ assert.match(html,/insertBeforeFinalBody\(app,DATA_INTEGRITY_PERSONNEL_JS\)/);
+ assert.match(runtime,/function dedupeMenu\(menu\)/);
+ assert.match(runtime,/ÇALIŞMAYI DEĞİŞTİR/);
+ assert.match(runtime,/O Güne Uygun Personeli Bul/);
+ assert.match(runtime,/gündür herhangi bir mesaiye gelmedi/);
+ assert.match(runtime,/Son mesai:/);
+ assert.match(runtime,/data-rpys-suitable-person/);
+ assert.doesNotMatch(runtime,/button[^\n]{0,120}>[^\n]*Uygun Kişiler/);
 });
 test('RPYS: signed duty and payroll documents have durable numbered archives',()=>{
  const html=source('index.html'),runtime=source('rpys-runtime-v395.js');
@@ -128,10 +160,10 @@ test('RPYS: signed duty and payroll documents have durable numbered archives',()
  assert.match(runtime,/v24FetchJson\(\"\/api\/snapshot\"/);
  new vm.Script(runtime,{filename:'rpys-runtime-v395.js'});
 });
-test('RPYS: Saymanlık totals include rostered staff and match duties by person id',()=>{
+test('RPYS: Saymanlık totals include eligible staff and match duties by person id',()=>{
  const html=source('index.html');
  assert.match(html,/function saymanlikPeopleForTotals\(\)/);
- assert.match(html,/\[\.\.\.\(roster\.say1\|\|\[\]\),\.\.\.\(roster\.say2\|\|\[\]\)\]\.map\(getPersonById\)\.forEach\(add\)/);
+ assert.match(html,/sayEligiblePeople\(ym\(\)\)\.forEach\(add\)/);
  assert.match(html,/out=saymanlikPeopleForTotals\(\)\.map\(p=>\{/);
  assert.match(html,/Number\(a\.person\.id\)===Number\(pid\)&&a\.day===d/);
  assert.match(html,/getPersonById\(personIdByName\(personName\)\)/);
