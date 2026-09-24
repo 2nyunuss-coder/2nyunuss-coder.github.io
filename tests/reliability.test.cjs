@@ -144,6 +144,48 @@ test('RPYS: context menus are deduplicated and expose date-specific suitable per
  assert.match(runtime,/data-rpys-suitable-person/);
  assert.doesNotMatch(runtime,/button[^\n]{0,120}>[^\n]*Uygun Kişiler/);
 });
+function rest16Runtime(){
+ const columns={
+  'acil|long16':{key:'long16',shift:'08:00-00:00',hours:16},
+  'acil|long24':{key:'long24',shift:'08:00-08:00',hours:24},
+  'pol|day8a':{key:'day8a',shift:'08:00-16:00',hours:8},
+  'pol|day8b':{key:'day8b',shift:'08:00-16:00',hours:8},
+  'pol|day7':{key:'day7',shift:'08:00-15:00',hours:7}
+ };
+ const context={console,setTimeout:()=>0,clearTimeout(){},alert(){},MutationObserver:function(){this.observe=()=>{}},
+  db:{staff:[{id:1,name:'Test Personel'}],assign:{},assignmentMeta:{},importedRecords:[]},ym:()=> '2026-09',
+  dateStr:d=>`2026-09-${String(d).padStart(2,'0')}`,dutyColumnByKey:(type,key)=>columns[type+'|'+key]||null,
+  document:{readyState:'complete',getElementById(){return null},querySelectorAll(){return[]},addEventListener(){}},addEventListener(){},CustomEvent:function(){}};
+ context.window=context;vm.createContext(context);vm.runInContext(source('rpys-runtime-v397.js'),context);
+ return {context,columns,api:context.rpysRest16V397}
+}
+test('RPYS: 16-hour next-day rest is a central non-overridable rule',()=>{
+ const html=source('index.html'),runtime=source('rpys-runtime-v397.js');
+ assert.match(html,/rpys-rest-16-hours-loader-v397/);
+ assert.match(html,/previousDayBlockingHours\(personId,d\)>=16/);
+ assert.match(html,/if\(hours>=16\)return true/);
+ assert.match(html,/00\.00 bitişi dinlenme kuralını kaldırmaz/);
+ assert.match(runtime,/const REST_LIMIT=16/);
+ for(const name of ['canTakeShift','canTakeShiftV2413','canTakeShiftV2414','setAssign','applyDutyBulkSelection','validateDutyMove','rpysApproveDutyConflict384'])assert.match(runtime,new RegExp(name));
+ assert.match(runtime,/wrapTransaction\("autoDistribute"/);
+ assert.match(runtime,/wrapTransaction\("distributeSkopiSequential"/);
+ new vm.Script(runtime,{filename:'rpys-runtime-v397.js'});
+});
+test('RPYS: rest calculation totals all work and crosses month boundaries',()=>{
+ const {context,columns,api}=rest16Runtime();
+ assert.equal(api.limit,16);assert.equal(api.parseShiftHours('08:00-00:00'),16);assert.equal(api.parseShiftHours('08:00-08:00'),24);assert.equal(api.parseShiftHours('08:00-07:00'),23);
+ context.db.assign={'2026-08|acil|31|long16':1};
+ assert.equal(api.previousDayHours(1,1),16);assert.equal(api.candidateResult(1,1,columns['pol|day7']).ok,false);
+ context.db.assign={'2026-08|pol|31|day8a':1,'2026-08|pol|31|day8b':1};
+ assert.equal(api.previousDayHours(1,1),16);assert.equal(api.candidateResult(1,1,columns['pol|day7']).ok,false);
+ context.db.assign={'2026-08|pol|31|day8a':1};assert.equal(api.candidateResult(1,1,columns['pol|day7']).ok,true);
+});
+test('RPYS: a long assignment cannot be inserted before an existing next-day duty',()=>{
+ const {context,columns,api}=rest16Runtime();context.db.assign={'2026-09|pol|2|day7':1};
+ const result=api.validateMutations([{key:'2026-09|acil|1|long16',type:'acil',day:1,colKey:'long16',pid:1}]);
+ assert.equal(result.ok,false);assert.equal(result.violations[0].longDate,'2026-09-01');assert.equal(result.violations[0].nextDate,'2026-09-02');
+ assert.equal(api.candidateResult(1,1,columns['acil|long16']).ok,false);
+});
 test('RPYS: signed duty and payroll documents have durable numbered archives',()=>{
  const html=source('index.html'),runtime=source('rpys-runtime-v395.js');
  assert.match(html,/rpys-data-safety-archive-loader-v395/);
