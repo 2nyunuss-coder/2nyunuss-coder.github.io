@@ -76,6 +76,7 @@
  const MOBILE_JS='<script id="rpys-mobile-secure-runtime-v303">(()=>{function closeMenu(){document.body.classList.remove("rpysMobileMenuOpen")}function setup(){if(!document.querySelector(".sidebar")||document.getElementById("rpysMobileMenuBtn"))return;let b=document.createElement("button");b.id="rpysMobileMenuBtn";b.className="rpysMobileMenuBtn";b.type="button";b.setAttribute("aria-label","Menüyü aç");b.textContent="☰";b.onclick=()=>document.body.classList.toggle("rpysMobileMenuOpen");let o=document.createElement("div");o.className="rpysMobileBackdrop";o.onclick=closeMenu;document.body.append(o,b);document.querySelectorAll(".sidebar .nav").forEach(n=>n.addEventListener("click",()=>{if(innerWidth<=900)closeMenu()}));addEventListener("resize",()=>{if(innerWidth>900)closeMenu()});}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup);else setup()})();<'+ '/script>';
  const FIILI_PRINT_JS='<script id="rpys-fiili-print-isolation-v1">(()=>{const selector="#fiilihizmet";function repairFiiliPrintButtons(){let section=document.querySelector(selector);if(!section)return;section.querySelectorAll("[data-rpys383print=\\"say\\"]").forEach(b=>b.removeAttribute("data-rpys383print"));section.querySelectorAll(".rpys332Print").forEach(b=>{b.dataset.rpysFiiliPrint="1";b.title="Fiilî Hizmet belgesini yazdır"})}document.addEventListener("click",e=>{let b=e.target.closest?.(selector+" .rpys332Print");if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(typeof printFiiliDocument==="function")printFiiliDocument()},true);new MutationObserver(repairFiiliPrintButtons).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-rpys383print"]});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",repairFiiliPrintButtons);else repairFiiliPrintButtons();setTimeout(repairFiiliPrintButtons,2500)})();<'+ '/script>';
  const DATA_SAFETY_ARCHIVE_JS='<script id="rpys-data-safety-archive-loader-v395" src="/rpys-runtime-v395.js?v=20260917-1"><'+ '/script>';
+ const DATA_INTEGRITY_PERSONNEL_JS='<script id="rpys-data-integrity-personnel-loader-v396" src="/rpys-runtime-v396.js?v=20260924-1"><'+ '/script>';
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
  function repair(app){
    app=replaceOnce(app,
@@ -98,10 +99,44 @@
    app=replaceOnce(app,
      'save();renderAll()\n}\nfunction resetAllPuantajOverrides(){',
      'saveNowV245({label:"Saymanlık manuel puantaj değişikliği"});renderAll()\n}\nfunction resetAllPuantajOverrides(){');
+   // Her değişiklikte hesaplama/personel önbelleklerini gecikmeli kayıt başlamadan temizle.
+   // Böylece ilk işlem eski önbellekten yeniden çizilip ekrandan kaybolmaz.
+   app=replaceOnce(app,
+     'function save(opts={}){\n  mergeSaveIntentV249(opts);',
+     'function save(opts={}){\n  window.__RPYS_LAST_USER_EDIT_V396__=Date.now();_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null;\n  mergeSaveIntentV249(opts);');
+   app=replaceOnce(app,
+     'function saveNowV245(opts={}){\n  mergeSaveIntentV249(opts);',
+     'function saveNowV245(opts={}){\n  window.__RPYS_LAST_USER_EDIT_V396__=Date.now();_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null;\n  mergeSaveIntentV249(opts);');
    // Kullanıcı yazarken, yerel kayıt veya bulut kuyruğu tamamlanmadan uzak revizyon sayfayı yenileyip veriyi ezmesin.
    app=replaceOnce(app,
      'async function poll(){if(reloading||document.hidden||!auth||!api)return;',
-     'async function poll(){let editAt=Math.max(Number(_saveQueuedAtV245||0),Number(window.__RPYS_LAST_USER_EDIT_V395__||0));if(reloading||document.hidden||!auth||!api||_saveTimerV245||_savePending||Date.now()-editAt<45000)return;');
+     'async function poll(){let editAt=Math.max(Number(_saveQueuedAtV245||0),Number(window.__RPYS_LAST_USER_EDIT_V396__||0));if(reloading||document.hidden||!auth||!api||_saveTimerV245||_savePending||Date.now()-editAt<60000)return;');
+   // Pasiflik değişikliğini tek işlemde kaydet, tüm çalışma ekranlarını yenile ve uyumluluk alanını eşle.
+   app=replaceOnce(app,
+     "function setPersonStatusDate(id,status,date){ensurePersonStatusHistory();if(!date)return alert('Tarih seç.');let p=getPersonById(id);if(!p)return;let a=db.personStatusHistory[id]||[];a=a.filter(x=>x.date!==date);a.push({date,status});a.sort((x,y)=>x.date.localeCompare(y.date));db.personStatusHistory[id]=a;let today=new Date().toISOString().slice(0,10),last=a.filter(x=>x.date<=today).pop();if(last)p.status=last.status;_peopleCache=null;save();renderPeople();safeRun(()=>renderUnitHubSafe());safeRun(()=>renderDayTracking())}",
+     "function setPersonStatusDate(id,status,date){ensurePersonStatusHistory();if(!date)return alert('Tarih seç.');let p=getPersonById(id);if(!p)return;let a=db.personStatusHistory[id]||[];a=a.filter(x=>x.date!==date);a.push({date,status});a.sort((x,y)=>x.date.localeCompare(y.date));db.personStatusHistory[id]=a;let today=new Date().toISOString().slice(0,10),last=a.filter(x=>x.date<=today).pop();if(last)p.status=last.status;p.active=p.status==='Aktif';_peopleCache=null;_assignCache={};_allAssignCache=null;_calcCache={};Object.keys(db.sayRoster||{}).forEach(mk=>ensureSayRoster(mk));saveNowV245({label:'Personel durum değişikliği'});renderAll()}"
+   );
+   // Personel yönetiminde aktifler üstte, pasifler ayrı ve en altta alfabetik sıralansın.
+   app=replaceOnce(app,
+     'personRows.innerHTML=db.staff.map(p=>{',
+     'let staffForPeopleV396=db.staff.slice().sort((a,b)=>(personStatusAt(a,date)==="Aktif"?0:1)-(personStatusAt(b,date)==="Aktif"?0:1)||String(a.name||"").localeCompare(String(b.name||""),"tr",{sensitivity:"base"}));\n  personRows.innerHTML=staffForPeopleV396.map(p=>{');
+   // Aktif işlem seçimlerinde pasif personeli çıkar; geçmiş izin raporlarında ise en alta taşı.
+   app=replaceOnce(app,
+     'let people=db.staff.slice().sort((a,b)=>a.name.localeCompare(b.name,"tr")).filter(p=>!q||p.name.toLocaleLowerCase("tr-TR").includes(q));',
+     'let people=db.staff.slice().sort((a,b)=>(a.status==="Aktif"?0:1)-(b.status==="Aktif"?0:1)||a.name.localeCompare(b.name,"tr")).filter(p=>!q||p.name.toLocaleLowerCase("tr-TR").includes(q));');
+   app=replaceOnce(app,
+     'if(document.getElementById("lPerson"))lPerson.innerHTML=db.staff.slice().sort((a,b)=>a.name.localeCompare(b.name,"tr")).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");',
+     'if(document.getElementById("lPerson"))lPerson.innerHTML=currentPeople().slice().sort((a,b)=>a.name.localeCompare(b.name,"tr")).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");');
+   app=replaceOnce(app,
+     'let opts=\'<option value="">Personel seç...</option>\'+db.staff.map(p=>`<option value="${p.id}">${esc(p.name)}${p.status==="Aktif"?"":" • Pasif"}</option>`).join("");',
+     'let opts=\'<option value="">Personel seç...</option>\'+db.staff.slice().sort((a,b)=>(a.status==="Aktif"?0:1)-(b.status==="Aktif"?0:1)||a.name.localeCompare(b.name,"tr")).map(p=>`<option value="${p.id}">${esc(p.name)}${p.status==="Aktif"?"":" • Pasif"}</option>`).join("");');
+   // Güncel saymanlıkta aktif personel bulunur; pasif kişinin gerçek geçmiş verisi varsa veri kaybını önlemek için korunur.
+   app=replaceOnce(app,
+     'return db.staff.filter(p=>personActiveAnyDayInMonth(p,mk)||personHasMonthData(p,mk))',
+     'return db.staff.filter(p=>p.status==="Aktif"||personHasMonthData(p,mk))');
+   app=replaceOnce(app,
+     'if(db.sayRoster[mk]?.say1&&db.sayRoster[mk]?.say2)return db.sayRoster[mk];',
+     'if(db.sayRoster[mk]?.say1&&db.sayRoster[mk]?.say2){let eligible=sayEligiblePeople(mk).slice().sort((a,b)=>a.name.localeCompare(b.name,"tr")),allowed=new Set(eligible.map(p=>Number(p.id))),seen=new Set(),clean=arr=>(arr||[]).map(Number).filter(id=>allowed.has(id)&&!seen.has(id)&&seen.add(id)),s1=clean(db.sayRoster[mk].say1),s2=clean(db.sayRoster[mk].say2);for(const p of eligible){let id=Number(p.id);if(seen.has(id))continue;(s1.length<16?s1:s2).push(id);seen.add(id)}db.sayRoster[mk]={say1:s1,say2:s2};return db.sayRoster[mk]}');
    // Arşiv, ekrandaki yaklaşık görünüm yerine yazıcıya gönderilen gerçek belge gövdesini alsın.
    app=replaceOnce(app,
      'function stablePrintDocument(title,body,orientation="portrait"){',
@@ -110,7 +145,7 @@
    // Aktif kadro + seçili ay SAY1/SAY2 kadrosu + o ay görevi bulunan kişiler birlikte hesaplanır.
    app=replaceOnce(app,
      'function totals(){\n  let ck="totals|"+ym();if(_calcCache[ck])return _calcCache[ck];\n  let as=assignmentsMonth(),out=currentPeople().map(p=>{',
-     'function saymanlikPeopleForTotals(){\n  let out=[],seen=new Set(),add=p=>{if(!p||seen.has(String(p.id)))return;seen.add(String(p.id));out.push(p)};\n  currentPeople().forEach(add);\n  let roster=ensureSayRoster(ym());[...(roster.say1||[]),...(roster.say2||[])].map(getPersonById).forEach(add);\n  assignmentsMonth().forEach(a=>add(a.person));\n  return out\n}\nfunction totals(){\n  let ck="totals|"+ym();if(_calcCache[ck])return _calcCache[ck];\n  let as=assignmentsMonth(),out=saymanlikPeopleForTotals().map(p=>{');
+     'function saymanlikPeopleForTotals(){\n  let out=[],seen=new Set(),add=p=>{if(!p||seen.has(String(p.id)))return;seen.add(String(p.id));out.push(p)};\n  sayEligiblePeople(ym()).forEach(add);\n  assignmentsMonth().forEach(a=>add(a.person));\n  return out\n}\nfunction totals(){\n  let ck="totals|"+ym();if(_calcCache[ck])return _calcCache[ck];\n  let as=assignmentsMonth(),out=saymanlikPeopleForTotals().map(p=>{');
    // Geçmiş ad/boşluk varyasyonlarında görevi kişi kimliği üzerinden eşleştir.
    app=replaceOnce(app,
      'let arr=assignmentsMonth().filter(a=>a.person.name===personName&&a.day===d);',
@@ -135,6 +170,7 @@
    if(!app.includes('rpys-mobile-secure-runtime-v303'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
    if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
    if(!app.includes('rpys-data-safety-archive-loader-v395'))app=insertBeforeFinalBody(app,DATA_SAFETY_ARCHIVE_JS);
+   if(!app.includes('rpys-data-integrity-personnel-loader-v396'))app=insertBeforeFinalBody(app,DATA_INTEGRITY_PERSONNEL_JS);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
  }
