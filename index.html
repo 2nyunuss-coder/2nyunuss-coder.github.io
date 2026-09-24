@@ -77,6 +77,7 @@
  const FIILI_PRINT_JS='<script id="rpys-fiili-print-isolation-v1">(()=>{const selector="#fiilihizmet";function repairFiiliPrintButtons(){let section=document.querySelector(selector);if(!section)return;section.querySelectorAll("[data-rpys383print=\\"say\\"]").forEach(b=>b.removeAttribute("data-rpys383print"));section.querySelectorAll(".rpys332Print").forEach(b=>{b.dataset.rpysFiiliPrint="1";b.title="Fiilî Hizmet belgesini yazdır"})}document.addEventListener("click",e=>{let b=e.target.closest?.(selector+" .rpys332Print");if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(typeof printFiiliDocument==="function")printFiiliDocument()},true);new MutationObserver(repairFiiliPrintButtons).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-rpys383print"]});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",repairFiiliPrintButtons);else repairFiiliPrintButtons();setTimeout(repairFiiliPrintButtons,2500)})();<'+ '/script>';
  const DATA_SAFETY_ARCHIVE_JS='<script id="rpys-data-safety-archive-loader-v395" src="/rpys-runtime-v395.js?v=20260917-1"><'+ '/script>';
  const DATA_INTEGRITY_PERSONNEL_JS='<script id="rpys-data-integrity-personnel-loader-v396" src="/rpys-runtime-v396.js?v=20260924-1"><'+ '/script>';
+ const REST_16_HOURS_JS='<script id="rpys-rest-16-hours-loader-v397" src="/rpys-runtime-v397.js?v=20260924-1"><'+ '/script>';
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
  function repair(app){
    app=replaceOnce(app,
@@ -154,6 +155,38 @@
      'let p=(db.staff||[]).find(x=>x.name===personName);if(!p)return [];',
      'let p=getPersonById(personIdByName(personName));if(!p)return [];');
    app=replaceOnce(app,'setInterval(()=>{if(_storageReady)v24RefreshServerStatus()},5000);','setInterval(()=>{if(_storageReady&&!document.hidden)v24RefreshServerStatus()},60000);');
+   // Kapatılamaz dinlenme kuralı: bir takvim günündeki toplam çalışma 16 saate ulaştıysa
+   // personel ertesi takvim gününde hiçbir birime atanamaz. 00.00 bitişli vardiyalar istisna değildir.
+   app=replaceOnce(app,
+     '    // 00:00 bitişli vardiya yalnız 22 saatin ALTINDAYSA ertesi güne engel sayılmaz.\n    if(shiftEndsAtMidnight(a.col)&&hrs<22)continue;\n    sum+=hrs',
+     '    // v3.0.4: Günlük toplamın tamamı sayılır; 00.00 bitişi dinlenme kuralını kaldırmaz.\n    sum+=hrs');
+   app=replaceOnce(app,
+     'function workedLongPreviousDay(personId,d){return previousDayBlockingHours(personId,d)>=22}',
+     'function workedLongPreviousDay(personId,d){return previousDayBlockingHours(personId,d)>=16}');
+   app=replaceOnce(app,
+     '  // 22–23–24 saatlik görevler bitiş saati ne olursa olsun ertesi günü kilitler.\n  if(hours>=22)return true;',
+     '  // 16 saat ve üzerindeki görevler bitiş saati ne olursa olsun ertesi günü kilitler.\n  if(hours>=16)return true;');
+   app=replaceOnce(app,
+     '  // 22+ saat ayrıca kesin blok olarak korunur.\n  if(workedLongPreviousDay(personId,d))return false;',
+     '  // Önceki takvim günündeki toplam 16+ saat çalışma kesin bloktur.\n  if(workedLongPreviousDay(personId,d))return false;');
+   app=replaceOnce(app,
+     '22–23–24 saat çalışan personel ERTESİ GÜN hiçbir vardiyaya yazılamaz.',
+     '16 saat ve üzeri çalışan personel ERTESİ GÜN hiçbir vardiyaya yazılamaz.');
+   app=replaceOnce(app,
+     '23–24 saatlik nöbetlerde sistem, nöbetten sonraki günü engeller; nöbetleri mümkün olduğunca dengeli aralıklarla dağıtır.',
+     'Bir takvim gününde toplam 16 saat ve üzeri çalışan personelin ertesi günü kesin olarak engellenir; nöbetler mümkün olduğunca dengeli aralıklarla dağıtılır.');
+   app=replaceOnce(app,
+     'if(previousDayHadDuty(pid,d)||isProtectedLeaveWeekend(pid,d)||isOnLeave(pid,d)){',
+     'if(previousDayHadDuty(pid,d)||workedLongPreviousDay(pid,d)||isProtectedLeaveWeekend(pid,d)||isOnLeave(pid,d)){');
+   app=replaceOnce(app,
+     'reason:previousDayHadDuty(pid,d)?"Nöbet sonrası dinlenme":isProtectedLeaveWeekend(pid,d)?"Tam hafta izin hafta sonu":"İzin günü"',
+     'reason:(previousDayHadDuty(pid,d)||workedLongPreviousDay(pid,d))?"16+ saat sonrası dinlenme":isProtectedLeaveWeekend(pid,d)?"Tam hafta izin hafta sonu":"İzin günü"');
+   app=replaceOnce(app,
+     'let duties=assignmentsMonth().filter(a=>a.person.id===Number(id)&&a.day===d&&Number(a.col?.hours||0)>=22);',
+     'let duties=previousDayBlockingHours(id,d+1)>=16?[true]:[];');
+   app=replaceOnce(app,
+     'engine:"v2.4.0-22plus-rest-leave-anchor",',
+     'engine:"v2.4.0-16plus-rest-leave-anchor",');
    app=replaceOnce(app,'function setUserPassword(id,pw){let u=db.users.find(x=>x.id===id);if(u&&pw){u.password=pw;save()}}',`async function setUserPassword(id,pw){
   if(!pw)return;
   if(String(pw).length<8){alert("Şifre en az 8 karakter olmalı.");return}
@@ -171,6 +204,7 @@
    if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
    if(!app.includes('rpys-data-safety-archive-loader-v395'))app=insertBeforeFinalBody(app,DATA_SAFETY_ARCHIVE_JS);
    if(!app.includes('rpys-data-integrity-personnel-loader-v396'))app=insertBeforeFinalBody(app,DATA_INTEGRITY_PERSONNEL_JS);
+   if(!app.includes('rpys-rest-16-hours-loader-v397'))app=insertBeforeFinalBody(app,REST_16_HOURS_JS);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
  }
@@ -182,6 +216,7 @@
    if(direct<40)throw new Error('Sayfa yapısı doğrulanamadı ('+direct+'/40).');
    const s1=d.getElementById('say1Panel'),s2=d.getElementById('say2Panel'),say=d.getElementById('saymanlik');
    if(!s1||!s2||!say||s1.parentElement!==say||s2.parentElement!==say)throw new Error('SAY1/SAY2 yapısı doğrulanamadı.');
+   if(!d.getElementById('rpys-rest-16-hours-loader-v397'))throw new Error('16 saat dinlenme güvenliği yüklenemedi.');
    for(const id of ['nobet','vardiyalar','saymanlik','goruntuler','personel','izin']){const el=d.getElementById(id);if(!el||el.parentElement!==main)throw new Error(id+' sayfası yanlış konumda.');}
  }
  try{
