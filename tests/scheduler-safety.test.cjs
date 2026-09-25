@@ -41,6 +41,24 @@ test('successful motor operation saves once, only after validation',()=>{
  const f=fixture(c=>{c.db.assign['2026-10|pol|5|day']=1;c.save();c.saveNowV245();});
  f.c.autoDistribute();assert.equal(f.saved.length,1);assert.equal(f.c.db.assign['2026-10|pol|5|day'],1);assert.equal(f.alerts.length,0);
 });
+test('Saymanlık-only hour edit does not leave an empty duty cell blocked',()=>{
+ const key='2026-10|pol|5|day',f=fixture(c=>{c.db.assign[key]=1;c.saveNowV245();});
+ f.c.db.manualDutyOverrides[key]={oldPid:1,newPid:1,reason:'Saymanlık mesai saati değişikliği'};
+ f.c.db.assignmentMeta[key]={shift:'09:00-17:00',hours:8,manual:true,source:'Saymanlık manuel saat'};
+ assert.equal(f.c.rpysScheduler398.protectedCell(key),false);
+ f.c.autoDistribute();assert.equal(f.c.db.assign[key],1);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
+});
+test('a manually cleared but unlocked empty cell can be filled automatically',()=>{
+ const key='2026-10|pol|5|day',f=fixture(c=>{c.db.assign[key]=1;c.saveNowV245();});
+ f.c.db.manualDutyOverrides[key]={oldPid:2,newPid:null,reason:'Manuel hücre temizleme'};
+ assert.equal(f.c.rpysScheduler398.protectedCell(key),false);
+ f.c.autoDistribute();assert.equal(f.c.db.assign[key],1);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
+});
+test('manual personnel assignment remains protected while Saymanlık marker becomes an icon',()=>{
+ const key='2026-10|pol|5|day',f=fixture();f.c.db.assign[key]=2;f.c.db.manualDutyOverrides[key]={oldPid:1,newPid:2,reason:'Manuel personel değişikliği'};
+ assert.equal(f.c.rpysScheduler398.protectedCell(key),true);
+ const badge=f.c.rpysScheduler398.manualBadgeHtml(key);assert.match(badge,/>✎<\/span>/);assert.doesNotMatch(badge,/ELLE↔SAY/);
+});
 for(const mode of ['existing','manual','locked-empty','other-unit','other-month'])test('motor rollback preserves '+mode+' and prevents partial cloud saves',()=>{
  let key=mode==='other-month'?'2026-09|pol|1|day':mode==='other-unit'?'2026-10|pol|1|other':'2026-10|pol|1|day';
  const f=fixture(c=>{c.db.assign[key]=2;c.saveNowV245();c.db.assignmentMeta[key]={hours:24};});

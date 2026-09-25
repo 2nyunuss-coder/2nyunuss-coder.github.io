@@ -3,9 +3,30 @@
   const clone=x=>JSON.parse(JSON.stringify(x)), own=(o,k)=>Object.prototype.hasOwnProperty.call(o||{},k);
   let run=null;
   const invalidate=()=>{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null};
+  function sayHoursOnly(key,data=db){
+    const override=data.manualDutyOverrides?.[key],meta=data.assignmentMeta?.[key];
+    const sayReason=override?.reason==='Saymanlık mesai saati değişikliği'||meta?.source==='Saymanlık manuel saat';
+    const samePerson=!override||Number(override.oldPid||0)===Number(override.newPid||0);
+    return !!sayReason&&samePerson;
+  }
+  function manualAssignmentCell(key,data=db){
+    const assigned=Number(data.assign?.[key]||0);
+    if(!assigned||sayHoursOnly(key,data))return false;
+    const override=data.manualDutyOverrides?.[key],meta=data.assignmentMeta?.[key];
+    if(override){
+      if(override.newPid!=null)return Number(override.newPid)===assigned;
+      if(/temiz|silme/i.test(String(override.reason||'')))return false;
+      return true;
+    }
+    return !!meta?.manual;
+  }
+  function manualBadgeHtml(key){
+    return db.manualDutyOverrides?.[key]?'<span class="manualSyncBadge" role="img" aria-label="Elle düzenlendi; Saymanlıkla senkron" title="Elle düzenlendi • Saymanlıkla senkron" style="font-size:11px;line-height:1;padding:2px 3px">✎</span>':'';
+  }
   function protectedCell(key){
-    if(db.rpysCellLocks?.[key])return true;
-    if(db.manualDutyOverrides?.[key]||db.assignmentMeta?.[key]?.manual)return true;
+    const reference=run?.before||db;
+    if(reference.rpysCellLocks?.[key])return true;
+    if(manualAssignmentCell(key,reference))return true;
     if(!run)return false;
     if(!key.startsWith(run.month+'|'))return true;
     const parts=key.split('|'),col=dutyColumnByKey(parts[1],parts.slice(3).join('|'));
@@ -38,6 +59,9 @@
       ['if(unit==="PORTABL + SKOPİ")purgeNonSkopiPoolAssignments();','// Only selected-unit unprotected cells can be rebuilt.'],
       ['delete db.assign[kk];','if(window.rpysScheduler398.protectedCell(kk))continue;\n        delete db.assign[kk];']
     ]);
+    change('enforceSkopiLeaveAnchors','distributeSkopiSequential',[
+      ['if(db.assign[k]&&(db.assignmentMeta?.[k]?.manual||db.manualDutyOverrides?.[k]))','if(db.assign[k]&&window.rpysScheduler398.manualAssignmentCell(k))']
+    ]);
     change('distributeSkopiSequential','leaveDutyRuleSummary',[
       ['  purgeRestAndLeaveViolations();','  // Validation reports existing conflicts; it never purges other units.'],
       ['  purgeNonSkopiPoolAssignments();',''],
@@ -51,6 +75,9 @@
     ]);
     change('distributeExactV251','selectedUnitOutsidersV2411',[
       ['!used.has(Number(id))&&v250Available(id,d,unit,daySlots)','!used.has(Number(id))&&v250Available(id,d,unit,daySlots)&&canTakeShiftV2414(id,d,rec.s.col,unit)']
+    ]);
+    change('manualSyncBadge','clearManualDutySyncForMonth',[
+      ['return db.manualDutyOverrides?.[k]?\'<span class="manualSyncBadge" title="Elle değiştirildi • Saymanlık canlı senkron">ELLE↔SAY</span>\':""','return window.rpysScheduler398.manualBadgeHtml(k)']
     ]);
     return repairCache(source);
   }
@@ -131,7 +158,7 @@
         for(const key of window.rpysRest16V397.allViolations().keys())if(!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
         for(const key of new Set([...Object.keys(before.assign||{}),...Object.keys(db.assign||{}),...Object.keys(before.assignmentMeta||{}),...Object.keys(db.assignmentMeta||{}),...Object.keys(before.rpysCellLocks||{})])){
-          if((protectedCell(key)||before.rpysCellLocks?.[key]||before.manualDutyOverrides?.[key]||before.assignmentMeta?.[key]?.manual)&&
+          if((protectedCell(key)||before.rpysCellLocks?.[key]||manualAssignmentCell(key,before))&&
             ['assign','assignmentMeta','manualDutyOverrides'].some(field=>JSON.stringify(db[field]?.[key])!==JSON.stringify(before[field]?.[key])))throw Object.assign(Error('Korunan hücre değişikliği engellendi.'),{cellKey:key});
         }
       }catch(e){db=before;invalidate();error=e}
@@ -147,7 +174,7 @@
     ['autoDistribute','runPolRotation2','distributeSkopiSequential'].forEach(wrapRun);
     document.documentElement.dataset.rpysSchedulerSafety='398';
   }
-  window.rpysScheduler398={repair,repairCache,install,protectedCell,mayClear,running:()=>!!run};
+  window.rpysScheduler398={repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
