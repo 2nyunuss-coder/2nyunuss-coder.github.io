@@ -109,7 +109,8 @@ test('RPYS: manual timesheet totals save before focus polling can reload the pag
  const html=source('index.html');
  assert.match(html,/saveNowV245\(\{label:\"Saymanlık manuel puantaj değişikliği\"\}\);renderAll\(\)/);
  assert.match(html,/window\.__RPYS_LAST_USER_EDIT_V396__/);
- assert.match(html,/_saveTimerV245\|\|_savePending\|\|Date\.now\(\)-editAt<60000/);
+ assert.match(html,/_saveTimerV245\|\|_savePending\|\|Number\(window\.__RPYS_EDIT_GUARD_UNTIL_V400__/);
+ assert.match(html,/Date\.now\(\)-editAt<60000/);
  assert.doesNotMatch(html,/Saymanlık manuel puantaj değişikliği[\s\S]{0,120}save\(\);renderAll\(\)/);
 });
 test('RPYS: every first edit invalidates stale caches before delayed rendering',()=>{
@@ -120,6 +121,36 @@ test('RPYS: every first edit invalidates stale caches before delayed rendering',
  assert.match(runtime,/markEdit\(\);invalidateCaches\(\);return base\.apply/);
  assert.match(runtime,/__RPYS_LAST_USER_EDIT_V396__/);
  new vm.Script(runtime,{filename:'rpys-runtime-v396.js'});
+});
+test('RPYS: first save is flushed immediately and remote reload stays guarded until acknowledgement',async()=>{
+ let immediate=0,box={style:{},replaceChildren(){this.cleared=true}},timer=0;
+ const controls={autoUnit:{value:'OTHER'},autoPeople:{selectedOptions:[]},month:{value:'2026-10'},dutySuitableListV2413:box};
+ const document={readyState:'complete',body:{},documentElement:{dataset:{}},getElementById:id=>controls[id]||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
+ const c={console,Date,Promise,document,db:{unitPools:{'2026-10|PORTABL + SKOPİ':[2]},skopiEligible:[1,2]},ym:()=> '2026-10',
+  suitablePeopleForDutyV2413:()=>[{p:{id:1}},{p:{id:2}},{p:{id:3}}],_assignCache:{old:1},_allAssignCache:[1],_calcCache:{old:1},_peopleCache:[1],
+  _saveTimerV245:0,_savePending:false,_storageWriteChain:Promise.resolve(),
+  save(){this._saveTimerV245=++timer;return null},saveNowV245(){this._saveTimerV245=0;immediate++;this._storageWriteChain=Promise.resolve();return '{}'},
+  setTimeout,clearTimeout,setInterval:()=>0,clearInterval(){},MutationObserver:function(){this.observe=()=>{}},addEventListener(){}};
+ c.window=c;vm.createContext(c);vm.runInContext(source('rpys-runtime-v400.js'),c);
+ c.save();await new Promise(resolve=>setTimeout(resolve,15));
+ assert.equal(immediate,1);assert.equal(c._saveTimerV245,0);assert.equal(c._assignCache&&Object.keys(c._assignCache).length,0);
+ assert.equal(c.rpysInteraction400.suitableRows({unit:'PORTABL + SKOPİ'}).rows.length,1);
+ c.rpysInteraction400.renderSuitable();assert.equal(box.style.display,'none');assert.equal(box.cleared,true);
+});
+test('RPYS: suitable personnel is click-only, single-menu and unit-pool scoped',()=>{
+ const runtime=source('rpys-runtime-v400.js'),html=source('index.html');
+ assert.match(runtime,/if\(!suitableOpen\)\{box\.replaceChildren\(\);box\.style\.display='none';return\}/);
+ assert.match(runtime,/configuredPool\(col\)/);assert.match(runtime,/rows\.filter\(row=>pool\.has/);
+ assert.match(runtime,/for\(const duplicate of menus\.slice\(1\)\)duplicate\.remove\(\)/);
+ assert.match(html,/rpys-interaction-guard-loader-v400/);assert.match(html,/rpys-manual-targets-loader-v399/);
+ assert.match(html,/__RPYS_EDIT_GUARD_UNTIL_V400__/);
+});
+test('RPYS: per-person day and night target panel is connected to the 6.1.1 safe scheduler',()=>{
+ const targets=source('rpys-targets-v399.js'),scheduler=source('rpys-scheduler-v398.js');
+ assert.match(targets,/Personel Gündüz \/ Nöbet Hedefleri/);assert.match(targets,/Hedeflere Göre Dağıt/);
+ assert.match(targets,/manualDistributionTargetsV399/);assert.match(targets,/rpysScheduler398\?\.manualAssignmentCell/);
+ assert.match(scheduler,/rpysTargets399\?\.enabledFor\(unit\)\?window\.rpysTargets399\.distribute\(unit\)/);
+ assert.doesNotMatch(targets,/engine:\s*['"]6\.1\.0/);
 });
 test('RPYS: inactive personnel move last and leave active operating lists',()=>{
  const html=source('index.html'),runtime=source('rpys-runtime-v396.js');

@@ -80,6 +80,8 @@
  const DATA_INTEGRITY_PERSONNEL_JS='<script id="rpys-data-integrity-personnel-loader-v396" src="/rpys-runtime-v396.js?v=20260924-1"><'+ '/script>';
  const REST_16_HOURS_JS='<script id="rpys-rest-16-hours-loader-v397" src="/rpys-runtime-v397.js?v=20260925-2"><'+ '/script>';
  const SCHEDULER_SAFETY_JS='<script id="rpys-scheduler-safety-loader-v398" src="/rpys-scheduler-v398.js?v=20260925-3"><'+ '/script>';
+ const MANUAL_TARGETS_JS='<script id="rpys-manual-targets-loader-v399" src="/rpys-targets-v399.js?v=20260925-2"><'+ '/script>';
+ const INTERACTION_GUARD_JS='<script id="rpys-interaction-guard-loader-v400" src="/rpys-runtime-v400.js?v=20260925-1"><'+ '/script>';
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
  function repair(app){
    app=replaceOnce(app,
@@ -113,7 +115,7 @@
    // Kullanıcı yazarken, yerel kayıt veya bulut kuyruğu tamamlanmadan uzak revizyon sayfayı yenileyip veriyi ezmesin.
    app=replaceOnce(app,
      'async function poll(){if(reloading||document.hidden||!auth||!api)return;',
-     'async function poll(){let editAt=Math.max(Number(_saveQueuedAtV245||0),Number(window.__RPYS_LAST_USER_EDIT_V396__||0));if(reloading||document.hidden||!auth||!api||_saveTimerV245||_savePending||Date.now()-editAt<60000)return;');
+     'async function poll(){let editAt=Math.max(Number(_saveQueuedAtV245||0),Number(window.__RPYS_LAST_USER_EDIT_V396__||0));if(reloading||document.hidden||!auth||!api||_saveTimerV245||_savePending||Number(window.__RPYS_EDIT_GUARD_UNTIL_V400__||0)>Date.now()||Date.now()-editAt<60000)return;');
    // Pasiflik değişikliğini tek işlemde kaydet, tüm çalışma ekranlarını yenile ve uyumluluk alanını eşle.
    app=replaceOnce(app,
      "function setPersonStatusDate(id,status,date){ensurePersonStatusHistory();if(!date)return alert('Tarih seç.');let p=getPersonById(id);if(!p)return;let a=db.personStatusHistory[id]||[];a=a.filter(x=>x.date!==date);a.push({date,status});a.sort((x,y)=>x.date.localeCompare(y.date));db.personStatusHistory[id]=a;let today=new Date().toISOString().slice(0,10),last=a.filter(x=>x.date<=today).pop();if(last)p.status=last.status;_peopleCache=null;save();renderPeople();safeRun(()=>renderUnitHubSafe());safeRun(()=>renderDayTracking())}",
@@ -208,6 +210,8 @@
    if(!app.includes('rpys-data-integrity-personnel-loader-v396'))app=insertBeforeFinalBody(app,DATA_INTEGRITY_PERSONNEL_JS);
    if(!app.includes('rpys-rest-16-hours-loader-v397'))app=insertBeforeFinalBody(app,REST_16_HOURS_JS);
    if(!app.includes('rpys-scheduler-safety-loader-v398'))app=insertBeforeFinalBody(app,SCHEDULER_SAFETY_JS);
+   if(!app.includes('rpys-manual-targets-loader-v399'))app=insertBeforeFinalBody(app,MANUAL_TARGETS_JS);
+   if(!app.includes('rpys-interaction-guard-loader-v400'))app=insertBeforeFinalBody(app,INTERACTION_GUARD_JS);
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
@@ -220,7 +224,7 @@
    if(direct<40)throw new Error('Sayfa yapısı doğrulanamadı ('+direct+'/40).');
    const s1=d.getElementById('say1Panel'),s2=d.getElementById('say2Panel'),say=d.getElementById('saymanlik');
    if(!s1||!s2||!say||s1.parentElement!==say||s2.parentElement!==say)throw new Error('SAY1/SAY2 yapısı doğrulanamadı.');
-   if(!d.getElementById('rpys-rest-16-hours-loader-v397'))throw new Error('16 saat dinlenme güvenliği yüklenemedi.');
+   for(const loader of ['rpys-rest-16-hours-loader-v397','rpys-scheduler-safety-loader-v398','rpys-manual-targets-loader-v399','rpys-interaction-guard-loader-v400'])if(!d.getElementById(loader))throw new Error(loader+' yüklenemedi.');
    for(const id of ['nobet','vardiyalar','saymanlik','goruntuler','personel','izin']){const el=d.getElementById(id);if(!el||el.parentElement!==main)throw new Error(id+' sayfası yanlış konumda.');}
  }
  try{
