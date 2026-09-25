@@ -38,18 +38,56 @@
   }
   function recordDate(month,day){return `${month}-${pad(Number(day))}`}
 
-  function recordsFor(personId){
+  // A synchronous motor run can index keys once while reading assignment VALUES live.
+  // This avoids stale result caches during trial swaps/deletes inside the optimizers.
+  let readIndex=null,eligibilityDepth=0;
+  function runIndexed(fn){
+    if(readIndex)return fn();
+    const byDate=new Map(),columns=new Map(),imported=new Map();
+    for(const type of ['pol','acil'])for(const col of safe(()=>dutyColumns(type,{includeDisabled:true}),[]))columns.set(type+'|'+col.key,{type,col});
+    for(const key of Object.keys(database().assign||{})){
+      const p=key.split('|');if(p.length<4)continue;
+      const date=recordDate(p[0],p[2]);if(!byDate.has(date))byDate.set(date,[]);byDate.get(date).push(key);
+    }
+    for(const [i,row] of (database().importedRecords||[]).entries()){
+      const date=String(row.date||recordDate(row.monthKey,row.day));if(!imported.has(date))imported.set(date,[]);imported.get(date).push({row,i});
+    }
+    readIndex={byDate,columns,imported};try{return fn()}finally{readIndex=null}
+  }
+  function indexedRecords(pid,dates){
+    const data=database(),out=[];
+    for(const date of dates){
+      const month=date.slice(0,7),day=Number(date.slice(8)),keys=new Set(readIndex.byDate.get(date)||[]);
+      for(const {type,col} of readIndex.columns.values())keys.add(`${month}|${type}|${day}|${col.key}`);
+      for(const key of keys){
+        if(Number(data.assign?.[key])!==Number(pid))continue;
+        const p=key.split('|'),type=p[1],colKey=p.slice(3).join('|'),col=readIndex.columns.get(type+'|'+colKey)?.col||column(type,colKey)||{},meta=data.assignmentMeta?.[key]||{};
+        out.push({key,date,day,type,colKey,hours:workHours(col,meta),source:'main'});
+      }
+      for(const {row,i} of readIndex.imported.get(date)||[]){
+        if(Number(row.personId)!==Number(pid)||safe(()=>typeof isImportedShiftBlocked==='function'&&isImportedShiftBlocked(row),false))continue;
+        out.push({key:`__imported_${i}`,date,hours:workHours(row.col||{},row.meta||{},row),source:'imported'});
+      }
+    }
+    return out;
+  }
+
+  function recordsFor(personId,dates){
+    if(readIndex&&dates)return indexedRecords(personId,dates);
     const data=database(),pid=Number(personId),out=[];
     for(const [key,value] of Object.entries(data.assign||{})){
       if(Number(value)!==pid)continue;
       const parts=String(key).split("|");if(parts.length<4)continue;
-      const month=parts[0],type=parts[1],day=Number(parts[2]),colKey=parts.slice(3).join("|"),meta=(data.assignmentMeta||{})[key]||{},col=column(type,colKey)||{};
+      const month=parts[0],type=parts[1],day=Number(parts[2]);
+      if(dates&&!dates.has(recordDate(month,day)))continue;
+      const colKey=parts.slice(3).join("|"),meta=(data.assignmentMeta||{})[key]||{},col=column(type,colKey)||{};
       out.push({key,date:recordDate(month,day),hours:workHours(col,meta),type,day,colKey,source:"main"})
     }
     for(let i=0;i<(data.importedRecords||[]).length;i++){
       const row=data.importedRecords[i];if(Number(row?.personId)!==pid)continue;
-      if(safe(()=>typeof isImportedShiftBlocked==="function"&&isImportedShiftBlocked(row),false))continue;
       const date=String(row.date||recordDate(row.monthKey,row.day));
+      if(dates&&!dates.has(date))continue;
+      if(safe(()=>typeof isImportedShiftBlocked==="function"&&isImportedShiftBlocked(row),false))continue;
       out.push({key:`__imported_${i}`,date,hours:workHours(row.col||{},row.meta||{},row),source:"imported"})
     }
     return out
@@ -87,8 +125,12 @@
     for(const m of mutations){if(m.oldPid)ids.add(m.oldPid);if(m.pid)ids.add(m.pid)}
     const violations=[];
     for(const pid of ids){
-      const before=recordsFor(pid),beforeMap=violationMap(before),afterMap=violationMap(applyMutations(before,pid,mutations));
-      for(const [key,item] of afterMap)if(!beforeMap.has(key))violations.push({...item,key,personId:Number(pid),personName:personName(pid)})
+      const dates=new Set();for(const m of mutations)for(const d of [-1,0,1])dates.add(addDays(m.date,d));
+      const before=recordsFor(pid,dates),beforeMap=violationMap(before),afterMap=violationMap(applyMutations(before,pid,mutations));
+      for(const [key,item] of afterMap){
+        const added=mutations.some(m=>m.pid===pid&&(m.date===item.longDate||m.date===item.nextDate)&&!before.some(r=>r.key===m.key&&r.date===m.date&&r.hours===m.hours));
+        if(!beforeMap.has(key)||added)violations.push({...item,key,personId:Number(pid),personName:personName(pid)})
+      }
     }
     return {ok:violations.length===0,violations,mutations}
   }
@@ -96,7 +138,7 @@
     return validateMutations([{pid:Number(personId),date:targetDate(day),day:Number(day),col:col||{},hours:workHours(col||{})}])
   }
   function previousDayHours(personId,day){
-    const previous=addDays(targetDate(day),-1),sum=recordsFor(personId).filter(x=>x.date===previous).reduce((n,x)=>n+Number(x.hours||0),0);
+    const previous=addDays(targetDate(day),-1),sum=recordsFor(personId,new Set([previous])).reduce((n,x)=>n+Number(x.hours||0),0);
     return Math.round(sum*10)/10
   }
   function allViolations(){
@@ -132,7 +174,11 @@
   }
   function wrapEligibility(name){
     const base=window[name];if(typeof base!=="function"||base.__rpys397)return;
-    const wrapped=function(personId,day,col){if(!candidateResult(personId,day,col).ok)return false;return base.apply(this,arguments)};
+    const wrapped=function(personId,day,col){
+      if(eligibilityDepth)return base.apply(this,arguments);
+      if(!candidateResult(personId,day,col).ok)return false;
+      eligibilityDepth++;try{return base.apply(this,arguments)}finally{eligibilityDepth--}
+    };
     wrapped.__rpys397=true;wrapped.__rpys397base=base;window[name]=wrapped
   }
   function wrapSetAssign(){
@@ -238,7 +284,7 @@
   document.addEventListener("click",event=>{if(event.target?.closest?.("#rpysPaste353"))armPasteGuard()},true);
   document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&String(event.key||"").toLowerCase()==="v"&&!/INPUT|TEXTAREA/.test(String(event.target?.tagName||"")))armPasteGuard()},true);
 
-  window.rpysRest16V397={limit:REST_LIMIT,parseShiftHours,recordsFor,previousDayHours,validateMutations,candidateResult,allViolations,install};
+  window.rpysRest16V397={limit:REST_LIMIT,parseShiftHours,recordsFor,previousDayHours,validateMutations,candidateResult,allViolations,runIndexed,install};
   window.addEventListener("rpys-direct-core-ready",()=>[0,160,700,2200].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install);else install();
   setTimeout(install,900);setTimeout(install,3000)
