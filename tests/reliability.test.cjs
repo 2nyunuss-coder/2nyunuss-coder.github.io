@@ -135,6 +135,8 @@ test('RPYS: first save is flushed immediately and remote reload stays guarded un
  c.save();await new Promise(resolve=>setTimeout(resolve,15));
  assert.equal(immediate,1);assert.equal(c._saveTimerV245,0);assert.equal(c._assignCache&&Object.keys(c._assignCache).length,0);
  assert.equal(c.rpysInteraction400.suitableRows({unit:'PORTABL + SKOPİ'}).rows.length,1);
+ const protectedRenderer=c.renderSuitableDutyPeopleV2413;c.renderSuitableDutyPeopleV2413=function legacyRenderer(){};
+ assert.equal(c.renderSuitableDutyPeopleV2413,protectedRenderer);assert.equal(c.__RPYS_BLOCKED_SUITABLE_RENDERERS_V400__,1);
  c.rpysInteraction400.renderSuitable();assert.equal(box.style.display,'none');assert.equal(box.cleared,true);
 });
 test('RPYS: suitable personnel is click-only, single-menu and unit-pool scoped',()=>{
@@ -144,6 +146,10 @@ test('RPYS: suitable personnel is click-only, single-menu and unit-pool scoped',
  assert.match(runtime,/eligible\.slice\(0,MAX_SUITABLE\)/);
  assert.match(runtime,/for\(const duplicate of menus\)if\(duplicate!==menu\)duplicate\.remove\(\)/);
  assert.match(runtime,/closest\?\.\('#rpysSuitableWrapV396'\)\)return false/);
+ assert.match(runtime,/className='rpys400SuitableWrap'/);
+ assert.match(runtime,/\.rpys338SuitableWrap,#rpys338SuitableList,#rpys339SuitableList/);
+ assert.match(runtime,/Object\.defineProperty\(window,'renderSuitableDutyPeopleV2413'/);
+ assert.doesNotMatch(runtime,/wrap\.className='dutySuitableWrapV2413'/);
  assert.match(html,/rpys-interaction-guard-loader-v400/);assert.match(html,/rpys-manual-targets-loader-v399/);
  assert.match(html,/__RPYS_EDIT_GUARD_UNTIL_V400__/);
 });
