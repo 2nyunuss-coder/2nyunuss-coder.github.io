@@ -3,6 +3,7 @@
   window.__RPYS_DATA_INTEGRITY_PERSONNEL_V396__=true;
 
   let suitableOpen=false,menuRepairTimer=0;
+  const suitableOwnedBy400=()=>!!window.__RPYS_INTERACTION_GUARD_V400__;
 
   function markEdit(){window.__RPYS_LAST_USER_EDIT_V396__=Date.now()}
   function invalidateCaches(){
@@ -130,8 +131,10 @@
     }
   }
   function repairMenus(){
-    ensureSuitableControl();
-    dedupeMenu(document.getElementById("dutyContextMenu"));
+    if(!suitableOwnedBy400()){
+      ensureSuitableControl();
+      dedupeMenu(document.getElementById("dutyContextMenu"));
+    }
     dedupeMenu(document.getElementById("cellContextMenu"))
   }
   function scheduleMenuRepair(delay=80){
@@ -169,6 +172,7 @@
     box.innerHTML=header+people;box.style.display=suitableOpen?"block":"none"
   }
   function installSuitableRenderer(){
+    if(suitableOwnedBy400())return;
     try{window.renderSuitableDutyPeopleV2413=renderSuitablePeople}catch(_){}
     try{renderSuitableDutyPeopleV2413=renderSuitablePeople}catch(_){}
   }
@@ -190,6 +194,7 @@
   ["input","change","paste","drop"].forEach(name=>document.addEventListener(name,markEdit,true));
   document.addEventListener("contextmenu",e=>{
     if(!e.target.closest?.(".dropDutyCell"))return;
+    if(suitableOwnedBy400())return;
     suitableOpen=false;
     [0,50,180].forEach(ms=>setTimeout(()=>{repairMenus();if(suitableOpen)return;const box=document.getElementById("dutySuitableListV2413");if(box)box.style.display="none";const b=document.getElementById("rpysSuitableButtonV396");if(b)b.textContent="👥 O Güne Uygun Personeli Bul"},ms))
   },true);
@@ -202,7 +207,8 @@
 
   function observe(){
     const observer=new MutationObserver(mutations=>{
-      if(mutations.some(m=>m.target?.closest?.("#dutyContextMenu,#cellContextMenu")||[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.("#dutyContextMenu,#cellContextMenu")||n.querySelector?.("#dutyContextMenu,#cellContextMenu")))))scheduleMenuRepair()
+      const selector=suitableOwnedBy400()?"#cellContextMenu":"#dutyContextMenu,#cellContextMenu";
+      if(mutations.some(m=>m.target?.closest?.(selector)||[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.(selector)||n.querySelector?.(selector)))))scheduleMenuRepair()
     });
     observer.observe(document.body,{childList:true,subtree:true})
   }
