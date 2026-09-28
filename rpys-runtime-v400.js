@@ -4,6 +4,7 @@
   window.__RPYS_INTERACTION_GUARD_V400__=true;
 
   let suitableOpen=false,repairTimer=0,flushTimer=0,ackToken=0,repairing=false;
+  const MAX_SUITABLE=8;
   const guard=()=>{window.__RPYS_EDIT_GUARD_UNTIL_V400__=Date.now()+120000};
   const invalidate=()=>{
     try{_assignCache={}}catch(_){}try{_allAssignCache=null}catch(_){}
@@ -58,20 +59,25 @@
   function suitableRows(col){
     let rows=[];try{rows=typeof suitablePeopleForDutyV2413==='function'?suitablePeopleForDutyV2413():[]}catch(e){console.warn('RPYS400 uygun personel',e)}
     if(!Array.isArray(rows))rows=[];
-    const pool=configuredPool(col),scoped=pool.size?rows.filter(row=>pool.has(Number((row?.p||row)?.id))):rows.slice(0,8);
-    return {rows:scoped,poolConfigured:pool.size>0,total:rows.length};
+    const pool=configuredPool(col),eligible=pool.size?rows.filter(row=>pool.has(Number((row?.p||row)?.id))):rows;
+    return {rows:eligible.slice(0,MAX_SUITABLE),poolConfigured:pool.size>0,total:eligible.length};
   }
   function displayDate(raw){const m=String(raw||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}.${m[2]}.${m[1]}`:String(raw||'—')}
+  function canonicalParts(){
+    const wrap=document.querySelector('#dutyContextMenu #rpysSuitableWrapV396')||document.getElementById('rpysSuitableWrapV396');
+    return {wrap,button:wrap?.querySelector('#rpysSuitableButtonV396')||document.getElementById('rpysSuitableButtonV396'),box:wrap?.querySelector('#dutySuitableListV2413')||document.getElementById('dutySuitableListV2413')};
+  }
   function renderSuitable(){
-    const box=document.getElementById('dutySuitableListV2413');if(!box)return;
-    if(!suitableOpen){box.replaceChildren();box.style.display='none';return}
+    const {box}=canonicalParts();if(!box)return;
+    if(!suitableOpen){if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none';return}
     const cell=currentCell();if(!cell){box.innerHTML='<div class="suitableNoneV2413">Önce bir nöbet günü hücresine sağ tıklayın.</div>';box.style.display='block';return}
     let col=null,date='';const type=cell.dataset.type,day=Number(cell.dataset.day);
     try{col=dutyColumnByKey(type,cell.dataset.col)}catch(_){}try{date=dateStr(day)}catch(_){date=monthKey()+'-'+String(day).padStart(2,'0')}
     if(!col){box.innerHTML='<div class="suitableNoneV2413">Vardiya bilgisi bulunamadı.</div>';box.style.display='block';return}
     const result=suitableRows(col),rows=result.rows;
-    const scope=result.poolConfigured?'birim için seçili personel havuzu':'ilk 8 uygun personel';
-    const header=`<div class="suitableHeadV2413"><b>${esc(displayDate(date))} • ${esc(col.unit||type)}</b><br><small>${esc(col.shift||'')} • ${rows.length} kişi • ${scope}</small></div>`;
+    const scope=result.poolConfigured?'birim için seçili personel havuzu':'uygun personel';
+    const count=result.total>rows.length?`${rows.length}/${result.total} kişi (ilk ${MAX_SUITABLE})`:`${rows.length} kişi`;
+    const header=`<div class="suitableHeadV2413"><b>${esc(displayDate(date))} • ${esc(col.unit||type)}</b><br><small>${esc(col.shift||'')} • ${count} • ${scope}</small></div>`;
     const people=rows.length?rows.map(item=>{
       const p=item?.p||item;if(!p)return '';
       const idle=Number(item.totalIdle??item.idle??999),last=String(item.lastAny||item.last||'');
@@ -86,9 +92,12 @@
     if(repairing)return;repairing=true;
     try{
       const menus=[...document.querySelectorAll('[id="dutyContextMenu"]')];if(!menus.length)return;
-      const menu=menus[0];for(const duplicate of menus.slice(1))duplicate.remove();
-      let wrap=menu.querySelector('#rpysSuitableWrapV396');
-      for(const old of [...menu.querySelectorAll('.dutySuitableWrapV2413')])if(old!==wrap)old.remove();
+      let menu=menus[0];
+      try{menu=menus.find(item=>{const style=getComputedStyle(item);return style.display!=='none'&&style.visibility!=='hidden'})||menu}catch(_){}
+      for(const duplicate of menus)if(duplicate!==menu)duplicate.remove();
+      const wraps=[...menu.querySelectorAll('.dutySuitableWrapV2413,#rpysSuitableWrapV396')];
+      let wrap=wraps.find(item=>item.id==='rpysSuitableWrapV396')||null;
+      for(const old of wraps)if(old!==wrap)old.remove();
       if(!wrap){wrap=document.createElement('div');wrap.id='rpysSuitableWrapV396';wrap.className='dutySuitableWrapV2413';menu.insertBefore(wrap,menu.firstChild)}
       wrap.removeAttribute('onmouseenter');wrap.onmouseenter=null;
       let button=wrap.querySelector('#rpysSuitableButtonV396'),box=wrap.querySelector('#dutySuitableListV2413');
@@ -98,18 +107,31 @@
         const fresh=button.cloneNode(true);button.replaceWith(fresh);button=fresh;button.dataset.rpys396='1';button.dataset.rpys400='1';
         button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();suitableOpen=!suitableOpen;button.textContent=suitableOpen?'👥 Uygun Personeli Gizle':'👥 O Güne Uygun Personeli Bul';renderSuitable()});
       }
-      button.textContent=suitableOpen?'👥 Uygun Personeli Gizle':'👥 O Güne Uygun Personeli Bul';
-      if(!suitableOpen){box.replaceChildren();box.style.display='none'}
+      const label=suitableOpen?'👥 Uygun Personeli Gizle':'👥 O Güne Uygun Personeli Bul';
+      if(button.textContent!==label)button.textContent=label;
+      if(!suitableOpen){if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none'}
       window.renderSuitableDutyPeopleV2413=renderSuitable;
     }finally{repairing=false}
   }
   function scheduleRepair(delay=0){clearTimeout(repairTimer);repairTimer=setTimeout(()=>{installSaveGuards();ensureSingleMenu()},delay)}
-  function install(){installSaveGuards();ensureSingleMenu();window.renderSuitableDutyPeopleV2413=renderSuitable;document.documentElement.dataset.rpysInteractionGuard='400'}
+  function installStyle(){
+    if(!document.head||typeof document.createElement!=='function')return;
+    if(document.getElementById('rpys400SuitableStyle'))return;
+    const style=document.createElement('style');style.id='rpys400SuitableStyle';
+    style.textContent='#dutyContextMenu .dutySuitableWrapV2413:not(#rpysSuitableWrapV396){display:none!important}#rpysSuitableWrapV396>#dutySuitableListV2413{overflow:auto;max-height:min(390px,55vh)}';
+    document.head.appendChild(style);
+  }
+  function install(){installSaveGuards();installStyle();ensureSingleMenu();window.renderSuitableDutyPeopleV2413=renderSuitable;document.documentElement.dataset.rpysInteractionGuard='400'}
 
   ['input','change','paste','drop'].forEach(name=>document.addEventListener(name,guard,true));
   document.addEventListener('contextmenu',e=>{if(!e.target.closest?.('.dropDutyCell'))return;suitableOpen=false;scheduleRepair(0);setTimeout(()=>scheduleRepair(0),80)},true);
-  const observer=new MutationObserver(mutations=>{if(mutations.some(m=>m.target?.closest?.('#dutyContextMenu')||[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('#dutyContextMenu,.dutySuitableWrapV2413')||n.querySelector?.('#dutyContextMenu,.dutySuitableWrapV2413')))))scheduleRepair(20)});
-  const start=()=>{install();observer.observe(document.body,{childList:true,subtree:true});let n=0,iv=setInterval(()=>{install();if(++n>=18)clearInterval(iv)},400)};
+  function structuralMenuMutation(mutation){
+    if(mutation.target?.closest?.('#rpysSuitableWrapV396'))return false;
+    const nodes=[...mutation.addedNodes,...mutation.removedNodes];
+    return nodes.some(node=>node.nodeType===1&&(node.matches?.('#dutyContextMenu,.dutySuitableWrapV2413,#rpysSuitableWrapV396')||node.querySelector?.('#dutyContextMenu,.dutySuitableWrapV2413,#rpysSuitableWrapV396')));
+  }
+  const observer=new MutationObserver(mutations=>{if(mutations.some(structuralMenuMutation))scheduleRepair(20)});
+  const start=()=>{install();observer.observe(document.body,{childList:true,subtree:true});setTimeout(install,900);setTimeout(install,2600)};
   window.rpysInteraction400={installSaveGuards,configuredPool,suitableRows,renderSuitable,ensureSingleMenu,guard};
   window.addEventListener('rpys-direct-core-ready',()=>setTimeout(start,80));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
