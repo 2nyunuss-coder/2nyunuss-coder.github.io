@@ -139,9 +139,11 @@ test('RPYS: first save is flushed immediately and remote reload stays guarded un
 });
 test('RPYS: suitable personnel is click-only, single-menu and unit-pool scoped',()=>{
  const runtime=source('rpys-runtime-v400.js'),html=source('index.html');
- assert.match(runtime,/if\(!suitableOpen\)\{box\.replaceChildren\(\);box\.style\.display='none';return\}/);
+ assert.match(runtime,/if\(!suitableOpen\)\{if\(!box\.childNodes\|\|box\.childNodes\.length\)box\.replaceChildren\(\)/);
  assert.match(runtime,/configuredPool\(col\)/);assert.match(runtime,/rows\.filter\(row=>pool\.has/);
- assert.match(runtime,/for\(const duplicate of menus\.slice\(1\)\)duplicate\.remove\(\)/);
+ assert.match(runtime,/eligible\.slice\(0,MAX_SUITABLE\)/);
+ assert.match(runtime,/for\(const duplicate of menus\)if\(duplicate!==menu\)duplicate\.remove\(\)/);
+ assert.match(runtime,/closest\?\.\('#rpysSuitableWrapV396'\)\)return false/);
  assert.match(html,/rpys-interaction-guard-loader-v400/);assert.match(html,/rpys-manual-targets-loader-v399/);
  assert.match(html,/__RPYS_EDIT_GUARD_UNTIL_V400__/);
 });
