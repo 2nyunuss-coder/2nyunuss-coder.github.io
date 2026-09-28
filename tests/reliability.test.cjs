@@ -244,7 +244,8 @@ test('RPYS: Saymanlık totals include eligible staff and match duties by person 
 test('RPYS: Fiilî Hizmet print controls cannot be classified as Saymanlık',()=>{
  const html=source('index.html');
  assert.match(html,/rpys-fiili-print-isolation-v1/);
- assert.match(html,/lastIndexOf\('<\/body>'\)/);
+ const insert=vm.runInNewContext('('+html.match(/const insertBeforeFinalBody=(.*);/)[1]+')');
+ assert.equal(insert('<body>İZİN</body>','<script src="/guard.js"></script>'),'<body>İZİN<script src="/guard.js"></script></body>');
  assert.match(html,/insertBeforeFinalBody\(app,FIILI_PRINT_JS\)/);
  assert.match(html,/selector=\"#fiilihizmet\"/);
  assert.match(html,/removeAttribute\(\"data-rpys383print\"\)/);
