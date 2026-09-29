@@ -10,7 +10,7 @@
   const get=id=>document.getElementById(id);
 
   function ensureStore(){
-    if(!window.db)return false;
+    if(typeof db==='undefined'||!db)return false;
     if(!db.shiftStudio||typeof db.shiftStudio!=='object')db.shiftStudio={disabled:{},custom:[]};
     if(!db.shiftStudio.disabled||typeof db.shiftStudio.disabled!=='object')db.shiftStudio.disabled={};
     if(!db.shiftStudio.disabledAt||typeof db.shiftStudio.disabledAt!=='object')db.shiftStudio.disabledAt={};
