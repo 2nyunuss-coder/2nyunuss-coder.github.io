@@ -70,8 +70,9 @@
     return {wrap,button:wrap?.querySelector('#rpysSuitableButtonV396')||(!menu?document.getElementById('rpysSuitableButtonV396'):null),box:wrap?.querySelector('#dutySuitableListV2413')||(!menu?document.getElementById('dutySuitableListV2413'):null)};
   }
   function renderSuitable(){
-    const {box}=canonicalParts();if(!box)return;
-    if(!suitableOpen){if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none';return}
+    const {wrap,box}=canonicalParts();if(!box)return;
+    if(!suitableOpen){wrap?.removeAttribute('data-rpys400-open');if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none';return}
+    wrap?.setAttribute('data-rpys400-open','1');
     const cell=currentCell();if(!cell){box.innerHTML='<div class="suitableNoneV2413">Önce bir nöbet günü hücresine sağ tıklayın.</div>';box.style.display='block';return}
     let col=null,date='';const type=cell.dataset.type,day=Number(cell.dataset.day);
     try{col=dutyColumnByKey(type,cell.dataset.col)}catch(_){}try{date=dateStr(day)}catch(_){date=monthKey()+'-'+String(day).padStart(2,'0')}
@@ -118,7 +119,7 @@
       const label=suitableOpen?'👥 Uygun Personeli Gizle':'👥 O Güne Uygun Personeli Bul';
       if(button.textContent!==label)button.textContent=label;
       if(suitableOpen)renderSuitable();
-      else{if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none'}
+      else{wrap.removeAttribute('data-rpys400-open');if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none'}
     }finally{repairing=false}
   }
   function scheduleRepair(delay=0){clearTimeout(repairTimer);repairTimer=setTimeout(()=>{installSaveGuards();ensureSingleMenu()},delay)}
@@ -126,7 +127,7 @@
     if(!document.head||typeof document.createElement!=='function')return;
     if(document.getElementById('rpys400SuitableStyle'))return;
     const style=document.createElement('style');style.id='rpys400SuitableStyle';
-    style.textContent='#dutyContextMenu .dutySuitableWrapV2413,#dutyContextMenu .rpys338SuitableWrap,#rpys338SuitableList,#rpys339SuitableList{display:none!important}.rpys400SuitableWrap{position:relative;display:block!important}#rpysSuitableWrapV396>#dutySuitableListV2413{overflow:auto;max-height:min(390px,55vh)}';
+    style.textContent='#dutyContextMenu .dutySuitableWrapV2413,#dutyContextMenu .rpys338SuitableWrap,#rpys338SuitableList,#rpys339SuitableList{display:none!important}.rpys400SuitableWrap{position:relative;display:block!important}#dutyContextMenu #rpysSuitableWrapV396>#dutySuitableListV2413{display:none!important;overflow:auto;max-height:min(390px,55vh)}#dutyContextMenu #rpysSuitableWrapV396[data-rpys400-open="1"]>#dutySuitableListV2413{display:block!important}';
     document.head.appendChild(style);
   }
   function lockRenderer(){
