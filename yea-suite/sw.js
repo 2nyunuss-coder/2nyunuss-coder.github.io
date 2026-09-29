@@ -1,12 +1,12 @@
 const CACHE_PREFIX = 'yea-suite-';
-const CACHE = CACHE_PREFIX + 'v19-apps-20260910';
+const CACHE = CACHE_PREFIX + 'v20-kaza-20260929';
 const CORE = ['./', './index.html', './boot-guard.js', './v10.html', './v17.html','./v17-bootstrap.js','./v17-core.js','./v17.css','./history-parser.js','./v16.html','./v16-bootstrap.js','./v16-core.js','./v16.css','./v15.html','./v15-bootstrap.js','./v15-core.js','./v15.css','./v14.html','./v14-bootstrap.js','./v14-core.js','./v14.css','./v13.html','./v13-bootstrap.js','./v13-core.js','./v13-fix.js','./v13.css','./v12.html','./v12-bootstrap.js','./v12-core.js','./v12.css','./v11.html','./v11-bootstrap.js','./v11-core.js','./v11.css','./v10-bootstrap.js','./v10-core.js','./v10.css','./v09.html','./v09.js','./v09-decision.js','./v08-assistant.js','./v07.js','./v06.css','./v07.css','./v08.css','./v09.css','./manifest.webmanifest','./icon.svg'];
 
 CORE.push('./v18.html','./v18-bootstrap.js','./v18-mobile.js','./v18.css','./arcade/','./arcade/index.html','./arcade/arcade.css','./arcade/arcade.js','./arcade/engine.js','./arcade/manifest.webmanifest','./history-query.js','./history-pro.js','./history-pro.css');
 
 CORE.push('./v18-bootstrap.js?hp=2','./v17-bootstrap.js?hp=2','./v17-core.js?hp=2');
 CORE.splice(0,CORE.length,...CORE.filter(path=>!path.startsWith('./arcade/')));
-CORE.push('./v19.html','./v19-bootstrap.js','./install.js','./install.css','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png');
+CORE.push('./v19.html','./v19-bootstrap.js','./v20.html','./v20-bootstrap.js','./v20-kaza.js','./v20.css','./install.js','./install.css','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png');
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));
@@ -24,8 +24,6 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET' || url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   const response = (async () => {
     const cache = await caches.open(CACHE).catch(() => null);
-    // Versioned local assets are immutable within a shell release. Their cached
-    // copy makes mobile/offline startup independent of a slow network response.
     const pinned = CORE.some(path => !['./','./index.html'].includes(path) && new URL(path,scope).href === url.href);
     if (pinned) { const hit=await cache?.match(request); if(hit)return hit; }
     try {
@@ -39,7 +37,7 @@ self.addEventListener('fetch', event => {
       const hit = await cache?.match(request);
       if (hit) return hit;
       if (request.mode === 'navigate' && (url.pathname === scope.pathname || url.pathname === scope.pathname + 'index.html')) {
-        const page = await cache?.match('./v19.html');
+        const page = await cache?.match('./v20.html');
         if (page) return page;
       }
       return new Response('Bağlantı yok. İnternete bağlanıp tekrar deneyin.', {
