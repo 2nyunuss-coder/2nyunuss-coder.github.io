@@ -127,23 +127,25 @@ test('RPYS: first save is flushed immediately and remote reload stays guarded un
  const controls={autoUnit:{value:'OTHER'},autoPeople:{selectedOptions:[]},month:{value:'2026-10'},dutySuitableListV2413:box};
  const document={readyState:'complete',body:{},documentElement:{dataset:{}},getElementById:id=>controls[id]||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
  const c={console,Date,Promise,document,db:{unitPools:{'2026-10|PORTABL + SKOPİ':[2]},skopiEligible:[1,2]},ym:()=> '2026-10',
-  suitablePeopleForDutyV2413:()=>[{p:{id:1}},{p:{id:2}},{p:{id:3}}],_assignCache:{old:1},_allAssignCache:[1],_calcCache:{old:1},_peopleCache:[1],
+  suitablePeopleForDutyV2413:()=>[{p:{id:1,status:'Aktif'}},{p:{id:2,status:'Aktif'}},{p:{id:3,status:'Pasif',active:false}}],_assignCache:{old:1},_allAssignCache:[1],_calcCache:{old:1},_peopleCache:[1],
   _saveTimerV245:0,_savePending:false,_storageWriteChain:Promise.resolve(),
   save(){this._saveTimerV245=++timer;return null},saveNowV245(){this._saveTimerV245=0;immediate++;this._storageWriteChain=Promise.resolve();return '{}'},
   setTimeout,clearTimeout,setInterval:()=>0,clearInterval(){},MutationObserver:function(){this.observe=()=>{}},addEventListener(){}};
  c.window=c;vm.createContext(c);vm.runInContext(source('rpys-runtime-v400.js'),c);
  c.save();await new Promise(resolve=>setTimeout(resolve,15));
  assert.equal(immediate,1);assert.equal(c._saveTimerV245,0);assert.equal(c._assignCache&&Object.keys(c._assignCache).length,0);
- assert.equal(c.rpysInteraction400.suitableRows({unit:'PORTABL + SKOPİ'}).rows.length,1);
+ assert.equal(c.rpysInteraction400.suitableRows({unit:'PORTABL + SKOPİ'}).rows.length,2);
  const protectedRenderer=c.renderSuitableDutyPeopleV2413;c.renderSuitableDutyPeopleV2413=function legacyRenderer(){};
  assert.equal(c.renderSuitableDutyPeopleV2413,protectedRenderer);assert.equal(c.__RPYS_BLOCKED_SUITABLE_RENDERERS_V400__,1);
  c.rpysInteraction400.renderSuitable();assert.equal(box.style.display,'none');assert.equal(box.cleared,true);
 });
-test('RPYS: suitable personnel is click-only, single-menu and unit-pool scoped',()=>{
+test('RPYS: suitable personnel is click-only, single-menu and includes every active eligible person',()=>{
  const runtime=source('rpys-runtime-v400.js'),html=source('index.html');
  assert.match(runtime,/if\(!suitableOpen\)\{wrap\?\.removeAttribute\('data-rpys400-open'\);if\(!box\.childNodes\|\|box\.childNodes\.length\)box\.replaceChildren\(\)/);
- assert.match(runtime,/configuredPool\(col\)/);assert.match(runtime,/rows\.filter\(row=>pool\.has/);
- assert.match(runtime,/eligible\.slice\(0,MAX_SUITABLE\)/);
+ assert.match(runtime,/p\.active!==false/);assert.match(runtime,/!==\'PASİF\'/);
+ assert.match(runtime,/return \{rows:eligible,poolConfigured:false,total:eligible\.length\}/);
+ assert.doesNotMatch(runtime,/rows\.filter\(row=>pool\.has/);
+ assert.match(runtime,/tüm aktif ve uygun personel/);
  assert.match(runtime,/for\(const duplicate of menus\)if\(duplicate!==menu\)duplicate\.remove\(\)/);
  assert.match(runtime,/closest\?\.\('#rpysSuitableWrapV396'\)\)return false/);
  assert.match(runtime,/className='rpys400SuitableWrap'/);
@@ -153,8 +155,17 @@ test('RPYS: suitable personnel is click-only, single-menu and unit-pool scoped',
  assert.match(runtime,/Object\.defineProperty\(window,'renderSuitableDutyPeopleV2413'/);
  assert.doesNotMatch(runtime,/wrap\.className='dutySuitableWrapV2413'/);
  assert.match(html,/rpys-interaction-guard-loader-v400/);assert.match(html,/rpys-manual-targets-loader-v399/);
- assert.match(html,/rpys-runtime-v400\.js\?v=20260929-1/);
+ assert.match(html,/rpys-runtime-v400\.js\?v=20260929-2/);
  assert.match(html,/__RPYS_EDIT_GUARD_UNTIL_V400__/);
+});
+test('RPYS: SDS doctor selection lists all doctors and provides select all',()=>{
+ const html=source('index.html');
+ assert.match(html,/fixedSdsDoctors/);
+ assert.match(html,/label===\'392\.19\'\)await fixedSdsDoctors/);
+ assert.match(html,/Bu branştaki tüm hekimler/);
+ assert.match(html,/Tümünü Seç/);
+ assert.match(html,/\(rr\?\.doctors\|\|\[\]\)\.map\(x=>x\.doctor\)/);
+ assert.doesNotMatch(html,/SDS_ALL_DOCTORS_LOADER[^;]+en fazla 5 hekim seçilebilir/);
 });
 test('RPYS: per-person day and night target panel is connected to the 6.1.1 safe scheduler',()=>{
  const targets=source('rpys-targets-v399.js'),scheduler=source('rpys-scheduler-v398.js');
