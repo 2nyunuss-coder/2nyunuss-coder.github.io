@@ -1,10 +1,9 @@
-/* First-edit durability and click-only, unit-scoped suitable-person menu. */
+/* First-edit durability and click-only suitable-person menu. */
 (()=>{
   if(window.__RPYS_INTERACTION_GUARD_V400__)return;
   window.__RPYS_INTERACTION_GUARD_V400__=true;
 
   let suitableOpen=false,repairTimer=0,flushTimer=0,ackToken=0,repairing=false,rendererLocked=false;
-  const MAX_SUITABLE=8;
   const ownedWraps=new WeakSet(),ownedButtons=new WeakSet();
   const guard=()=>{window.__RPYS_EDIT_GUARD_UNTIL_V400__=Date.now()+120000};
   const invalidate=()=>{
@@ -60,8 +59,8 @@
   function suitableRows(col){
     let rows=[];try{rows=typeof suitablePeopleForDutyV2413==='function'?suitablePeopleForDutyV2413():[]}catch(e){console.warn('RPYS400 uygun personel',e)}
     if(!Array.isArray(rows))rows=[];
-    const pool=configuredPool(col),eligible=pool.size?rows.filter(row=>pool.has(Number((row?.p||row)?.id))):rows;
-    return {rows:eligible.slice(0,MAX_SUITABLE),poolConfigured:pool.size>0,total:eligible.length};
+    const eligible=rows.filter(row=>{const p=row?.p||row;return p&&p.active!==false&&String(p.status||'Aktif').toLocaleUpperCase('tr-TR')!=='PASİF'});
+    return {rows:eligible,poolConfigured:false,total:eligible.length};
   }
   function displayDate(raw){const m=String(raw||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}.${m[2]}.${m[1]}`:String(raw||'—')}
   function canonicalParts(){
@@ -78,8 +77,8 @@
     try{col=dutyColumnByKey(type,cell.dataset.col)}catch(_){}try{date=dateStr(day)}catch(_){date=monthKey()+'-'+String(day).padStart(2,'0')}
     if(!col){box.innerHTML='<div class="suitableNoneV2413">Vardiya bilgisi bulunamadı.</div>';box.style.display='block';return}
     const result=suitableRows(col),rows=result.rows;
-    const scope=result.poolConfigured?'birim için seçili personel havuzu':'uygun personel';
-    const count=result.total>rows.length?`${rows.length}/${result.total} kişi (ilk ${MAX_SUITABLE})`:`${rows.length} kişi`;
+    const scope='tüm aktif ve uygun personel';
+    const count=`${rows.length} kişi`;
     const header=`<div class="suitableHeadV2413"><b>${esc(displayDate(date))} • ${esc(col.unit||type)}</b><br><small>${esc(col.shift||'')} • ${count} • ${scope}</small></div>`;
     const people=rows.length?rows.map(item=>{
       const p=item?.p||item;if(!p)return '';
@@ -88,7 +87,7 @@
       const lastText=last?` • Son mesai: ${displayDate(last)}`:'',spouse=item.spouseToday?' • Eşi bugün görevde':'';
       let style='';try{style=personColorStyle(p.id,false)}catch(_){}
       return `<button type="button" class="suitablePersonV2413 rpys400SuitablePerson" data-rpys-suitable-person="${Number(p.id)}" style="${esc(style)}"><b>${esc(p.name)}</b><span>${esc(idleText+lastText+spouse)}</span></button>`;
-    }).join(''):'<div class="suitableNoneV2413">Bu hücre için seçili birim havuzunda kurallara uygun personel bulunamadı.</div>';
+    }).join(''):'<div class="suitableNoneV2413">Bu gün ve vardiya için aktif, izin/çakışma/dinlenme kurallarına uygun personel bulunamadı.</div>';
     box.innerHTML=header+people;box.style.display='block';
   }
   function ensureSingleMenu(){
