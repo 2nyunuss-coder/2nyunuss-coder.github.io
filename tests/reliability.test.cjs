@@ -167,6 +167,19 @@ test('RPYS: SDS doctor selection lists all doctors and provides select all',()=>
  assert.match(html,/\(rr\?\.doctors\|\|\[\]\)\.map\(x=>x\.doctor\)/);
  assert.doesNotMatch(html,/SDS_ALL_DOCTORS_LOADER[^;]+en fazla 5 hekim seçilebilir/);
 });
+test('RPYS: custom shifts are key-scoped, reorderable and accept every unit',()=>{
+ const runtime=source('rpys-runtime-v405.js'),html=source('index.html');
+ assert.match(runtime,/db\.shiftStudio\.disabled\[k\]/);
+ assert.doesNotMatch(runtime,/shiftSignature\(c\)!==sig/);
+ assert.match(runtime,/columnOrder/);
+ assert.match(runtime,/Birim içinde sola kaydır/);
+ assert.match(runtime,/Birim içinde sağa kaydır/);
+ assert.match(runtime,/Mevcut veya yeni birim adı/);
+ assert.match(runtime,/gerektiğinde yeni birim adı yazabilirsin/);
+ assert.match(runtime,/Yeni mükerrer sütun oluşturulmadı/);
+ assert.match(html,/rpys-custom-shift-loader-v405/);
+ assert.match(html,/rpys-runtime-v405\.js\?v=20260929-1/);
+});
 test('RPYS: per-person day and night target panel is connected to the 6.1.1 safe scheduler',()=>{
  const targets=source('rpys-targets-v399.js'),scheduler=source('rpys-scheduler-v398.js');
  assert.match(targets,/Personel Gündüz \/ Nöbet Hedefleri/);assert.match(targets,/Hedeflere Göre Dağıt/);
