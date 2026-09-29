@@ -178,7 +178,7 @@ test('RPYS: custom shifts are key-scoped, reorderable and accept every unit',()=
  assert.match(runtime,/gerektiğinde yeni birim adı yazabilirsin/);
  assert.match(runtime,/Yeni mükerrer sütun oluşturulmadı/);
  assert.match(html,/rpys-custom-shift-loader-v405/);
- assert.match(html,/rpys-runtime-v405\.js\?v=20260929-1/);
+ assert.match(html,/rpys-runtime-v405\.js\?v=20260929-2/);
 });
 test('RPYS: per-person day and night target panel is connected to the 6.1.1 safe scheduler',()=>{
  const targets=source('rpys-targets-v399.js'),scheduler=source('rpys-scheduler-v398.js');
