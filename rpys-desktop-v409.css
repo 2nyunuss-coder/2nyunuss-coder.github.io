@@ -1,70 +1,30 @@
 /* Table controls apply in both views; business-cell colors are deliberately preserved. */
 .rpysTableZoom319,.rpysF20ZoomTools,.r319zoom{display:none!important}
-.rpysViewZoom409{position:sticky;left:0;top:0;z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:8px;background:#edf4fb;color:#17365d;border:1px solid #c3d4e6;border-radius:8px;margin-bottom:8px;width:fit-content;max-width:100%;zoom:1!important}
-.rpysViewZoom409 button,.rpysPanelToggle409{background:#fff!important;color:#17365d!important;border:1px solid #aebfd3!important;border-radius:6px;padding:5px 8px!important;min-height:30px!important;font-size:12px!important;cursor:pointer}
-.rpysViewZoom409 output{font-weight:700;min-width:38px;text-align:center}
-.rpysPanelToggle409{margin-right:8px}
-.rpysTableFold409:not(.rpysViewZoom409){display:none!important}
-.rpysPanelFold409:not(.rpysFoldBar409){display:none!important}
-.tablewrap.rpysTableFull409{position:fixed!important;inset:12px!important;width:calc(100vw - 24px)!important;height:calc(100dvh - 24px)!important;max-width:none!important;max-height:none!important;background:#fff!important;padding:12px!important;border:2px solid #17365d!important;z-index:9000;box-shadow:0 0 0 30px #172b4699;overflow:auto!important}
-.page:has(.rpysTableFull409){z-index:9000!important}
-#rpysViewBar409{display:flex;gap:9px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #bfd0e2;color:#17365d;border-radius:10px;padding:10px;margin:8px 0 12px;position:relative;z-index:800}
-#rpysViewBar409 button,#rpysViewBar409 select,#rpysDock409 button,#rpysStart409 button,#rpysDesktopHome409 button{font-family:inherit;color:#17365d;background:#fff;border:1px solid #bfd0e2;border-radius:8px;padding:9px 12px;cursor:pointer;min-height:36px;font-size:13px}
-#rpysViewBar409 strong{font-size:11px;color:#52677b}
-#rpysViewBar409 select{max-width:190px}
-#rpysDesktopHome409[hidden],#rpysDock409[hidden],#rpysStart409[hidden],.rpysWindowHead409{display:none}
-body.rpysDesktop409{--desk-bg:#e8f1f8;--desk-ink:#17365d;--desk-card:#fff;--desk-border:#b9cde0;background:var(--desk-bg)!important}body.rpysDesktop409[data-desktop-theme409=ivory]{--desk-bg:#f4eed5;--desk-border:#d4c4a8}
-body.rpysDesktop409[data-desktop-theme409=forest]{--desk-bg:#e4efe7;--desk-ink:#205336;--desk-card:#fbfffc;--desk-border:#b1cdbb}
-body.rpysDesktop409[data-desktop-theme409=navy]{--desk-bg:#15263e;--desk-ink:#e8f3ff;--desk-card:#233b59;--desk-border:#567591}
-body.rpysDesktop409 .app{display:block!important;background:transparent!important}body.rpysDesktop409 .sidebar{display:none!important}body.rpysDesktop409 .main{margin:0!important;width:100%!important;padding:10px 16px 72px!important;background:transparent!important;max-width:none!important}
-body.rpysDesktop409 .main>.top,body.rpysDesktop409 .main>.page{display:none!important}
-body.rpysDesktop409 .main>.page.rpysWindow409[data-desk-open=yes]{display:block!important;position:fixed!important;left:var(--win-x,12px)!important;top:var(--win-y,var(--rpys-work-top))!important;width:calc(100vw - 24px)!important;height:calc(100dvh - var(--rpys-work-top) - 106px)!important;min-width:320px!important;min-height:220px!important;overflow:auto!important;resize:none!important;z-index:var(--win-z,200);background:#f6f9fc!important;color:#17365d!important;border:1px solid #abc0d8!important;border-radius:12px!important;padding:0 12px 16px!important;box-shadow:0 15px 45px #13294330;margin:0!important;max-width:none!important}
-body.rpysDesktop409 .main>.page.rpysWindow409[data-desk-open=yes].rpysFocused409{border:2px solid #278c97!important}
-.rpysDesktop409 .rpysWindowHead409{display:flex;position:sticky;top:0;left:0;align-items:center;justify-content:space-between;gap:7px;background:#e9f1fa;color:#17365d;z-index:60;padding:9px 12px;margin:0 -12px 14px;border-bottom:1px solid #bfd0e2;cursor:move;touch-action:none}
-.rpysDesktop409 .rpysWindowHead409 strong{flex:1;font-size:14px}
-.rpysDesktop409 .rpysWindowHead409 button{background:#fff!important;color:#17365d!important;border:1px solid #aebfd3!important;border-radius:7px;padding:5px 10px!important;min-height:30px!important;cursor:pointer}
-.rpysDesktop409 .rpysWindowHead409 button:last-child{padding:5px 8px!important}
-.rpysDesktop409 .rpysWindowHead409 button[data-view-action=resize]{display:none}
-.rpysDesktop409 .rpysWindowHead409 button[data-view-action=toggle]{display:none}
-#rpysDesktopHome409{padding:24px 20px;color:var(--desk-ink);max-width:1200px;margin:auto}.rpysHomeHeading409>span{font-size:11px;letter-spacing:2px}.rpysHomeHeading409 h2{font-size:30px;color:inherit;margin:12px 0 8px}.rpysHomeHeading409 p{font-size:14px;line-height:1.8;color:inherit}.rpysShortcuts409{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:20px 0}.rpysShortcuts409 button{background:var(--desk-card);color:var(--desk-ink);border:1px solid var(--desk-border);border-radius:10px;padding:15px 18px;text-align:left;min-height:84px}.rpysShortcuts409 button:first-child{border-left:3px solid #17365d}
-#rpysDock409{position:fixed;bottom:0;left:0;right:0;z-index:810;display:flex;gap:7px;padding:9px;background:#fff;border-top:1px solid #bfd0e2;min-height:58px}
-.rpysTasks409{flex:1;display:flex;gap:5px;overflow:auto}
-.rpysTasks409 button{white-space:nowrap}
-.rpysTasks409 .selected{border-bottom:3px solid #007e87!important;background:#e7f5f6!important}
-#rpysStart409{position:fixed;bottom:65px;left:10px;z-index:820;width:440px;max-width:calc(100vw - 20px);background:#fff;color:#17365d;border:1px solid #aebfd3;border-radius:14px;padding:15px;box-shadow:0 14px 45px #0004}
-#rpysStart409 header{display:flex;align-items:center;justify-content:space-between}
-#rpysStart409 header h3{margin:0}
-#rpysStart409 input{width:100%;margin:10px 0;background:#fff;color:#17365d;border:1px solid #aebfd3;border-radius:7px;padding:9px 12px}
-.rpysAllModules409{max-height:55vh;overflow:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
-.rpysModuleRow409{display:flex;gap:6px;align-items:center;padding:8px;border:1px solid #dfeaf3;border-radius:8px;background:#f8fbff}
-.rpysModuleRow409 button:first-child{flex:1;text-align:left}
-.rpysModuleRow409[hidden]{display:none}
-@media(max-width:760px){body.rpysDesktop409 .main{padding:6px 6px 70px!important}.rpysHomeHeading409 h2{font-size:23px}.rpysShortcuts409{grid-template-columns:1fr 1fr}.body.rpysDesktop409 .main>.page.rpysWindow409[data-desk-open=yes]{left:4px!important;top:var(--rpys-work-top)!important;width:calc(100vw - 8px)!important;height:calc(100dvh - var(--rpys-work-top) - 106px)!important}.rpysViewZoom409{gap:3px}.rpysDesktop409 .rpysWindowHead409{padding:8px 10px;margin:0 -10px 12px}}
-@media print{#rpysViewBar409,#rpysDesktopHome409,#rpysDock409,#rpysStart409,.rpysWindowHead409,.rpysViewZoom409,.rpysPanelToggle409{display:none!important}body.rpysDesktop409 .main>.page{display:block!important}body.rpysDesktop409 .main>.page.rpysWindow409[data-desk-open=yes]{position:static!important;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;box-shadow:none!important;border:0!important;padding:0!important}table{zoom:1!important}}
+.rpysViewZoom409{position:sticky;left:0;top:0;z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:8px;background:#edf4fb;color:#17365d;border:1px solid #c3d4e6;border-radius:8[...]
+.rpysViewZoom409 button,.rpysPanelToggle409{background:#fff!important;color:#17365d!important;border:1px solid #aebfd3!important;border-radius:6px;padding:5px 8px!important;min-height:30px!importan[...]
+.tablewrap.rpysTableFull409{position:fixed!important;inset:12px!important;width:calc(100vw - 24px)!important;height:calc(100dvh - 24px)!important;max-width:none!important;max-height:none!important;[...]
+#rpysViewBar409{display:flex;gap:9px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #bfd0e2;color:#17365d;border-radius:10px;padding:10px;margin:8px 0 12px;position:relative;z-i[...]
+body.rpysDesktop409{--desk-bg:#e8f1f8;--desk-ink:#17365d;--desk-card:#fff;--desk-border:#b9cde0;background:var(--desk-bg)!important}body.rpysDesktop409[data-desktop-theme409=ivory]{--desk-bg:#f4eed[...]
+body.rpysDesktop409 .app{display:block!important;background:transparent!important}body.rpysDesktop409 .sidebar{display:none!important}body.rpysDesktop409 .main{margin:0!important;width:100%!importa[...]
+#rpysDesktopHome409{padding:24px 20px;color:var(--desk-ink);max-width:1200px;margin:auto}.rpysHomeHeading409>span{font-size:11px;letter-spacing:2px}.rpysHomeHeading409 h2{font-size:30px;color:inher[...]
+@media(max-width:760px){body.rpysDesktop409 .main{padding:6px 6px 70px!important}.rpysHomeHeading409 h2{font-size:23px}.rpysShortcuts409{grid-template-columns:1fr 1fr}.rpysDesktop409 .main>.page.r[...]
+@media print{#rpysViewBar409,#rpysDesktopHome409,#rpysDock409,#rpysStart409,.rpysWindowHead409,.rpysViewZoom409,.rpysPanelToggle409{display:none!important}body.rpysDesktop409 .main>.page{display:n[...]
+
 body:not(.rpysDesktop409) #rpysViewBar409 select{display:none}
 
 /* v410: keep cloud status in its own strip ABOVE the taskbar. */
-body.rpysDesktop409 #v24MasterBadge,body.rpysDesktop409 .v24MasterBadge{position:fixed!important;bottom:66px!important;left:14px!important;right:auto!important;max-width:calc(100vw - 260px)!important;max-height:32px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;z-index:805!important;font-size:10px!important;padding:5px 10px!important}
+body.rpysDesktop409 #v24MasterBadge,body.rpysDesktop409 .v24MasterBadge{position:fixed!important;bottom:66px!important;left:14px!important;right:auto!important;max-width:calc(100vw - 260px)!import[...]
 body.rpysDesktop409 .rpysFixedTools{bottom:66px!important;z-index:806!important;right:8px!important;max-width:230px!important}
 body.rpysDesktop409 .autoSaveBadge,body.rpysDesktop409 #autoSaveBadge{bottom:105px!important;z-index:805!important}
 #rpysDock409{z-index:810!important}#rpysStart409{z-index:820!important}
 body:not(.rpysDesktop409) #rpysViewBar409 [data-view-action=newgroup]{display:none}
-.rpysGroups410{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:14px 0}.rpysGroupCard410{position:relative;background:var(--desk-card);border:1px solid var(--desk-border);border-radius:10px;padding:15px 18px 14px;color:var(--desk-ink)}
-.rpysGroupCard410>button:first-child{background:transparent;border:0;color:inherit;text-align:left;padding:0;display:block;width:100%;font-weight:700;margin-bottom:8px}
-.rpysGroupCard410 small{display:block;margin-top:6px;opacity:.8}
-.rpysDialog410{position:fixed;inset:0;background:#13294388;z-index:850;display:grid;place-items:center;padding:15px}.rpysDialog410>section{background:#fff;color:#17365d;border-radius:14px;width:min(600px,92vw);max-height:90dvh;overflow:auto;padding:20px;box-shadow:0 15px 60px #0004}
-.rpysDialog410 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.rpysDialog410 h3{margin:0}
-.rpysDialog410 button,.rpysDialog410 input,.rpysDialog410 select,.rpysDialog410 textarea{background:#fff;color:#17365d;border:1px solid #aebfd3;border-radius:7px;padding:9px 10px}
-.rpysDialog410 .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.rpysDialog410 .actions button{min-width:110px}
-@media(max-width:760px){.rpysGroupChoices410{grid-template-columns:1fr}body.rpysDesktop409 #v24MasterBadge,body.rpysDesktop409 .v24MasterBadge{max-width:calc(100vw - 30px)!important}.rpysDesktop409 .main{overflow-x:hidden!important}}
+.rpysGroups410{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:14px 0}.rpysGroupCard410{position:relative;background:var(--desk-card);border:1px solid var(--d[...]
+.rpysDialog410{position:fixed;inset:0;background:#13294388;z-index:850;display:grid;place-items:center;padding:15px}.rpysDialog410>section{background:#fff;color:#17365d;border-radius:14px;width:mi[...]
+@media(max-width:760px){.rpysGroupChoices410{grid-template-columns:1fr}body.rpysDesktop409 #v24MasterBadge,body.rpysDesktop409 .v24MasterBadge{max-width:calc(100vw - 30px)!important}.rpysDesktop40[...]
 @media print{.rpysDialog410{display:none!important}}
 
 html.rpysEdgeHover411,html.rpysEdgeHover411 *{cursor:var(--rpys-edge-cursor)!important}
 
-.rpysEdgeGrip411{position:fixed;z-index:90;touch-action:none;user-select:none}.rpysEdgeGrip411[data-edge=n],.rpysEdgeGrip411[data-edge=s]{left:calc(var(--win-x) + 12px);width:calc(var(--win-w) - 24px);height:8px;cursor:ns-resize}.rpysEdgeGrip411[data-edge=e],.rpysEdgeGrip411[data-edge=w]{top:calc(var(--win-y) + 12px);height:calc(var(--win-h) - 24px);width:8px;cursor:ew-resize}
-.rpysEdgeGrip411[data-edge=ne],.rpysEdgeGrip411[data-edge=nw],.rpysEdgeGrip411[data-edge=se],.rpysEdgeGrip411[data-edge=sw]{width:12px;height:12px;border-radius:50%;background:rgba(23,54,93,.12);border:1px solid rgba(23,54,93,.3)}
-.rpysEdgeGrip411[data-edge=ne]{left:calc(var(--win-x) + var(--win-w) - 16px);top:calc(var(--win-y) + 8px);cursor:nwse-resize}.rpysEdgeGrip411[data-edge=nw]{left:calc(var(--win-x) + 8px);top:calc(var(--win-y) + 8px);cursor:nesw-resize}.rpysEdgeGrip411[data-edge=se]{left:calc(var(--win-x) + var(--win-w) - 16px);top:calc(var(--win-y) + var(--win-h) - 16px);cursor:nesw-resize}.rpysEdgeGrip411[data-edge=sw]{left:calc(var(--win-x) + 8px);top:calc(var(--win-y) + var(--win-h) - 16px);cursor:nwse-resize}
-.rpysEdgeGrip411[hidden]{display:none!important}
+.rpysEdgeGrip411{position:fixed;z-index:90;touch-action:none;user-select:none}.rpysEdgeGrip411[data-edge=n],.rpysEdgeGrip411[data-edge=s]{left:calc(var(--win-x) + 12px);width:calc(var(--win-w) - 2[...]
 
-@media(max-width:760px){.rpysEdgeGrip411{display:none!important}}
+.rpysEdgeGrip411[hidden]{display:none!important}
