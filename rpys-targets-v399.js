@@ -17,7 +17,11 @@
   function persist(){window.__RPYS_LAST_USER_EDIT_V396__=Date.now();saveNowV245({label:'Personel gündüz/nöbet hedefleri'});}
   function model(u,ids=selected(u)){
     const rebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
+    // Mevcut G/N sayısını assignmentsMonth() önbelleğinden değil, seçili ayın
+    // gerçek vardiya hücrelerinden yeniden hesapla. Böylece ay değiştirirken eski
+    // ayın önbelleği yeni ayın toplamına karışamaz.
     const actual=Object.fromEntries(ids.map(id=>[id,empty()])),fixed=Object.fromEntries(ids.map(id=>[id,empty()]));
+    const counted=new Set();
     const slots=[],mutable=new Set();let lockedEmpty=0;
     for(const s of unitSlots(u).filter(s=>!isShiftBlockedForMonth(s.type,s.col,ym())))for(let d=1;d<=daysInMonth();d++){
       if(!isDutyCellApplicable(s.type,s.col,d))continue;
@@ -28,10 +32,19 @@
       if(!protectedCell&&(rebuild||!own(db.assign,k))){mutable.add(k);slots.push({key:k,day:d,type:s.type,col:s.col,kind:kind(s.col)});}
       else if(!db.assign[k])lockedEmpty++;
     }
-    for(const a of assignmentsMonth().filter(a=>a.col?.unit===u)){
-      const id=Number(a.person.id),t=kind(a.col);if(!actual[id])continue;
+    // Aynı hücreyi yalnız bir kez say; kaynak db.assign + unitSlots() olsun.
+    // Bu, tabloda görünen ayın gerçek hücre toplamını verir.
+    for(const s of unitSlots(u).filter(s=>!isShiftBlockedForMonth(s.type,s.col,ym())))for(let d=1;d<=daysInMonth();d++){
+      if(!isDutyCellApplicable(s.type,s.col,d))continue;
+      const k=keyFor(s.type,d,s.col.key),raw=db.assign?.[k],id=Number(raw||0);
+      if(!id||!actual[id]||counted.has(k))continue;
+      counted.add(k);
+      const t=kind(s.col);
       actual[id][t]++;
-      if(a.importedExtra||!mutable.has(keyFor(a.type,a.day,a.col.key)))fixed[id][t]++;
+      const manualProtected=window.rpysScheduler398?.manualAssignmentCell
+        ?window.rpysScheduler398.manualAssignmentCell(k)
+        :!!(db.manualDutyOverrides?.[k]||db.assignmentMeta?.[k]?.manual);
+      if(!mutable.has(k)||manualProtected)fixed[id][t]++;
     }
     const required=empty();for(const id of ids)for(const t of kinds)required[t]+=fixed[id][t];
     for(const s of slots)required[s.kind]++;
