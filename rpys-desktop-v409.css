@@ -28,3 +28,32 @@ html.rpysEdgeHover411,html.rpysEdgeHover411 *{cursor:var(--rpys-edge-cursor)!imp
 .rpysEdgeGrip411{position:fixed;z-index:90;touch-action:none;user-select:none}.rpysEdgeGrip411[data-edge=n],.rpysEdgeGrip411[data-edge=s]{left:calc(var(--win-x) + 12px);width:calc(var(--win-w) - 2[...]
 
 .rpysEdgeGrip411[hidden]{display:none!important}
+
+
+/* v412.1: Saymanlık isimleri yazdırma alanının içinde tut */
+#say1Grid table tbody td:first-child,
+#say2Grid table tbody td:first-child {
+  max-width: 85px !important;
+  width: 85px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 12px !important;
+  padding: 6px 4px !important;
+}
+#say1Grid table thead th:first-child,
+#say2Grid table thead th:first-child {
+  max-width: 85px !important;
+  width: 85px !important;
+  font-size: 11px !important;
+  padding: 6px 4px !important;
+}
+#say1Grid table td,
+#say2Grid table td { padding: 5px 4px !important; font-size: 11px !important; vertical-align: middle !important; }
+#say1Grid table th,
+#say2Grid table th { padding: 5px 4px !important; font-size: 11px !important; font-weight: 600 !important; }
+@media print {
+  #say1Grid table tbody td:first-child,
+  #say2Grid table tbody td:first-child { max-width: 80px !important; width: 80px !important; font-size: 11px !important; line-height: 1.2 !important; }
+  #say1Grid table, #say2Grid table { font-size: 10px !important; }
+}
