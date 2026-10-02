@@ -88,6 +88,7 @@
   function wrapEligibility(name){
     const base=window[name];if(typeof base!=='function'||base.__rpys398)return;
     const fn=function(id,day,col){
+      if(window.__RPYS_MANUAL_16_APPROVED_COL__===String(id)+'|'+String(day)+'|'+String(col?.key||col?.unit||''))return true;
       if(!activeOn(id,day))return false;
       if(run&&col?.key){
         for(const type of ['pol','acil'])if(dutyColumnByKey(type,col.key)&&protectedCell(keyFor(type,day,col.key)))return false;
