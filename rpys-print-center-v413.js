@@ -12,8 +12,8 @@ function period(row,base){
  return Math.floor(n/12)+'-'+String(n%12+1).padStart(2,'0');
 }
 function table(title,heads,rows){return stablePrintHeader(title)+'<table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'+stableSignatures();}
-function printNote(id,month){try{const all=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');return String(all[id+'|'+month]||'').trim()}catch(_){return''}}
-function noteBlock(id,month){const noteKey=id==='say1'||id==='say2'?'saymanlik':id;if(noteKey!=='nobet'&&noteKey!=='saymanlik')return'';const v=printNote(noteKey,month);if(!v)return'';return '<div class="printNote"><b>📝 Not</b><div>'+esc(v).replace(/\\n/g,'<br>')+'</div></div>'}
+function printNote(id,month){try{const all=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');const k=id+'|'+month;const v=all[k]??all[(id==='say1'||id==='say2'?'saymanlik':id)+'|'+month]??'';return String(v).trim()}catch(_){return''}}
+function noteBlock(id,month){const noteKey=id==='say1'||id==='say2'?'saymanlik':id;if(noteKey!=='nobet'&&noteKey!=='saymanlik')return'';const v=printNote(noteKey,month);if(!v)return'';return '<div class="printNote"><b>📝 Not</b><div>'+esc(v).replace(/\r?\n/g,'<br>')+'</div></div>'}
 function documents(id){
  if(id==='say1'||id==='say2'){const n=id==='say2'?2:1;return [stableSayDoc(sayNamesForPage(n),'SAYFA '+n+'/2')];}
  if(id==='puantaj')return [stableSayDoc(sayNamesForPage(1),'SAYFA 1/2'),stableSayDoc(sayNamesForPage(2),'SAYFA 2/2')];
