@@ -190,6 +190,7 @@
       if(eligibilityDepth)return base.apply(this,arguments);
       const result=candidateResult(personId,day,col);
       if(!result.ok){
+        if(window.__RPYS_MANUAL_16_APPROVED__===`${targetDate(day)}|${Number(personId)}|${String(col?.key||col?.unit||"")}`) return true;
         if(!isManualConsecutive16(personId,day,col,result))return false;
         return true;
       }
@@ -206,6 +207,7 @@
         if(!result.ok){
           if(!isManualConsecutive16(pid,day,col,result)){alert(violationText(result));return false}
           const token=String(type)+"|"+Number(day)+"|"+colKey+"|"+pid;
+          if(window.__RPYS_MANUAL_16_APPROVED__===`${targetDate(day)}|${pid}|${String(col?.key||col?.unit||"")}`){approved16Token=token;window.__RPYS_MANUAL_16_APPROVED__="";}
           if(approved16Token!==token){
             const nm=personName(pid),prev=addDays(targetDate(day),-1),hrs=previousDayHours(pid,day);
             const ok=window.confirm("⚠️ 16 SAAT DİNLENME UYARISI\\n\\n"+nm+" personeli "+prev+" tarihinde "+hrs+" saat görev yapmış.\\n\\nBugün tekrar 16 saatlik göreve atanacak.\\n\\nYine de bu atamayı yapmak istiyor musunuz?");
