@@ -158,8 +158,11 @@
   }
 
   let approved16Token="";
+  function isManualDutyContext(){
+    return !!(safe(()=>dutyContextCellV2413,null)||document.querySelector('.dropDutyCell.dutySelected')||document.activeElement?.closest?.('.dropDutyCell'));
+  }
   function isManualConsecutive16(personId,day,col,result){
-    if(!result?.violations?.length)return false;
+    if(!isManualDutyContext()||!result?.violations?.length)return false;
     if(workHours(col||{})<REST_LIMIT)return false;
     if(previousDayHours(Number(personId),day)<REST_LIMIT)return false;
     const target=targetDate(day),previous=addDays(target,-1);
