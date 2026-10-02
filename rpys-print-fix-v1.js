@@ -16,6 +16,6 @@ function prepare(){
 }
 function style(){if(document.getElementById('rpys-print-fix-v1-style'))return;const s=document.createElement('style');s.id='rpys-print-fix-v1-style';s.textContent='@media print{.rpysPageNote{display:block!important;margin:4mm 0 2mm!important;padding:2mm!important;border:1px solid #777!important;break-inside:avoid!important}.rpysPageNoteTitle,.rpysPageNoteMeta,.rpysPageNote textarea{display:none!important}.rpysNotePrintText{display:block!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:break-word!important;font:8pt Arial,sans-serif!important;line-height:1.3!important;min-height:5mm}.rpysPageNote:not(.rpysHasPrintNote){display:block!important}.sayScreenTable,#saymanlik table{table-layout:fixed!important;width:100%!important}.sayScreenTable td:first-child,#saymanlik table td:first-child{white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;overflow:hidden!important;vertical-align:middle!important}}.rpysNotePrintText{display:none}';document.head.appendChild(s)}
 function run(){style();prepare()}
-run();new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
+run();setTimeout(run,800);setTimeout(run,2000);
 window.addEventListener('beforeprint',prepare);window.addEventListener('afterprint',()=>document.querySelectorAll('.rpysNotePrintText').forEach(x=>x.remove()));
 })();
