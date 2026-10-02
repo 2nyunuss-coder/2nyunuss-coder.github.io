@@ -217,7 +217,7 @@
     alert("Şifre güvenli şekilde değiştirildi. Diğer eski oturumlar geçersiz kılındı.");
   }catch(e){alert(e?.message||"Şifre değiştirilemedi.")}
 }`);
-   if(!app.includes('rpys-page-notes-external-v2'))app=insertBeforeFinalBody(app,'<script id="rpys-page-notes-external-v2" src="/rpys-page-notes-v2.js?v=20261002-2"><\/script>');
+   if(!app.includes('rpys-page-notes-external-v2'))app=insertBeforeFinalBody(app,'<script id="rpys-page-notes-external-v2" src="/rpys-page-notes-v2.js?v=20261002-3"><\/script>');
    if(!app.includes('rpys-mobile-secure-v303'))app=app.replace(/<\/head>/i,MOBILE_CSS+'</head>');
    if(!app.includes('rpys-mobile-secure-runtime-v303'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
    if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
@@ -231,10 +231,10 @@
    if(!app.includes('rpys-monthly-list-variants-loader-v406'))app=insertBeforeFinalBody(app,MONTHLY_LIST_VARIANTS_JS);
    if(!app.includes('rpys-desktop-view-loader-v409'))app=insertBeforeFinalBody(app,DESKTOP_VIEW_JS);
    if(!app.includes('rpys-saymanlik-name-fit-v1')){
-    const SAY_NAME_FIT_JS='<style id="rpys-saymanlik-name-fit-v1">#say1Grid td:first-child,#say2Grid td:first-child{white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;vertical-align:middle!important;font-size:10.5px!important;line-height:1.05!important;padding-left:3px!important;padding-right:3px!important}</style><script id="rpys-saymanlik-name-fit-runtime-v1">(()=>{function fit(){document.querySelectorAll("#say1Grid td:first-child,#say2Grid td:first-child").forEach(c=>{if(!c.textContent.trim())return;c.style.fontSize="10.5px";c.style.whiteSpace="nowrap";let n=0;while(c.scrollWidth>c.clientWidth+1&&n<12){let s=parseFloat(getComputedStyle(c).fontSize);if(s<=7)break;c.style.fontSize=(s-.5)+"px";n++}})}let obs=new MutationObserver(fit);function start(){fit();obs.observe(document.body,{childList:true,subtree:true});setTimeout(fit,300);setTimeout(fit,1200);setTimeout(fit,2500)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start()})();<'+ '/script>';
+    const SAY_NAME_FIT_JS='<style id="rpys-saymanlik-name-fit-v1">#say1Grid td:first-child,#say2Grid td:first-child{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;word-break:break-word!important;vertical-align:middle!important;font-size:8.5px!important;line-height:1.02!important;padding-left:2px!important;padding-right:2px!important}</style><script id="rpys-saymanlik-name-fit-runtime-v2">(()=>{function fit(){document.querySelectorAll("#say1Grid td:first-child,#say2Grid td:first-child").forEach(c=>{if(!c.textContent.trim())return;c.style.whiteSpace="normal";c.style.overflowWrap="anywhere";c.style.wordBreak="break-word";let n=0;c.style.fontSize="8.5px";while(c.scrollHeight>c.clientHeight+1&&n<4){let s=parseFloat(getComputedStyle(c).fontSize);if(s<=6)break;c.style.fontSize=(s-.5)+"px";n++}})}function start(){fit();setTimeout(fit,300);setTimeout(fit,1000);setTimeout(fit,2000)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start()})();<'+ '/script>';
     app=insertBeforeFinalBody(app,SAY_NAME_FIT_JS);
    }
-   if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261002-4"><'+ '/script>');
+   if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261002-5"><'+ '/script>');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
