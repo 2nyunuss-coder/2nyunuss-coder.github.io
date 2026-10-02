@@ -207,7 +207,7 @@
         if(!result.ok){
           if(!isManualConsecutive16(pid,day,col,result)){alert(violationText(result));return false}
           const token=String(type)+"|"+Number(day)+"|"+colKey+"|"+pid;
-          if(window.__RPYS_MANUAL_16_APPROVED__===`${targetDate(day)}|${pid}|${String(col?.key||col?.unit||"")}`){approved16Token=token;window.__RPYS_MANUAL_16_APPROVED__="";}
+          if(window.__RPYS_MANUAL_16_APPROVED__===`${targetDate(day)}|${pid}|${String(col?.key||col?.unit||"")}`){approved16Token=token;}
           if(approved16Token!==token){
             const nm=personName(pid),prev=addDays(targetDate(day),-1),hrs=previousDayHours(pid,day);
             const ok=window.confirm("⚠️ 16 SAAT DİNLENME UYARISI\\n\\n"+nm+" personeli "+prev+" tarihinde "+hrs+" saat görev yapmış.\\n\\nBugün tekrar 16 saatlik göreve atanacak.\\n\\nYine de bu atamayı yapmak istiyor musunuz?");
@@ -215,7 +215,7 @@
           }else approved16Token="";
         }
       }
-      return base.apply(this,arguments)
+      const out=base.apply(this,arguments); if(approved16Token===token){approved16Token="";window.__RPYS_MANUAL_16_APPROVED__="";} return out
     };
     wrapped.__rpys397=true;wrapped.__rpys397base=base;window.setAssign=wrapped
   }
