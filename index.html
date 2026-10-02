@@ -217,7 +217,7 @@
     alert("Şifre güvenli şekilde değiştirildi. Diğer eski oturumlar geçersiz kılındı.");
   }catch(e){alert(e?.message||"Şifre değiştirilemedi.")}
 }`);
-   if(!app.includes('rpys-page-notes-external-v2'))app=insertBeforeFinalBody(app,'<script id="rpys-page-notes-external-v2" src="/rpys-page-notes-v2.js?v=20261002-3"><\/script>');
+   if(!app.includes('rpys-page-notes-external-v2'))app=insertBeforeFinalBody(app,'<script id="rpys-page-notes-external-v2" src="/rpys-page-notes-v2.js?v=20261002-4"><\/script>');
    if(!app.includes('rpys-mobile-secure-v303'))app=app.replace(/<\/head>/i,MOBILE_CSS+'</head>');
    if(!app.includes('rpys-mobile-secure-runtime-v303'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
    if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
