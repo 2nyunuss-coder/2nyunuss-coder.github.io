@@ -235,6 +235,7 @@
     app=insertBeforeFinalBody(app,SAY_NAME_FIT_JS);
    }
    if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261002-4"><'+ '/script>');
+   if(!app.includes('rpys-print-fix-v1'))app=insertBeforeFinalBody(app,'<script id="rpys-print-fix-v1" src="/rpys-print-fix-v1.js?v=20261002-1"><'+ '/script>');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
