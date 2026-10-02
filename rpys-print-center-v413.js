@@ -14,20 +14,7 @@ function period(row,base){
 function table(title,heads,rows){return stablePrintHeader(title)+'<table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'+stableSignatures();}
 function printNote(id,month){try{const all=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');const noteId=id==='say1'||id==='say2'?'saymanlik':id;let v=all[noteId+'|'+month]??'';if(!String(v).trim()){const ta=document.querySelector('#'+noteId+' .rpysPageNote textarea');if(ta)v=ta.value||''}return String(v).trim()}catch(_){return''}}
 function noteBlock(id,month){const noteKey=id==='say1'||id==='say2'?'saymanlik':id;if(noteKey!=='nobet'&&noteKey!=='saymanlik')return'';const v=printNote(noteKey,month);if(!v)return'';return '<div class="printNote"><b>📝 Not</b><div>'+String(v).split(/\r?\n/).map(esc).join('<br>')+'</div></div>'}
-function sayUnitMukellefTotal(){try{return totals().reduce((sum,r)=>sum+(Number(puantajValue(r,'muk'))||0),0)}catch(_){return 0}}
-function trimSayTotals(html){try{
- const d=new DOMParser().parseFromString('<div id="rpysSayRoot">'+String(html||'')+'</div>','text/html'),root=d.getElementById('rpysSayRoot');
- root.querySelectorAll('table.stableSay tr').forEach(tr=>{
-   const cells=[...tr.querySelectorAll('td')],txt=String(tr.textContent||'').replace(/\s+/g,' ').trim();
-   if(cells.length&&!/toplam/i.test(txt)){const name=cells[0],len=String(name.textContent||'').trim().length;name.classList.add('sayNameCell');if(len>22)name.classList.add('sayNameLong');if(len>30)name.classList.add('sayNameVeryLong')}
-   if(/toplam\s*m[üu]kellef/i.test(txt)){
-     tr.classList.add('sayCompactTotal','sayMukellefTotal');
-     if(cells.length>=2){cells[0].textContent='Toplam Mükellef';cells[cells.length-1].textContent=String(Math.round(sayUnitMukellefTotal()*100)/100)}
-   }
-   if(/toplam\s*fazla\s*mesai/i.test(txt)){tr.classList.add('sayCompactTotal','sayOvertimeTotal');if(cells.length)cells[0].textContent='Toplam Fazla Mesai'}
- });
- return root.innerHTML
-}catch(_){return html}}
+function trimSayTotals(html){return window.rpysSaymanlik414?window.rpysSaymanlik414.prepare(html):html}
 function documents(id){
  if(id==='say1'||id==='say2'){const n=id==='say2'?2:1;return [trimSayTotals(stableSayDoc(sayNamesForPage(n),'SAYFA '+n+'/2'))];}
  if(id==='puantaj')return [stableSayDoc(sayNamesForPage(1),'SAYFA 1/2'),stableSayDoc(sayNamesForPage(2),'SAYFA 2/2')];
@@ -60,7 +47,7 @@ function build(pack){
    const bodies=documents(r.doc);
    for(let copy=1;copy<=r.copies;copy++)for(const body of bodies){
     if(!body||!body.includes('<table'))throw Error(names[r.doc]+' hazırlanamadı.');
-    parts.push({doc:r.doc,month:r.month,copy,body:body+noteBlock(r.doc,r.month)});
+    parts.push({doc:r.doc,month:r.month,copy,body:body+(body.includes('rpysSay414Note')?'':noteBlock(r.doc,r.month))});
    }
   }
  }finally{
@@ -95,6 +82,11 @@ function neutralizeLegacy(){
  });
 }
 function routePackageClick(e){
+ const control=e.target.closest?.('#rpysBulkPreview413 [data-bulk-print],#rpysBulkPreview413 [data-bulk-close]');
+ if(control){
+  e.preventDefault();e.stopImmediatePropagation();
+  control.onclick?.call(control,e);return;
+ }
  const button=e.target.closest?.('#r377v4 .r377print');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  try{const packs=JSON.parse(localStorage.getItem('rpys_bulk_print_377')||'[]');const index=Number(button.closest('[data-pack]')?.dataset.pack);preview(build(packs[index]));}catch(error){alert('Paket hazırlanamadı: '+error.message);}

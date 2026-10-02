@@ -8,19 +8,25 @@ function mount(id){
  const sec=document.getElementById(id);
  if(!sec || !sec.classList.contains('page'))return;
  let box=sec.querySelector('.rpysPageNote');
- if(box)return;
+ if(box){
+  if(box.dataset.rpysNoteMonth!==month()){
+   box.dataset.rpysNoteMonth=month();
+   const ta=box.querySelector('textarea'),print=box.querySelector('.rpysPageNotePrint');
+   ta.value=read()[key(id)]||'';print.textContent=ta.value;
+  }
+  return;
+ }
  box=document.createElement('div');
  box.className='rpysPageNote';
+ box.dataset.rpysNoteMonth=month();
  box.innerHTML='<div class="rpysPageNoteTitle">📝 Not</div><textarea placeholder="Bu liste için kısa not..."></textarea><div class="rpysPageNotePrint"></div><div class="rpysPageNoteMeta"><span>Bu ay için saklanır</span><button type="button">Temizle</button></div>';
  const ta=box.querySelector('textarea'),print=box.querySelector('.rpysPageNotePrint'),btn=box.querySelector('button');
  const syncPrint=()=>{print.textContent=ta.value||''};
  ta.value=read()[key(id)]||'';syncPrint();
- let timer;
  ta.addEventListener('input',()=>{
-   syncPrint();clearTimeout(timer);timer=setTimeout(()=>{
-    const x=read();x[key(id)]=ta.value;
-    try{localStorage.setItem(KEY,JSON.stringify(x))}catch(_){}
-   },150);
+   syncPrint();
+   const x=read();x[id+'|'+box.dataset.rpysNoteMonth]=ta.value;
+   try{localStorage.setItem(KEY,JSON.stringify(x))}catch(_){}
  });
  btn.onclick=()=>{ta.value='';syncPrint();const x=read();delete x[key(id)];try{localStorage.setItem(KEY,JSON.stringify(x))}catch(_){}ta.focus()};
  const sig=sec.querySelector(':scope > .sayScreenSignatures');
