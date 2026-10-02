@@ -157,6 +157,15 @@
     safe(()=>{_assignCache={}},null);safe(()=>{_allAssignCache=null},null);safe(()=>{_calcCache={}},null)
   }
 
+  let approved16Token="";
+  function isManualConsecutive16(personId,day,col,result){
+    if(!result?.violations?.length)return false;
+    if(workHours(col||{})<REST_LIMIT)return false;
+    if(previousDayHours(Number(personId),day)<REST_LIMIT)return false;
+    const target=targetDate(day),previous=addDays(target,-1);
+    return result.violations.every(v=>String(v.nextDate)===String(target)&&String(v.longDate)===String(previous)&&Number(v.hours)>=REST_LIMIT);
+  }
+
   function installCoreRule(){
     const blocking=function(personId,day){return previousDayHours(personId,day)};blocking.__rpys397=true;
     const worked=function(personId,day){return previousDayHours(personId,day)>=REST_LIMIT};worked.__rpys397=true;
@@ -176,7 +185,11 @@
     const base=window[name];if(typeof base!=="function"||base.__rpys397)return;
     const wrapped=function(personId,day,col){
       if(eligibilityDepth)return base.apply(this,arguments);
-      if(!candidateResult(personId,day,col).ok)return false;
+      const result=candidateResult(personId,day,col);
+      if(!result.ok){
+        if(!isManualConsecutive16(personId,day,col,result))return false;
+        return true;
+      }
       eligibilityDepth++;try{return base.apply(this,arguments)}finally{eligibilityDepth--}
     };
     wrapped.__rpys397=true;wrapped.__rpys397base=base;window[name]=wrapped
@@ -186,8 +199,14 @@
     const wrapped=function(type,day,colKey,id){
       const pid=Number(id||0);
       if(pid){
-        const key=safe(()=>keyFor(type,Number(day),colKey),`${currentMonth()}|${type}|${Number(day)}|${colKey}`),result=validateMutations([{key,type,day:Number(day),colKey,pid}]);
-        if(!result.ok){alert(violationText(result));return false}
+        const key=safe(()=>keyFor(type,Number(day),colKey),String(currentMonth())+"|"+type+"|"+Number(day)+"|"+colKey),result=validateMutations([{key,type,day:Number(day),colKey,pid}]),col=safe(()=>dutyColumnByKey(type,colKey),{});
+        if(!result.ok){
+          if(!isManualConsecutive16(pid,day,col,result)){alert(violationText(result));return false}
+          const token=String(type)+"|"+Number(day)+"|"+colKey+"|"+pid;
+          if(approved16Token!==token){
+            if(typeof window.rpysApproveDutyConflict384!=="function"||!window.rpysApproveDutyConflict384(pid,type,Number(day),colKey,key))return false;
+          }else approved16Token="";
+        }
       }
       return base.apply(this,arguments)
     };
@@ -224,8 +243,15 @@
   function wrapConflictApproval(){
     const base=window.rpysApproveDutyConflict384;if(typeof base!=="function"||base.__rpys397)return;
     const wrapped=function(pid,type,day,colKey,targetKey){
-      const key=targetKey||safe(()=>keyFor(type,Number(day),colKey),""),result=validateMutations([{key,type,day:Number(day),colKey,pid:Number(pid)}]);
-      if(!result.ok){alert(violationText(result));return false}
+      const key=targetKey||safe(()=>keyFor(type,Number(day),colKey),"");
+      const col=safe(()=>dutyColumnByKey(type,colKey),{});
+      const result=validateMutations([{key,type,day:Number(day),colKey,pid:Number(pid)}]);
+      if(!result.ok){
+        if(!isManualConsecutive16(Number(pid),Number(day),col,result)){alert(violationText(result));return false}
+        const ok=base.apply(this,arguments);
+        if(ok)approved16Token=String(type)+"|"+Number(day)+"|"+colKey+"|"+Number(pid);
+        return ok;
+      }
       return base.apply(this,arguments)
     };
     wrapped.__rpys397=true;wrapped.__rpys397base=base;window.rpysApproveDutyConflict384=wrapped
