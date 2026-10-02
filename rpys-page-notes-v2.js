@@ -6,7 +6,7 @@ const key=id=>id+'|'+month();
 
 function mount(id){
  const sec=document.getElementById(id);
- if(!sec)return;
+ if(!sec || !sec.classList.contains('page'))return;
  let box=sec.querySelector('.rpysPageNote');
  if(box)return;
  box=document.createElement('div');
@@ -23,20 +23,19 @@ function mount(id){
    },150);
  });
  btn.onclick=()=>{ta.value='';syncPrint();const x=read();delete x[key(id)];try{localStorage.setItem(KEY,JSON.stringify(x))}catch(_){}ta.focus()};
- const sigs=[...sec.querySelectorAll('.sayScreenSignatures')];
- const sig=sigs[sigs.length-1];
- if(sig&&sig.parentNode) sig.parentNode.insertBefore(box,sig.nextSibling);
+ const sig=sec.querySelector(':scope > .sayScreenSignatures');
+ if(sig) sig.insertAdjacentElement('afterend',box);
  else{
-   const panels=[...sec.querySelectorAll('.panel')];
+   const panels=[...sec.querySelectorAll(':scope > .panel')];
    const last=panels[panels.length-1];
-   if(last&&last.parentNode)last.parentNode.insertAdjacentElement('afterend',box);
+   if(last) last.insertAdjacentElement('afterend',box);
    else sec.appendChild(box);
  }
 }
 
 function css(){
- if(document.getElementById('rpys-page-notes-style-v3'))return;
- const st=document.createElement('style');st.id='rpys-page-notes-style-v3';
+ if(document.getElementById('rpys-page-notes-style-v4'))return;
+ const st=document.createElement('style');st.id='rpys-page-notes-style-v4';
  st.textContent=`
 .rpysPageNote{display:block!important;width:100%!important;clear:both!important;margin:6px 0 10px!important;padding:7px 9px!important;background:#fff!important;border:1px solid #d7e1ec!important;border-radius:7px!important;box-sizing:border-box!important}
 .rpysPageNoteTitle{display:block!important;font-size:11px!important;font-weight:700!important;color:#17365d!important;margin-bottom:4px!important}
