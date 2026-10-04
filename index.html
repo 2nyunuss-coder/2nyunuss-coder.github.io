@@ -237,6 +237,7 @@
     app=insertBeforeFinalBody(app,SAY_NAME_FIT_JS);
    }
    if(!app.includes('rpys-saymanlik-print-loader-v414'))app=insertBeforeFinalBody(app,'<script id="rpys-saymanlik-print-loader-v414" src="/rpys-saymanlik-print-v414.js?v=20261002-414"><'+ '/script>');
+   if(!app.includes('rpys-duty-print-loader-v415'))app=insertBeforeFinalBody(app,'<script id="rpys-duty-print-loader-v415" src="/rpys-duty-print-v415.js?v=20261004-1"><'+ '/script>');
    if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261002-414"><'+ '/script>');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
