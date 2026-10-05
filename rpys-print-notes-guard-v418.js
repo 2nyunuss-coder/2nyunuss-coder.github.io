@@ -10,13 +10,26 @@ function currentMonth(){return String(document.getElementById('month')?.value||'
 function store(){
  try{return JSON.parse(localStorage.getItem(STORE)||'{}')||{}}catch(_){return{}}
 }
+function liveNoteValue(kind){
+ const sec=document.getElementById(kind);if(!sec)return'';
+ const candidates=[
+  ...sec.querySelectorAll('.rpysPageNote textarea,textarea[placeholder*="not" i],textarea[aria-label*="not" i],textarea[title*="not" i],textarea[name*="not" i],textarea[id*="not" i]')
+ ];
+ for(const ta of candidates){const v=String(ta?.value??'').trim();if(v)return v}
+ const box=sec.querySelector('.rpysPageNote');
+ for(const el of [box?.querySelector('.rpysPageNotePrint'),box?.querySelector('.rpysNotePrintText')]){const v=String(el?.textContent??'').trim();if(v)return v}
+ for(const ta of sec.querySelectorAll('textarea')){
+  const hint=[ta.placeholder,ta.getAttribute('aria-label'),ta.title,ta.name,ta.id,ta.closest('.rpysPageNote,[class*="note" i],[id*="note" i]')?.textContent].join(' ').toLocaleLowerCase('tr-TR');
+  const v=String(ta.value??'').trim();if(v&&hint.includes('not'))return v;
+ }
+ return'';
+}
 function visibleNote(kind,m){
- const sec=document.getElementById(kind),box=sec?.querySelector('.rpysPageNote');
- const ta=box?.querySelector('textarea');
- const live=[ta?.value,box?.querySelector('.rpysPageNotePrint')?.textContent,box?.querySelector('.rpysNotePrintText')?.textContent]
-   .map(v=>String(v??'')).find(v=>v.trim());
- if(m===currentMonth()&&live)return live.trim();
- return String(store()[kind+'|'+m]??'').trim();
+ const live=liveNoteValue(kind),cm=currentMonth();
+ if(live&&(m===cm||!/^(?:19|20)\d{2}-(?:0[1-9]|1[0-2])$/.test(String(m))))return live;
+ const saved=String(store()[kind+'|'+m]??'').trim();
+ if(saved)return saved;
+ return m===cm?live:'';
 }
 function style(doc){
  if(doc.getElementById('rpys-print-note-guard-style-v418'))return;
@@ -26,8 +39,14 @@ function style(doc){
 }
 function insertForTable(doc,table,kind){
  const sheet=table.closest('.sheet'),scope=sheet||table.closest('.stableSayPage,.rpys393saywrap,.rpys393doc')||table.parentElement||doc.body;
- if(scope?.querySelector(noteSelectors))return;
- const m=String(sheet?.dataset?.month||currentMonth()),value=visibleNote(kind,m);
+ const m=String(sheet?.dataset?.month||currentMonth()),value=visibleNote(kind,m),existing=scope?.querySelector(noteSelectors);
+ if(existing){
+  const target=existing.querySelector('.rpysSay414NoteContent,div:not(:first-child)')||[...existing.children].find(x=>x.tagName!=='B')||existing;
+  const current=String(target?.textContent??'').trim();
+  if(value&&!current)target.textContent=value;
+  if(existing.dataset){existing.dataset.rpysNoteKind=kind;existing.dataset.rpysNoteMonth=m}
+  return;
+ }
  const box=doc.createElement('div'),b=doc.createElement('b'),text=doc.createElement('div');
  box.className='rpysPrintNoteGuard418';box.dataset.rpysNoteKind=kind;box.dataset.rpysNoteMonth=m;
  b.textContent='NOT';text.textContent=value||' ';box.append(b,text);
