@@ -22,8 +22,9 @@ table.rpysSay414Table .rpysSay414GrandLabel,table.rpysSay414Table .rpysSay414Gra
 @media print{.rpysSay414Table,.rpysSay414Note{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `;
 function note(m){
- const ta=document.querySelector('#saymanlik .rpysPageNote textarea'),box=ta?.closest('.rpysPageNote');
- if(box?.dataset.rpysNoteMonth===m)return String(ta.value||'').trim();
+ const sec=document.getElementById('saymanlik');
+ const ta=sec?.querySelector('.rpysPageNote textarea,textarea[placeholder*="not" i],textarea[aria-label*="not" i],textarea[title*="not" i],textarea[name*="not" i],textarea[id*="not" i]');
+ const live=String(ta?.value||'').trim();if(live)return live;
  try{const all=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');return String(all['saymanlik|'+m]||'').trim()}catch(_){return ''}
 }
 function unitTotals(){
