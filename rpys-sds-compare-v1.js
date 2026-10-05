@@ -36,6 +36,66 @@
     const diff=oldV===0?(newV>0?"Yeni":"—"):`${pct>0?"+":""}${pct.toFixed(1)}%`;
     return `<span class="v">${oldV} → ${newV}</span><small>${diff}</small>`;
   };
+  const WORD_COMPARE_KEY="rpys_sds_compare_word_v1";
+  const saveWordComparison=(html,oldMonth,newMonth)=>{const payload={html,oldMonth,newMonth,savedAt:new Date().toISOString()};window.__RPYS_SDS_WORD_COMPARE__=payload;try{localStorage.setItem(WORD_COMPARE_KEY,JSON.stringify(payload))}catch(e){console.warn("SDS Word karşılaştırma verisi saklanamadı",e)}};
+  const xmlEsc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+  const wordPara=(value,{bold=false,size=18,color="111111",align="left",after=80}={})=>{
+    const lines=String(value??"").split(/\n+/).filter(x=>x.trim());
+    return (lines.length?lines:[""]).map(line=>`<w:p><w:pPr><w:spacing w:after="${after}"/><w:jc w:val="${align}"/></w:pPr><w:r><w:rPr>${bold?"<w:b/>":""}<w:sz w:val="${size}"/><w:color w:val="${color}"/></w:rPr><w:t xml:space="preserve">${xmlEsc(line.trim())}</w:t></w:r></w:p>`).join("");
+  };
+  const comparisonSections=doc=>{
+    const branch=[...doc.querySelectorAll(".branch-line")].map(x=>x.innerText||x.textContent||"").filter(Boolean);
+    const queries=[...doc.querySelectorAll(".comparison-list li")].map(x=>x.innerText||x.textContent||"").filter(Boolean);
+    const note=doc.querySelector(".note")?.innerText||doc.querySelector(".note")?.textContent||"";
+    let out="";
+    if(branch.length){out+=wordPara("Branş Karşılaştırmaları",{bold:true,size:22,after:100});for(const x of branch)out+=wordPara(x,{size:18,after:50})}
+    if(queries.length){out+=wordPara("Karşılaştırmalar",{bold:true,size:22,after:100});for(const x of queries)out+=wordPara(x,{size:18,after:70})}
+    if(note)out+=wordPara(note,{size:15,after:80});
+    return out;
+  };
+  const comparisonTableXml=table=>{
+    const widths=[1050,1450,878,878,878,878,878,878,878,878,878],total=widths.reduce((a,b)=>a+b,0);
+    const borders=`<w:tblBorders><w:top w:val="single" w:sz="5" w:color="667085"/><w:left w:val="single" w:sz="5" w:color="667085"/><w:bottom w:val="single" w:sz="5" w:color="667085"/><w:right w:val="single" w:sz="5" w:color="667085"/><w:insideH w:val="single" w:sz="4" w:color="8795A5"/><w:insideV w:val="single" w:sz="4" w:color="8795A5"/></w:tblBorders>`;
+    const grid=`<w:tblGrid>${widths.map(w=>`<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>`;
+    const rows=[...table.rows].map((row,ri)=>{
+      const isHead=ri===0||!!row.closest("thead"),cl=String(row.className||""),fill=isHead?"17365D":cl.includes("grand")?"D9E5F1":cl.includes("max")?"F2F4F7":cl.includes("summary")?"EAF0F6":"FFFFFF",bold=isHead||cl.includes("summary");
+      let col=0,cells="";
+      for(const c of [...row.cells]){
+        const span=Math.max(1,Number(c.colSpan)||1),width=widths.slice(col,col+span).reduce((a,b)=>a+b,0)||Math.floor(total/11);col+=span;
+        const raw=(c.innerText||c.textContent||"").replace(/\r/g,"").replace(/[ \t]+/g," ").trim(),lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean),font=isHead?12:cl.includes("max")?10:11,color=isHead?"FFFFFF":"111111";
+        const paras=(lines.length?lines:[""]).map(line=>`<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="150" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr>${bold?"<w:b/>":""}<w:sz w:val="${font}"/><w:color w:val="${color}"/></w:rPr><w:t xml:space="preserve">${xmlEsc(line)}</w:t></w:r></w:p>`).join("");
+        cells+=`<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>${span>1?`<w:gridSpan w:val="${span}"/>`:""}<w:shd w:fill="${fill}"/><w:vAlign w:val="center"/></w:tcPr>${paras}</w:tc>`;
+      }
+      return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells}</w:tr>`;
+    }).join("");
+    return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="30" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="30" w:type="dxa"/></w:tblCellMar>${borders}</w:tblPr>${grid}${rows}</w:tbl>`;
+  };
+  const applyComparisonToWord=(xml,payload)=>{
+    const htmlDoc=new DOMParser().parseFromString(payload.html,"text/html"),table=htmlDoc.querySelector("table");
+    if(!table)return{xml,count:0};
+    const replacement=comparisonTableXml(table)+comparisonSections(htmlDoc),norm=s=>String(s||"").toLocaleUpperCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]+/g," ").trim(),W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const wordDoc=new DOMParser().parseFromString(xml,"application/xml"),all=[...wordDoc.getElementsByTagNameNS(W,"tbl")],top=all.filter(t=>{for(let p=t.parentNode;p&&p!==wordDoc;p=p.parentNode)if(p.namespaceURI===W&&p.localName==="tbl")return false;return true});
+    const targets=top.filter(t=>{
+      const firstRows=[...t.childNodes].filter(n=>n.nodeType===1&&n.namespaceURI===W&&n.localName==="tr").slice(0,3).map(row=>norm([...row.getElementsByTagNameNS(W,"t")].map(n=>n.textContent||"").join(" "))),head=firstRows.join(" "),u=norm([...t.getElementsByTagNameNS(W,"t")].map(n=>n.textContent||"").join(" "));
+      const metricTitle=head.includes("MR VE BT TETKIK SAYILARI")||head.includes("USG TETKIK SAYILARI");
+      const doctorMetric=/^BRANS HEKIM/.test(head)&&/(MR|BT|USG)/.test(head)&&/(POLIKLINIK|ACIL|KLINIK)/.test(head);
+      const emergencyMetric=/^ACIL SERVIS/.test(head)&&/(MR|BT|USG)/.test(head)&&(head.includes("TOPLAM")||head.includes("HEKIM")||head.includes("BRANS"));
+      return metricTitle||doctorMetric||emergencyMetric;
+    });
+    if(!targets.length)return{xml,count:0};
+    const fragment=new DOMParser().parseFromString(`<w:root xmlns:w="${W}">${replacement}</w:root>`,"application/xml"),nodes=[...fragment.documentElement.childNodes].filter(n=>n.nodeType===1).map(n=>wordDoc.importNode(n,true)),parent=targets[0].parentNode;
+    for(const n of nodes)parent.insertBefore(n,targets[0]);
+    for(const t of targets)t.parentNode?.removeChild(t);
+    return{xml:new XMLSerializer().serializeToString(wordDoc),count:targets.length};
+  };
+  function installFullWordIntegration(){
+    const core=window.SDS_WORD_CORE;if(!core?.gen||!core.gen.__sds18||core.gen.__rpysSdsCompareV1)return false;
+    const old=core.gen,gen=async function(m,tpl){const ab=await old.call(this,m,tpl);try{let payload=window.__RPYS_SDS_WORD_COMPARE__;try{payload=JSON.parse(localStorage.getItem(WORD_COMPARE_KEY)||"null")||payload}catch(_){}if(!payload?.html)return ab;const z=await JSZip.loadAsync(ab),f=z.file("word/document.xml");if(!f)return ab;const result=applyComparisonToWord(await f.async("string"),payload);if(!result.count){console.warn("SDS karşılaştırma: şablonda değiştirilecek tetkik tablosu bulunamadı");return ab}z.file("word/document.xml",result.xml);window.__RPYS_SDS_WORD_COMPARE_APPLIED__={tables:result.count,at:new Date().toISOString(),months:[payload.oldMonth,payload.newMonth]};return await z.generateAsync({type:"arraybuffer",compression:"DEFLATE"})}catch(e){console.error("SDS Tam Evrak karşılaştırma entegrasyonu",e);return ab}};
+    gen.__sds18=true;gen.__s392v4=true;gen.__sdsCompareV1=true;gen.__rpysSdsCompareV1=true;core.gen=gen;return true;
+  }
+  const wordWrapTimer=setInterval(()=>{if(installFullWordIntegration())clearInterval(wordWrapTimer)},200);
+  setTimeout(()=>clearInterval(wordWrapTimer),30000);
+  window.addEventListener("rpys-direct-core-ready",()=>setTimeout(installFullWordIntegration,160));
   const branchRows=map=>{
     const branches=new Map();
     for(const d of map.values()){
@@ -94,7 +154,7 @@
     m.querySelector(".sc-close").onclick=()=>{m.remove();style.remove()};m.addEventListener("click",e=>{if(e.target===m){m.remove();style.remove()}});
     let output="";
     const status=m.querySelector("#scStatus"),preview=m.querySelector("#scPreview"),download=m.querySelector("#scDownload"),print=m.querySelector("#scPrint");
-    m.querySelector("#scBuild").onclick=async()=>{try{if(!window.XLSX)throw new Error("Excel okuma bileşeni yüklenemedi.");const of=m.querySelector("#scOldFile").files[0],nf=m.querySelector("#scNewFile").files[0];if(!of||!nf)throw new Error("İki ay için de Excel dosyası seçin.");status.textContent="Dosyalar okunuyor…";const [ob,nb]=await Promise.all([of.arrayBuffer(),nf.arrayBuffer()]);const om=inputRows(XLSX.read(ob,{type:"array"})),nm=inputRows(XLSX.read(nb,{type:"array"}));if(!om.size||!nm.size)throw new Error("Dosyalarda geçerli hekim kaydı bulunamadı. “Doktor Seçiniz” kayıtları dışarıda bırakılır.");output=buildHtml(om,nm,m.querySelector("#scOldMonth").value||"Önceki ay",m.querySelector("#scNewMonth").value||"Yeni ay");const d=new DOMParser().parseFromString(output,"text/html");const sections=[...d.querySelectorAll("h2, .branch-line, .comparison-list")].map(x=>x.outerHTML).join("");preview.innerHTML=`<div><b>${om.size}</b> önceki ay, <b>${nm.size}</b> yeni ay hekim kaydı eşleştirildi. Tabloda <b>${d.querySelectorAll("tbody tr:not(.summary)").length}</b> hekim var.</div>`+d.querySelector("table").outerHTML+sections;status.textContent="Karşılaştırma hazır. Word çıktısında tek hekim tablosu, branş karşılaştırmaları ve sorgu karşılaştırmaları bulunur.";download.disabled=print.disabled=false}catch(e){output="";download.disabled=print.disabled=true;status.textContent=e?.message||"Dosyalar okunamadı."}};
+    m.querySelector("#scBuild").onclick=async()=>{try{if(!window.XLSX)throw new Error("Excel okuma bileşeni yüklenemedi.");const of=m.querySelector("#scOldFile").files[0],nf=m.querySelector("#scNewFile").files[0];if(!of||!nf)throw new Error("İki ay için de Excel dosyası seçin.");status.textContent="Dosyalar okunuyor…";const [ob,nb]=await Promise.all([of.arrayBuffer(),nf.arrayBuffer()]);const om=inputRows(XLSX.read(ob,{type:"array"})),nm=inputRows(XLSX.read(nb,{type:"array"}));if(!om.size||!nm.size)throw new Error("Dosyalarda geçerli hekim kaydı bulunamadı. “Doktor Seçiniz” kayıtları dışarıda bırakılır.");const oldMonth=m.querySelector("#scOldMonth").value||"Önceki ay",newMonth=m.querySelector("#scNewMonth").value||"Yeni ay";output=buildHtml(om,nm,oldMonth,newMonth);saveWordComparison(output,oldMonth,newMonth);const d=new DOMParser().parseFromString(output,"text/html");const sections=[...d.querySelectorAll("h2, .branch-line, .comparison-list")].map(x=>x.outerHTML).join("");preview.innerHTML=`<div><b>${om.size}</b> önceki ay, <b>${nm.size}</b> yeni ay hekim kaydı eşleştirildi. Tabloda <b>${d.querySelectorAll("tbody tr:not(.summary)").length}</b> hekim var.</div>`+d.querySelector("table").outerHTML+sections;status.textContent="Karşılaştırma hazır. Bu sonuç Tam Evrak > Word oluştur çıktısına da eklenecek.";download.disabled=print.disabled=false}catch(e){output="";download.disabled=print.disabled=true;status.textContent=e?.message||"Dosyalar okunamadı."}};
     download.onclick=()=>{if(!output)return;const blob=new Blob(["\ufeff",output],{type:"application/msword;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="SDS_Goruntuleme_Karsilastirmasi.doc";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)};
     print.onclick=()=>{if(!output)return;const w=window.open("","_blank");if(!w)return alert("Yazdırma penceresi engellendi. İzin verip tekrar deneyin.");w.onload=()=>setTimeout(()=>w.print(),200);w.document.open();w.document.write(output);w.document.close()};
   }
