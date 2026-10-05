@@ -26,7 +26,7 @@ function documentBody(type){
  if(value){
   const box=d.createElement('div'),title=d.createElement('b'),content=d.createElement('div');
   box.className='rpysDutyPrint415Note';title.textContent='Not';content.textContent=value;
-  box.append(title,content);table.insertAdjacentElement('afterend',box);
+  box.append(title,content);const sig=d.querySelector('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]');if(sig)sig.insertAdjacentElement('beforebegin',box);else table.insertAdjacentElement('afterend',box);
  }
  return d.body.innerHTML;
 }
@@ -49,7 +49,7 @@ function print(type,orientation){
   #rpysDutyPrint415Content table.stableDuty tbody td:not(:first-child){height:auto!important;font-size:4.7pt!important;line-height:1.02!important;padding:.16mm .22mm!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;overflow:hidden!important}
   #rpysDutyPrint415Content .ph{text-align:center;margin-bottom:2mm}
   #rpysDutyPrint415Content .sigs{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:3mm;margin-top:2mm}
-  .rpysDutyPrint415Note{border:1px solid #94a3b8;padding:1.4mm 2mm;margin:2mm 0;font:6.5pt Arial,sans-serif;line-height:1.2;break-inside:avoid}
+  .rpysDutyPrint415Note{display:block!important;border:1px solid #94a3b8;padding:1.4mm 2mm;margin:2mm 0;font:6.5pt Arial,sans-serif;line-height:1.2;break-inside:avoid}
   .rpysDutyPrint415Note b{display:block;margin-bottom:.5mm}.rpysDutyPrint415Note div{white-space:pre-wrap;overflow-wrap:anywhere}`;
  const doc=frame.contentDocument;doc.open();doc.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Nöbet Listesi</title><style>'+css+'</style></head><body><div id="rpysDutyPrint415Page"><div id="rpysDutyPrint415Viewport"><div id="rpysDutyPrint415Content">'+body+'</div></div></div></body></html>');doc.close();
  const ready=doc.fonts?.ready||Promise.resolve();
