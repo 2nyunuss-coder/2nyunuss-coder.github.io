@@ -77,7 +77,7 @@ function prepare(html,opts={}){
   const page=t.closest('.stableSayPage,.rpys393saywrap')||t.parentElement;
   page.querySelectorAll('.rpysSay414Note,.rpys383Note,.printNote').forEach(x=>x.remove());
   const text=opts.snapshot?String(t.dataset.rpysNote||''):note(m);t.dataset.rpysNote=text;
-  if(text){const box=d.createElement('div'),b=d.createElement('b'),content=d.createElement('div');box.className='rpysSay414Note';b.textContent='Not';content.textContent=text;box.append(b,content);t.insertAdjacentElement('afterend',box)}
+  if(text){const box=d.createElement('div'),b=d.createElement('b'),content=d.createElement('div');box.className='rpysSay414Note';b.textContent='Not';content.textContent=text;box.append(b,content);const sig=page?.querySelector?.('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]')||[...d.querySelectorAll('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]')].find(x=>(t.compareDocumentPosition(x)&4));if(sig)sig.insertAdjacentElement('beforebegin',box);else t.insertAdjacentElement('afterend',box)}
  }
  d.querySelectorAll('#rpys-saymanlik-print-style-v414').forEach(x=>x.remove());
  const style=d.createElement('style');style.id='rpys-saymanlik-print-style-v414';style.textContent=css;d.body.append(style);
