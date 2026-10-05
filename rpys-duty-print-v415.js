@@ -12,8 +12,9 @@ function install(){
  });
 }
 function note(){
- const box=document.querySelector('#nobet .rpysPageNote'),ta=box?.querySelector('textarea');
- if(ta&&box.dataset.rpysNoteMonth===month())return ta.value.trim();
+ const sec=document.getElementById('nobet');
+ const ta=sec?.querySelector('.rpysPageNote textarea,textarea[placeholder*="not" i],textarea[aria-label*="not" i],textarea[title*="not" i],textarea[name*="not" i],textarea[id*="not" i]');
+ const live=String(ta?.value||'').trim();if(live)return live;
  try{const notes=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');return String(notes['nobet|'+month()]||'').trim()}catch(_){return ''}
 }
 function documentBody(type){
