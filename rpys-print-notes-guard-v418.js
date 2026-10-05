@@ -21,17 +21,16 @@ function visibleNote(kind,m){
 function style(doc){
  if(doc.getElementById('rpys-print-note-guard-style-v418'))return;
  const s=doc.createElement('style');s.id='rpys-print-note-guard-style-v418';
- s.textContent='.rpysPrintNoteGuard418{display:block!important;position:static!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;margin:1.5mm 0!important;padding:1.5mm 2mm!important;border:1px solid #94a3b8!important;background:#fff!important;color:#111!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;break-inside:avoid!important;page-break-inside:avoid!important;text-align:left!important}.rpysPrintNoteGuard418 b{display:block!important;font:700 6.5pt Arial,sans-serif!important;margin:0 0 .5mm!important}.rpysPrintNoteGuard418 div{display:block!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:break-word!important}';
+ s.textContent='.rpysPrintNoteGuard418{display:block!important;position:static!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;margin:1.5mm 0!important;padding:1.5mm 2mm!important;border:1px solid #94a3b8!important;background:#fff!important;color:#111!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;break-inside:avoid!important;page-break-inside:avoid!important;text-align:left!important}.rpysPrintNoteGuard418 b{display:block!important;font:700 6.5pt Arial,sans-serif!important;margin:0 0 .5mm!important}.rpysPrintNoteGuard418 div{display:block!important;min-height:7mm!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:break-word!important;border-bottom:1px dotted #94a3b8!important}';
  (doc.head||doc.documentElement).appendChild(s);
 }
 function insertForTable(doc,table,kind){
  const sheet=table.closest('.sheet'),scope=sheet||table.closest('.stableSayPage,.rpys393saywrap,.rpys393doc')||table.parentElement||doc.body;
  if(scope?.querySelector(noteSelectors))return;
  const m=String(sheet?.dataset?.month||currentMonth()),value=visibleNote(kind,m);
- if(!value)return;
  const box=doc.createElement('div'),b=doc.createElement('b'),text=doc.createElement('div');
  box.className='rpysPrintNoteGuard418';box.dataset.rpysNoteKind=kind;box.dataset.rpysNoteMonth=m;
- b.textContent='Not';text.textContent=value;box.append(b,text);
+ b.textContent='NOT';text.textContent=value||' ';box.append(b,text);
  const sig=scope?.querySelector('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]');
  if(sig)sig.insertAdjacentElement('beforebegin',box);else table.insertAdjacentElement('afterend',box);
 }
