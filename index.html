@@ -236,17 +236,17 @@
     const SAY_NAME_FIT_JS='<style id="rpys-saymanlik-name-fit-v2">#say1Grid td:first-child,#say2Grid td:first-child{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;word-break:break-word!important;vertical-align:middle!important;font-size:8.5px!important;line-height:1.05!important;padding-left:2px!important;padding-right:2px!important}</style><script id="rpys-saymanlik-name-fit-runtime-v3">(()=>{function fit(){document.querySelectorAll("#say1Grid td:first-child,#say2Grid td:first-child").forEach(c=>{if(!c.textContent.trim())return;c.style.whiteSpace="normal";c.style.overflowWrap="anywhere";c.style.wordBreak="break-word";let s=8.5;c.style.fontSize=s+"px";let n=0;while(n<7&&(c.scrollWidth>c.clientWidth+1||c.scrollHeight>c.clientHeight+1)&&s>5){s=Math.max(5,s-.5);c.style.fontSize=s+"px";n++}c.style.lineHeight=s<=6?".95":"1.05"})}function start(){fit();setTimeout(fit,250);setTimeout(fit,800);setTimeout(fit,1600);setTimeout(fit,3000)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start()})();<'+ '/script>';
     app=insertBeforeFinalBody(app,SAY_NAME_FIT_JS);
    }
-   if(!app.includes('rpys-saymanlik-print-loader-v414'))app=insertBeforeFinalBody(app,'<script id="rpys-saymanlik-print-loader-v414" src="/rpys-saymanlik-print-v414.js?v=20261005-417"><'+ '/script>');
-   if(!app.includes('rpys-duty-print-loader-v415'))app=insertBeforeFinalBody(app,'<script id="rpys-duty-print-loader-v415" src="/rpys-duty-print-v415.js?v=20261005-417"><'+ '/script>');
+   if(!app.includes('rpys-saymanlik-print-loader-v414'))app=insertBeforeFinalBody(app,'<script id="rpys-saymanlik-print-loader-v414" src="/rpys-saymanlik-print-v414.js?v=20261005-419"><'+ '/script>');
+   if(!app.includes('rpys-duty-print-loader-v415'))app=insertBeforeFinalBody(app,'<script id="rpys-duty-print-loader-v415" src="/rpys-duty-print-v415.js?v=20261005-419"><'+ '/script>');
    if(!app.includes('rpys-sds-compare-loader-v1'))app=insertBeforeFinalBody(app,'<script id="rpys-sds-compare-loader-v1" src="/rpys-sds-compare-v1.js?v=20261005-7"><'+ '/script>');
-   if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261005-417"><'+ '/script>');
-   if(!app.includes('rpys-print-note-guard-loader-v418'))app=insertBeforeFinalBody(app,'<script id="rpys-print-note-guard-loader-v418" src="/rpys-print-notes-guard-v418.js?v=20261005-418"><'+ '/script>');
+   if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261005-419"><'+ '/script>');
+   if(!app.includes('rpys-print-note-guard-loader-v418'))app=insertBeforeFinalBody(app,'<script id="rpys-print-note-guard-loader-v418" src="/rpys-print-notes-guard-v418.js?v=20261005-419"><'+ '/script>');
    // Supabase kaynak HTML eski loader etiketlerini zaten içeriyorsa "var" kontrolü yeni scripti eklemiyordu.
    // Belge henüz document.write ile çalıştırılmadan önce tüm yazdırma script yollarını zorla güncel sürüme çevir.
    app=app
-     .replace(/\/rpys-saymanlik-print-v414\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-print-v414.js?v=20261005-417')
-     .replace(/\/rpys-duty-print-v415\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-duty-print-v415.js?v=20261005-417')
-     .replace(/\/rpys-print-center-v413\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-print-center-v413.js?v=20261005-417');
+     .replace(/\/rpys-saymanlik-print-v414\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-print-v414.js?v=20261005-419')
+     .replace(/\/rpys-duty-print-v415\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-duty-print-v415.js?v=20261005-419')
+     .replace(/\/rpys-print-center-v413\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-print-center-v413.js?v=20261005-419');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
