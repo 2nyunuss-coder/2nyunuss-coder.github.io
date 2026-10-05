@@ -13,7 +13,7 @@ function period(row,base){
 }
 function table(title,heads,rows){return stablePrintHeader(title)+'<table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'+stableSignatures();}
 function printNote(id,month){try{const all=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');const noteId=id==='say1'||id==='say2'?'saymanlik':id;let v=all[noteId+'|'+month]??'';if(!String(v).trim()){const ta=document.querySelector('#'+noteId+' .rpysPageNote textarea');if(ta)v=ta.value||''}return String(v).trim()}catch(_){return''}}
-function noteBlock(id,month){const noteKey=id==='say1'||id==='say2'?'saymanlik':id;if(noteKey!=='nobet'&&noteKey!=='saymanlik')return'';const v=printNote(noteKey,month);if(!v)return'';return '<div class="printNote"><b>📝 Not</b><div>'+String(v).split(/\r?\n/).map(esc).join('<br>')+'</div></div>'}
+function withNote(body,id,month){const noteKey=id==='say1'||id==='say2'?'saymanlik':id;if(noteKey!=='nobet'&&noteKey!=='saymanlik')return body;if(/rpysSay414Note|rpysDutyPrint415Note|class=["'][^"']*printNote/.test(String(body||'')))return body;const v=printNote(noteKey,month);if(!v)return body;const d=new DOMParser().parseFromString(String(body||''),'text/html');d.body.prepend(...d.head.querySelectorAll('style'));const box=d.createElement('div'),b=d.createElement('b'),content=d.createElement('div');box.className='printNote';b.textContent='📝 Not';content.textContent=v;box.append(b,content);const sig=d.querySelector('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]');const table=d.querySelector(noteKey==='nobet'?'table.stableDuty':'table.stableSay,table.rpys393saytable,table.say');if(sig)sig.insertAdjacentElement('beforebegin',box);else if(table)table.insertAdjacentElement('afterend',box);else d.body.append(box);return d.body.innerHTML}
 function trimSayTotals(html){return window.rpysSaymanlik414?window.rpysSaymanlik414.prepare(html):html}
 function documents(id){
  if(id==='say1'||id==='say2'){const n=id==='say2'?2:1;return [trimSayTotals(stableSayDoc(sayNamesForPage(n),'SAYFA '+n+'/2'))];}
@@ -47,7 +47,7 @@ function build(pack){
    const bodies=documents(r.doc);
    for(let copy=1;copy<=r.copies;copy++)for(const body of bodies){
     if(!body||!body.includes('<table'))throw Error(names[r.doc]+' hazırlanamadı.');
-    parts.push({doc:r.doc,month:r.month,copy,body:body+(body.includes('rpysSay414Note')?'':noteBlock(r.doc,r.month))});
+    parts.push({doc:r.doc,month:r.month,copy,body:withNote(body,r.doc,r.month)});
    }
   }
  }finally{
