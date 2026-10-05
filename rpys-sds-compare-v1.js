@@ -30,16 +30,27 @@
     if(!mrName&&!usgName)throw new Error("MR&BT veya USG adlı sayfa bulunamadı.");
     return result;
   };
-  const metric=(oldV,newV)=>{
+  const metric=(oldV,newV,oldKnown=true)=>{
+    if(!oldKnown)return `<span class="v">– → ${newV}</span><small>–</small>`;
     const pct=(newV-oldV)/oldV*100;
     const diff=oldV===0?(newV>0?"Yeni":"—"):`${pct>0?"+":""}${pct.toFixed(1)}%`;
     return `<span class="v">${oldV} → ${newV}</span><small>${diff}</small>`;
+  };
+  const branchRows=map=>{
+    const branches=new Map();
+    for(const d of map.values()){
+      const name=String(d.branch||"").trim();if(!name)continue;
+      const k=norm(name);let b=branches.get(k);
+      if(!b){b={name,mr:[0,0,0],bt:[0,0,0],usg:[0,0,0]};branches.set(k,b)}
+      for(const g of ["mr","bt","usg"])for(let i=0;i<3;i++)b[g][i]+=Number(d[g]?.[i]||0);
+    }
+    return branches;
   };
   const buildHtml=(oldMap,newMap,oldMonth,newMonth)=>{
     const keys=new Set([...oldMap.keys(),...newMap.keys()]);
     const docs=[...keys].map(k=>({k,o:oldMap.get(k)||null,n:newMap.get(k)||null})).sort((a,b)=>String(a.n?.branch||a.o?.branch||"").localeCompare(String(b.n?.branch||b.o?.branch||""),"tr")||String(a.n?.doctor||a.o?.doctor||"").localeCompare(String(b.n?.doctor||b.o?.doctor||""),"tr"));
     const heads=["Branş","Hekim",...["MR","BT","USG"].flatMap(m=>["Pol","Acil","Klinik"].map(s=>`${m}<br>${s}`))];
-    const body=docs.map(({o,n})=>{const d=n||o;const cells=[`<td>${esc(n?.branch||o?.branch||"")}</td>`,`<td class="doctor">${esc(d.doctor)}</td>`];for(const group of ["mr","bt","usg"])for(let i=0;i<3;i++)cells.push(`<td class="metric">${metric(o?.[group]?.[i]||0,n?.[group]?.[i]||0)}</td>`);return `<tr>${cells.join("")}</tr>`}).join("");
+    const body=docs.map(({o,n})=>{const d=n||o;const cells=[`<td>${esc(n?.branch||o?.branch||"")}</td>`,`<td class="doctor">${esc(d.doctor)}</td>`];for(const group of ["mr","bt","usg"])for(let i=0;i<3;i++)cells.push(`<td class="metric">${metric(o?.[group]?.[i]||0,n?.[group]?.[i]||0,!!o)}</td>`);return `<tr>${cells.join("")}</tr>`}).join("");
     const groups=["mr","bt","usg"],groupLabels={mr:"MR",bt:"BT",usg:"USG"};
     const total=(month,group,i)=>docs.reduce((s,d)=>s+Number(month==="old"?d.o?.[group]?.[i]||0:d.n?.[group]?.[i]||0),0);
     const settingTotals=groups.flatMap(g=>[0,1,2].map(i=>`<td class="metric total-cell">${metric(total("old",g,i),total("new",g,i))}</td>`)).join("");
@@ -51,6 +62,16 @@
       return `<td class="max-cell"><span>↑ ${up?`${esc(up.name)} +${up.pct.toFixed(1)}%`:"—"}</span><span>↓ ${down?`${esc(down.name)} ${down.pct.toFixed(1)}%`:"—"}</span></td>`
     })).join("");
     const summaries=`<tr class="summary"><th colspan="2">BİRİM TOPLAMLARI</th>${settingTotals}</tr><tr class="summary"><th colspan="2">MODALİTE TOPLAMI</th>${modalityTotals}</tr><tr class="summary grand"><th colspan="2">GENEL TOPLAM</th><td colspan="9" class="metric">${metric(allOld,allNew)}</td></tr><tr class="summary max"><th colspan="2">HEKİM BAZINDA EN BÜYÜK ARTIŞ / AZALIŞ</th>${maxChanges}</tr>`;
+    const oldBranches=branchRows(oldMap),newBranches=branchRows(newMap),branchKeys=new Set([...oldBranches.keys(),...newBranches.keys()]);
+    const branchComparisons=[...branchKeys].map(k=>{
+      const o=oldBranches.get(k)||null,n=newBranches.get(k)||null,b=n||o;
+      const modalityLine=["mr","bt","usg"].map((g,i)=>{
+        const ov=o?o[g].reduce((s,v)=>s+v,0):0,nv=n?n[g].reduce((s,v)=>s+v,0):0;
+        return `${groupLabels[g]} ${metric(ov,nv,!!o)}`;
+      }).join("; ");
+      const ov=o?[...o.mr,...o.bt,...o.usg].reduce((s,v)=>s+v,0):0,nv=n?[...n.mr,...n.bt,...n.usg].reduce((s,v)=>s+v,0):0;
+      return `<p class="branch-line"><b>${esc(b.name)}:</b> ${modalityLine}; Genel ${metric(ov,nv,!!o)}</p>`;
+    }).join("");
     const topDoctor=(which,g,i)=>{
       const vals=docs.map(d=>({name:which==="old"?d.o?.doctor||d.n?.doctor||"":d.n?.doctor||d.o?.doctor||"",count:Number(which==="old"?d.o?.[g]?.[i]||0:d.n?.[g]?.[i]||0)}));
       const max=Math.max(0,...vals.map(x=>x.count));
@@ -62,8 +83,8 @@
       return `<li><b>${groupLabels[g]} · ${["Poliklinik","Acil","Klinik"][i]}:</b> ${esc(oldMonth)} en yüksek: ${oldTop.name} (${oldTop.count}); ${esc(newMonth)} en yüksek: ${newTop.name} (${newTop.count}). En yüksek istem sayısı değişimi: ${pct}.</li>`
     })).join("");
     return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>SDS Görüntüleme İstem Karşılaştırması</title><style>
-      @page{size:A4 landscape;margin:6mm}*{box-sizing:border-box}body{font:8pt Arial,sans-serif;color:#111;margin:0}h1{font-size:13pt;text-align:center;margin:0 0 2mm}h2{font-size:8pt;margin:3mm 0 1mm}p{font-size:7pt;text-align:center;margin:0 0 3mm}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:.35pt solid #667085;padding:.8mm .45mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere}th{background:#17365d;color:white;font-size:6.2pt}td{font-size:5.9pt}.doctor{text-align:left;font-weight:bold;white-space:normal;overflow-wrap:anywhere}.metric .v{display:block;white-space:nowrap;font-weight:bold}.metric small{display:block;font-size:5.2pt;color:#374151}.summary,.summary th,.summary td{background:#eaf0f6;font-weight:900!important;color:#000!important;border:1pt solid #24364b!important}.summary.grand th,.summary.grand td{background:#d9e5f1!important}.summary.max th,.summary.max td{background:#f2f4f7!important}.summary .metric,.summary .metric .v,.summary .metric small{font-weight:900!important;color:#000!important}.max-cell{font-size:4.8pt;line-height:1.05}.max-cell span{display:block}ol{margin:0;padding-left:5mm}li{font-size:6pt;line-height:1.2;margin:.4mm 0}.note{font-size:5.8pt;text-align:left;margin-top:2mm}@media screen{body{padding:10mm}table{max-width:1200px;margin:auto}h1,p,.note,ol,h2{max-width:1200px;margin-left:auto;margin-right:auto}}
-      </style></head><body><h1>SDS Görüntüleme Tetkik İstemleri</h1><p>${esc(oldMonth)} → ${esc(newMonth)} | Hekim verileri ve toplamlar tek tabloda; hücrelerde önceki sayı → yeni sayı ve yüzde değişim</p><table><colgroup><col style="width:10%"><col style="width:18%">${Array.from({length:9},()=>'<col style="width:8%">').join("")}</colgroup><thead><tr>${heads.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${body}${summaries}</tbody></table><h2>SDS Sorgu Karşılaştırmaları</h2><ol>${queryComparisons}</ol><div class="note">Yüzde değişim = (yeni ay − önceki ay) / önceki ay. Önceki ay değeri 0 ve yeni ay değeri pozitifse “Yeni”, iki ay da 0 ise “—” gösterilir. En büyük artış/azalış satırında önceki ay değeri sıfırdan büyük hekimlerin yüzde değişimleri gösterilir. Hekimler adlarına göre eşleştirilmiştir; “Doktor Seçiniz” satırları sayım ve kıyaslamalara alınmaz.</div></body></html>`;
+      @page{size:A4 landscape;margin:6mm}*{box-sizing:border-box}body{font:8pt Arial,sans-serif;color:#111;margin:0}h1{font-size:13pt;text-align:center;margin:0 0 2mm}h2{font-size:10pt;font-weight:bold;margin:3mm 0 1mm}p{font-size:7pt;text-align:center;margin:0 0 3mm}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:.35pt solid #667085;padding:.8mm .45mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere}th{background:#17365d;color:white;font-size:6.2pt}td{font-size:5.9pt}.doctor{text-align:left;font-weight:bold;white-space:normal;overflow-wrap:anywhere}.metric .v{display:block;white-space:nowrap;font-weight:bold}.metric small{display:block;font-size:5.2pt;color:#374151}.summary,.summary th,.summary td{background:#eaf0f6;font-weight:900!important;color:#000!important;border:1pt solid #24364b!important}.summary.grand th,.summary.grand td{background:#d9e5f1!important}.summary.max th,.summary.max td{background:#f2f4f7!important}.summary .metric,.summary .metric .v,.summary .metric small{font-weight:900!important;color:#000!important}.max-cell{font-size:4.8pt;line-height:1.05}.max-cell span{display:block}.branch-line{font-size:8.5pt;line-height:1.3;text-align:left;margin:1mm 0}.comparison-list{margin:0;padding-left:5mm}.comparison-list li{font-size:8.5pt;line-height:1.3;margin:1mm 0}.note{font-size:7.5pt;text-align:left;margin-top:2mm}@media screen{body{padding:10mm}table{max-width:1200px;margin:auto}h1,p,.note,ol,h2,.branch-line{max-width:1200px;margin-left:auto;margin-right:auto}}
+      </style></head><body><h1>SDS Görüntüleme Tetkik İstemleri</h1><p>${esc(oldMonth)} → ${esc(newMonth)} | Hekim verileri ve toplamlar tek tabloda; hücrelerde önceki sayı → yeni sayı ve yüzde değişim</p><table><colgroup><col style="width:10%"><col style="width:18%">${Array.from({length:9},()=>'<col style="width:8%">').join("")}</colgroup><thead><tr>${heads.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${body}${summaries}</tbody></table><h2>Branş Karşılaştırmaları</h2>${branchComparisons}<h2>Karşılaştırmalar</h2><ol class="comparison-list">${queryComparisons}</ol><div class="note">Yüzde değişim = (yeni ay − önceki ay) / önceki ay. Önceki ay değeri 0 ve yeni ay değeri pozitifse “Yeni”, iki ay da 0 ise “—” gösterilir. Önceki ay hekim veya branş kaydı bulunmuyorsa hücrelerde “–” gösterilir. En büyük artış/azalış satırında önceki ay değeri sıfırdan büyük hekimlerin yüzde değişimleri gösterilir. “Doktor Seçiniz” satırları sayım ve kıyaslamalara alınmaz.</div></body></html>`;
   };
   function openDialog(){
     if(document.getElementById("rpysSdsCompareModal"))return;
@@ -73,7 +94,7 @@
     m.querySelector(".sc-close").onclick=()=>{m.remove();style.remove()};m.addEventListener("click",e=>{if(e.target===m){m.remove();style.remove()}});
     let output="";
     const status=m.querySelector("#scStatus"),preview=m.querySelector("#scPreview"),download=m.querySelector("#scDownload"),print=m.querySelector("#scPrint");
-    m.querySelector("#scBuild").onclick=async()=>{try{if(!window.XLSX)throw new Error("Excel okuma bileşeni yüklenemedi.");const of=m.querySelector("#scOldFile").files[0],nf=m.querySelector("#scNewFile").files[0];if(!of||!nf)throw new Error("İki ay için de Excel dosyası seçin.");status.textContent="Dosyalar okunuyor…";const [ob,nb]=await Promise.all([of.arrayBuffer(),nf.arrayBuffer()]);const om=inputRows(XLSX.read(ob,{type:"array"})),nm=inputRows(XLSX.read(nb,{type:"array"}));if(!om.size||!nm.size)throw new Error("Dosyalarda geçerli hekim kaydı bulunamadı. “Doktor Seçiniz” kayıtları dışarıda bırakılır.");output=buildHtml(om,nm,m.querySelector("#scOldMonth").value||"Önceki ay",m.querySelector("#scNewMonth").value||"Yeni ay");const d=new DOMParser().parseFromString(output,"text/html");preview.innerHTML=`<div><b>${om.size}</b> önceki ay, <b>${nm.size}</b> yeni ay hekim kaydı eşleştirildi. Tabloda <b>${d.querySelectorAll("tbody tr:not(.summary)").length}</b> hekim var.</div>`+d.querySelector("table").outerHTML;status.textContent="Karşılaştırma hazır. Word çıktısında tek karşılaştırma tablosu ve sorgu karşılaştırmaları bulunur.";download.disabled=print.disabled=false}catch(e){output="";download.disabled=print.disabled=true;status.textContent=e?.message||"Dosyalar okunamadı."}};
+    m.querySelector("#scBuild").onclick=async()=>{try{if(!window.XLSX)throw new Error("Excel okuma bileşeni yüklenemedi.");const of=m.querySelector("#scOldFile").files[0],nf=m.querySelector("#scNewFile").files[0];if(!of||!nf)throw new Error("İki ay için de Excel dosyası seçin.");status.textContent="Dosyalar okunuyor…";const [ob,nb]=await Promise.all([of.arrayBuffer(),nf.arrayBuffer()]);const om=inputRows(XLSX.read(ob,{type:"array"})),nm=inputRows(XLSX.read(nb,{type:"array"}));if(!om.size||!nm.size)throw new Error("Dosyalarda geçerli hekim kaydı bulunamadı. “Doktor Seçiniz” kayıtları dışarıda bırakılır.");output=buildHtml(om,nm,m.querySelector("#scOldMonth").value||"Önceki ay",m.querySelector("#scNewMonth").value||"Yeni ay");const d=new DOMParser().parseFromString(output,"text/html");const sections=[...d.querySelectorAll("h2, .branch-line, .comparison-list")].map(x=>x.outerHTML).join("");preview.innerHTML=`<div><b>${om.size}</b> önceki ay, <b>${nm.size}</b> yeni ay hekim kaydı eşleştirildi. Tabloda <b>${d.querySelectorAll("tbody tr:not(.summary)").length}</b> hekim var.</div>`+d.querySelector("table").outerHTML+sections;status.textContent="Karşılaştırma hazır. Word çıktısında tek hekim tablosu, branş karşılaştırmaları ve sorgu karşılaştırmaları bulunur.";download.disabled=print.disabled=false}catch(e){output="";download.disabled=print.disabled=true;status.textContent=e?.message||"Dosyalar okunamadı."}};
     download.onclick=()=>{if(!output)return;const blob=new Blob(["\ufeff",output],{type:"application/msword;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="SDS_Goruntuleme_Karsilastirmasi.doc";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)};
     print.onclick=()=>{if(!output)return;const w=window.open("","_blank");if(!w)return alert("Yazdırma penceresi engellendi. İzin verip tekrar deneyin.");w.onload=()=>setTimeout(()=>w.print(),200);w.document.open();w.document.write(output);w.document.close()};
   }
