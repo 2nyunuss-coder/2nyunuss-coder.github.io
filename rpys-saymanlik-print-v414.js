@@ -18,7 +18,7 @@ table.rpysSay414Table.stableSay tr.rpysSay414Grand td,table.rpysSay414Table.say 
 table.rpysSay414Table .rpysSay414GrandLabel,table.rpysSay414Table .rpysSay414GrandValue{display:inline!important;font:inherit!important;white-space:nowrap!important}
 .rpysSay414Note{display:block!important;position:static!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;margin:1.5mm 0!important;padding:1.5mm 2mm!important;border:1px solid #94a3b8!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;break-inside:avoid!important;text-align:left!important}
 .rpysSay414Note b{display:block!important;font:700 6.5pt Arial,sans-serif!important;margin-bottom:.5mm!important}
-.rpysSay414Note div{display:block!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important}
+.rpysSay414Note div{display:block!important;min-height:7mm!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;border-bottom:1px dotted #94a3b8!important}
 @media print{.rpysSay414Table,.rpysSay414Note{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `;
 function note(m){
@@ -77,7 +77,7 @@ function prepare(html,opts={}){
   const page=t.closest('.stableSayPage,.rpys393saywrap')||t.parentElement;
   page.querySelectorAll('.rpysSay414Note,.rpys383Note,.printNote').forEach(x=>x.remove());
   const text=opts.snapshot?String(t.dataset.rpysNote||''):note(m);t.dataset.rpysNote=text;
-  if(text){const box=d.createElement('div'),b=d.createElement('b'),content=d.createElement('div');box.className='rpysSay414Note';b.textContent='Not';content.textContent=text;box.append(b,content);const sig=page?.querySelector?.('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]')||[...d.querySelectorAll('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]')].find(x=>(t.compareDocumentPosition(x)&4));if(sig)sig.insertAdjacentElement('beforebegin',box);else t.insertAdjacentElement('afterend',box)}
+  {const box=d.createElement('div'),b=d.createElement('b'),content=d.createElement('div');box.className='rpysSay414Note';b.textContent='NOT';content.className='rpysSay414NoteContent';content.textContent=text||' ';box.append(b,content);const sig=page?.querySelector?.('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]')||[...d.querySelectorAll('.sigs,.sayScreenSignatures,.stableSignatures,[data-rpys-signatures]')].find(x=>(t.compareDocumentPosition(x)&4));if(sig)sig.insertAdjacentElement('beforebegin',box);else t.insertAdjacentElement('afterend',box)}
  }
  d.querySelectorAll('#rpys-saymanlik-print-style-v414').forEach(x=>x.remove());
  const style=d.createElement('style');style.id='rpys-saymanlik-print-style-v414';style.textContent=css;d.body.append(style);
