@@ -1,0 +1,65 @@
+(()=>{
+  if(window.__RPYS_SDS_COMPARE_V1__)return;
+  window.__RPYS_SDS_COMPARE_V1__=true;
+  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const norm=s=>String(s??"").trim().toLocaleUpperCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ");
+  const num=v=>{if(typeof v==="number"&&Number.isFinite(v))return v;const s=String(v??"").trim();if(!s)return 0;const n=Number(s.replace(/[^\d-]/g,""));return Number.isFinite(n)?n:0};
+  const inputRows=wb=>{
+    const result=new Map();
+    const rowsFor=name=>{const sh=wb.Sheets[name];return sh?XLSX.utils.sheet_to_json(sh,{header:1,defval:null,raw:true}):[]};
+    const process=(rows,kind)=>{
+      let h=-1;
+      for(let i=0;i<Math.min(rows.length,20);i++)if(norm(rows[i]?.[0])==="BRANS"&&norm(rows[i]?.[1]).startsWith("DOKTOR")){h=i;break}
+      if(h<0)return;
+      for(let i=h+1;i<rows.length;i++){
+        const r=rows[i]||[],branch=String(r[0]??"").trim(),doctor=String(r[1]??"").trim(),key=norm(doctor);
+        if(!key||norm(branch)==="GENEL TOPLAM")continue;
+        let x=result.get(key);if(!x){x={doctor,branch,mr:[0,0,0],bt:[0,0,0],usg:[0,0,0]};result.set(key,x)}
+        if(branch)x.branch=branch;
+        if(kind==="mrbt"){
+          [2,3,4].forEach((c,j)=>x.mr[j]+=num(r[c]));
+          [6,7,8].forEach((c,j)=>x.bt[j]+=num(r[c]));
+        }else [2,3,4].forEach((c,j)=>x.usg[j]+=num(r[c]));
+      }
+    };
+    const mrName=wb.SheetNames.find(n=>norm(n).includes("MR")||norm(n).includes("BT"));
+    const usgName=wb.SheetNames.find(n=>norm(n).includes("USG"));
+    if(mrName)process(rowsFor(mrName),"mrbt");
+    if(usgName)process(rowsFor(usgName),"usg");
+    if(!mrName&&!usgName)throw new Error("MR&BT veya USG adlı sayfa bulunamadı.");
+    return result;
+  };
+  const metric=(oldV,newV)=>{
+    const pct=(newV-oldV)/oldV*100;
+    const diff=oldV===0?(newV>0?"Yeni":"—"):`${pct>0?"+":""}${pct.toFixed(1)}%`;
+    return `<span class="v">${oldV} → ${newV}</span><small>${diff}</small>`;
+  };
+  const buildHtml=(oldMap,newMap,oldMonth,newMonth)=>{
+    const keys=new Set([...oldMap.keys(),...newMap.keys()]);
+    const docs=[...keys].map(k=>({k,o:oldMap.get(k)||null,n:newMap.get(k)||null})).sort((a,b)=>String(a.n?.branch||a.o?.branch||"").localeCompare(String(b.n?.branch||b.o?.branch||""),"tr")||String(a.n?.doctor||a.o?.doctor||"").localeCompare(String(b.n?.doctor||b.o?.doctor||""),"tr"));
+    const heads=["Branş","Hekim",...["MR","BT","USG"].flatMap(m=>["Pol","Acil","Klinik"].map(s=>`${m}<br>${s}`))];
+    const body=docs.map(({o,n})=>{const d=n||o;const cells=[`<td>${esc(n?.branch||o?.branch||"")}</td>`,`<td class="doctor">${esc(d.doctor)}</td>`];for(const group of ["mr","bt","usg"])for(let i=0;i<3;i++)cells.push(`<td class="metric">${metric(o?.[group]?.[i]||0,n?.[group]?.[i]||0)}</td>`);return `<tr>${cells.join("")}</tr>`}).join("");
+    return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>SDS Görüntüleme İstem Karşılaştırması</title><style>
+      @page{size:A4 landscape;margin:6mm}*{box-sizing:border-box}body{font:8pt Arial,sans-serif;color:#111;margin:0}h1{font-size:13pt;text-align:center;margin:0 0 2mm}p{font-size:7pt;text-align:center;margin:0 0 3mm}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:.35pt solid #667085;padding:1mm .6mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere}th{background:#17365d;color:white;font-size:6.5pt}td{font-size:6.2pt}.doctor{text-align:left;font-weight:bold}.metric .v{display:block;white-space:nowrap;font-weight:bold}.metric small{display:block;font-size:5.6pt;color:#374151}.note{font-size:6pt;text-align:left;margin-top:2mm}@media screen{body{padding:10mm}table{max-width:1200px;margin:auto}h1,p,.note{max-width:1200px;margin-left:auto;margin-right:auto}}
+      </style></head><body><h1>SDS Görüntüleme Tetkik İstemleri</h1><p>${esc(oldMonth)} → ${esc(newMonth)} | Hücrelerde önceki sayı → yeni sayı ve yüzde değişim</p><table><thead><tr>${heads.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table><div class="note">Yüzde değişim = (yeni ay − önceki ay) / önceki ay. Önceki ay değeri 0 ve yeni ay değeri pozitifse “Yeni”, iki ay da 0 ise “—” gösterilir. Hekimler adlarına göre eşleştirilmiştir.</div></body></html>`;
+  };
+  function openDialog(){
+    if(document.getElementById("rpysSdsCompareModal"))return;
+    const m=document.createElement("div");m.id="rpysSdsCompareModal";m.innerHTML=`<div class="sc-card"><button class="sc-close" type="button" aria-label="Kapat">×</button><h2>SDS aylık hekim karşılaştırması</h2><p>Önceki ay ve yeni ay dosyalarını yükleyin. Dosyalarda MR&BT ile USG sayfaları ve hekim bazında Pol, Acil, Klinik sütunları bulunmalı.</p><div class="sc-grid"><label>Önceki ay adı<input id="scOldMonth" type="text" value="Önceki ay"></label><label>Yeni ay adı<input id="scNewMonth" type="text" value="Yeni ay"></label><label>Önceki ay Excel dosyası<input id="scOldFile" type="file" accept=".xlsx,.xls"></label><label>Yeni ay Excel dosyası<input id="scNewFile" type="file" accept=".xlsx,.xls"></label></div><div class="sc-actions"><button id="scBuild" type="button">Tabloyu oluştur</button><button id="scDownload" type="button" disabled>Word evrakını indir</button><button id="scPrint" type="button" disabled>Yazdır / PDF</button></div><div id="scStatus" role="status"></div><div id="scPreview"></div></div>`;
+    m.style.cssText="position:fixed;inset:0;background:#071426b8;z-index:2147483600;display:grid;place-items:center;padding:14px;font:14px Arial,sans-serif";
+    const style=document.createElement("style");style.textContent="#rpysSdsCompareModal .sc-card{position:relative;background:#fff;color:#17365d;width:min(1100px,96vw);max-height:92vh;overflow:auto;border-radius:14px;padding:22px;box-shadow:0 16px 60px #0005}#rpysSdsCompareModal h2{margin:0 0 8px;font-size:20px}#rpysSdsCompareModal p{line-height:1.5}#rpysSdsCompareModal .sc-close{position:absolute;right:12px;top:8px;border:0;background:none;font-size:28px;cursor:pointer}#rpysSdsCompareModal .sc-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:10px}#rpysSdsCompareModal label{display:grid;gap:5px;font-weight:700;font-size:12px}#rpysSdsCompareModal input{padding:8px;border:1px solid #b8c7d8;border-radius:6px;min-width:0}#rpysSdsCompareModal .sc-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}#rpysSdsCompareModal button:not(.sc-close){padding:9px 12px;border:0;border-radius:7px;background:#17365d;color:white;font-weight:700;cursor:pointer}#rpysSdsCompareModal button:disabled{opacity:.45;cursor:not-allowed}#rpysSdsCompareModal #scStatus{font-size:12px;margin:8px 0}#rpysSdsCompareModal #scPreview{overflow:auto}#rpysSdsCompareModal table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px}#rpysSdsCompareModal th,#rpysSdsCompareModal td{border:1px solid #8795a5;padding:4px;text-align:center}#rpysSdsCompareModal th{background:#17365d;color:white}#rpysSdsCompareModal td:first-child,#rpysSdsCompareModal td:nth-child(2){text-align:left}#rpysSdsCompareModal small{display:block;color:#475569}@media(max-width:650px){#rpysSdsCompareModal .sc-grid{grid-template-columns:1fr}#rpysSdsCompareModal .sc-card{padding:16px}}";document.head.append(style);document.body.append(m);
+    m.querySelector(".sc-close").onclick=()=>{m.remove();style.remove()};m.addEventListener("click",e=>{if(e.target===m){m.remove();style.remove()}});
+    let output="";
+    const status=m.querySelector("#scStatus"),preview=m.querySelector("#scPreview"),download=m.querySelector("#scDownload"),print=m.querySelector("#scPrint");
+    m.querySelector("#scBuild").onclick=async()=>{try{if(!window.XLSX)throw new Error("Excel okuma bileşeni yüklenemedi.");const of=m.querySelector("#scOldFile").files[0],nf=m.querySelector("#scNewFile").files[0];if(!of||!nf)throw new Error("İki ay için de Excel dosyası seçin.");status.textContent="Dosyalar okunuyor…";const [ob,nb]=await Promise.all([of.arrayBuffer(),nf.arrayBuffer()]);const om=inputRows(XLSX.read(ob,{type:"array"})),nm=inputRows(XLSX.read(nb,{type:"array"}));if(!om.size||!nm.size)throw new Error("Dosyalarda hekim kayıtları bulunamadı.");output=buildHtml(om,nm,m.querySelector("#scOldMonth").value||"Önceki ay",m.querySelector("#scNewMonth").value||"Yeni ay");const d=new DOMParser().parseFromString(output,"text/html");preview.innerHTML=`<div><b>${om.size}</b> önceki ay, <b>${nm.size}</b> yeni ay hekim kaydı eşleştirildi. Toplam <b>${d.querySelectorAll("tbody tr").length}</b> hekim.</div>`+d.querySelector("table").outerHTML;status.textContent="Karşılaştırma hazır. Tablo Word evrakında tek kez yer alır.";download.disabled=print.disabled=false}catch(e){output="";download.disabled=print.disabled=true;status.textContent=e?.message||"Dosyalar okunamadı."}};
+    download.onclick=()=>{if(!output)return;const blob=new Blob(["\ufeff",output],{type:"application/msword;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="SDS_Goruntuleme_Karsilastirmasi.doc";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)};
+    print.onclick=()=>{if(!output)return;const w=window.open("","_blank");if(!w)return alert("Yazdırma penceresi engellendi. İzin verip tekrar deneyin.");w.document.open();w.document.write(output);w.document.close();w.onload=()=>w.print()};
+  }
+  function mount(){
+    if(!document.body||document.getElementById("rpysSdsCompareOpen"))return;
+    const side=document.querySelector(".sidebar");if(!side)return;
+    const b=document.createElement("button");b.id="rpysSdsCompareOpen";b.type="button";b.className="btn alt";b.textContent="SDS Ay Karşılaştırması";b.style.cssText="display:block;width:calc(100% - 12px);margin:10px 6px;padding:9px 8px;font-weight:700";b.onclick=openDialog;side.append(b);
+  }
+  const start=()=>{mount();new MutationObserver(mount).observe(document.body,{childList:true,subtree:true})};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+})();
