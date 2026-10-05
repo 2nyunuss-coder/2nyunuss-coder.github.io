@@ -57,8 +57,11 @@
   }
   function mount(){
     if(!document.body||document.getElementById("rpysSdsCompareOpen"))return;
-    const side=document.querySelector(".sidebar");if(!side)return;
-    const b=document.createElement("button");b.id="rpysSdsCompareOpen";b.type="button";b.className="btn alt";b.textContent="SDS Ay Karşılaştırması";b.style.cssText="display:block;width:calc(100% - 12px);margin:10px 6px;padding:9px 8px;font-weight:700";b.onclick=openDialog;side.prepend(b);
+    const card=[...document.querySelectorAll("section,div,article")].filter(el=>/Hekim\s*\/\s*Branş İstem Dosyalarını Yükle/i.test(el.innerText||"")&&el.querySelector("button")).sort((a,b)=>(a.innerText||"").length-(b.innerText||"").length)[0];
+    if(!card)return;
+    const b=document.createElement("button");b.id="rpysSdsCompareOpen";b.type="button";b.className="btn alt";b.textContent="Önceki Ay + Bu Ayı Karşılaştır";b.style.cssText="display:inline-block;margin:0 0 0 8px;padding:8px 10px;font-weight:700";b.onclick=openDialog;
+    const fileButton=[...card.querySelectorAll("button")].find(x=>/^Dosya Seç$/i.test((x.innerText||x.textContent||"").trim()));
+    if(fileButton)fileButton.insertAdjacentElement("afterend",b);else card.append(b);
   }
   const start=()=>{mount();new MutationObserver(mount).observe(document.body,{childList:true,subtree:true})};
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
