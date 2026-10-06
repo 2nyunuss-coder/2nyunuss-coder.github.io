@@ -41,7 +41,7 @@ function shiftInfo(th){
  const shifts=[...shiftRow.cells],index=shifts.indexOf(th);if(index<0)return null;
  let offset=0,unit='',within=0;
  for(const group of head.rows[0].querySelectorAll('th.unitHeaderAction')){
-  const span=Math.max(1,Number(group.colSpan)||1);
+  const span=Math.max(1,Number(group.dataset.rpysOriginalSpan)||Number(group.colSpan)||1);
   if(index>=offset&&index<offset+span){unit=[...group.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()||group.textContent.trim();within=index-offset;break}
   offset+=span;
  }
@@ -54,16 +54,20 @@ function shiftInfo(th){
 }
 function shiftInfoBase(th,head){
  const shifts=[...head.rows[1].cells],index=shifts.indexOf(th);if(index<0)return null;
- let offset=0,unit='';for(const group of head.rows[0].querySelectorAll('th.unitHeaderAction')){const span=Math.max(1,Number(group.colSpan)||1);if(index>=offset&&index<offset+span){unit=[...group.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()||group.textContent.trim();break}offset+=span}
+ let offset=0,unit='';for(const group of head.rows[0].querySelectorAll('th.unitHeaderAction')){const span=Math.max(1,Number(group.dataset.rpysOriginalSpan)||Number(group.colSpan)||1);if(index>=offset&&index<offset+span){unit=[...group.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()||group.textContent.trim();break}offset+=span}
  return {unit,name:shiftName(th)}
 }
 function applyShiftVisibility(th,hidden){
  const info=shiftInfo(th);if(!info)return;
- for(const row of [...info.table.rows].slice(2)){const cell=row.cells[info.index+1];if(cell)cell.classList.toggle('rpysShiftCellCollapsed',hidden)}
+ for(const row of [...info.table.rows].slice(2)){const cell=row.cells[info.index+1];if(cell)cell.style.display=hidden?'none':''}
  th.dataset.rpysShiftName=info.name;th.setAttribute('aria-expanded',String(!hidden));
- th.title='Sağ tık ile '+(hidden?'göster: ':'gizle: ')+info.unit+' • '+info.name;
- th.classList.toggle('rpysShiftCollapsed',hidden);th.style.cursor='pointer';
- const label=hidden?'↔':info.name;if(th.textContent!==label)th.textContent=label;
+ th.title='Sağ tık ile gizle: '+info.unit+' • '+info.name;th.style.display=hidden?'none':'';
+ const head=info.table.tHead,groups=[...head.rows[0].querySelectorAll('th.unitHeaderAction')];let offset=0;
+ for(const group of groups){
+  const span=Math.max(1,Number(group.dataset.rpysOriginalSpan)||Number(group.colSpan)||1),shown=[...head.rows[1].cells].slice(offset,offset+span).filter(x=>x.style.display!=='none').length;
+  group.colSpan=Math.max(1,shown);group.style.display=shown?'':'none';offset+=span;
+ }
+ renderHiddenShiftControls(info.table);
 }
 function toggleShift(th){
  const info=shiftInfo(th);if(!info)return;
@@ -74,6 +78,7 @@ function toggleShift(th){
 function scanShiftHeaders(){
  const state=collapsedShifts();
  document.querySelectorAll('#nobet #polGrid table.schedule,#nobet #acilGrid table.schedule').forEach(table=>{
+  for(const group of table.tHead?.rows?.[0]?.querySelectorAll('th.unitHeaderAction')||[])if(!group.dataset.rpysOriginalSpan)group.dataset.rpysOriginalSpan=String(group.colSpan||1);
   for(const th of table.tHead?.rows?.[1]?.querySelectorAll('th.shift')||[]){
    const info=shiftInfo(th);if(!info)continue;
    th.dataset.rpysShiftName=info.name;th.style.cursor='context-menu';
@@ -81,15 +86,31 @@ function scanShiftHeaders(){
   }
  });
 }
+function renderHiddenShiftControls(table){
+ const grid=table.closest('#polGrid,#acilGrid');if(!grid)return;
+ const hidden=[...(table.tHead?.rows?.[1]?.querySelectorAll('th.shift')||[])].map(th=>({th,info:shiftInfo(th)})).filter(x=>x.info&&collapsedShifts().has(x.info.key));
+ let tray=grid.querySelector(':scope > .rpysDutyHiddenShifts');
+ if(!hidden.length){tray?.remove();return}
+ if(!tray){tray=document.createElement('div');tray.className='rpysDutyHiddenShifts';grid.insertBefore(tray,table)}
+ const signature=JSON.stringify(hidden.map(x=>x.info.key));if(tray.dataset.signature===signature)return;
+ tray.dataset.signature=signature;tray.replaceChildren();
+ for(const item of hidden){const button=document.createElement('button');button.type='button';button.className='rpysDutyShowShift';button.dataset.shiftKey=item.info.key;button.dataset.grid=grid.id;button.textContent='↗ Göster: '+item.info.unit+' • '+item.info.name;tray.append(button)}
+}
 document.addEventListener('contextmenu',event=>{
  const th=event.target.closest?.('#nobet #polGrid th.shift,#nobet #acilGrid th.shift');
  if(!th)return;
  event.preventDefault();event.stopImmediatePropagation();toggleShift(th);
 },true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('#nobet .rpysDutyShowShift');if(!button)return;
+ event.preventDefault();const grid=document.getElementById(button.dataset.grid),table=grid?.querySelector('table.schedule');
+ const th=[...(table?.tHead?.rows?.[1]?.querySelectorAll('th.shift')||[])].find(x=>shiftInfo(x)?.key===button.dataset.shiftKey);if(!th)return;
+ const state=collapsedShifts();state.delete(button.dataset.shiftKey);saveCollapsedShifts(state);applyShiftVisibility(th,false);
+},true);
 const shiftObserver=new MutationObserver(scanShiftHeaders);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})});
 else {scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})}
-const shiftStyle=document.createElement('style');shiftStyle.textContent='#nobet .schedule th.shift{cursor:context-menu!important}#nobet .schedule th.shift.rpysShiftCollapsed,#nobet .schedule td.rpysShiftCellCollapsed{width:14px!important;min-width:14px!important;max-width:14px!important;padding:0!important;overflow:hidden!important}#nobet .schedule th.shift.rpysShiftCollapsed{white-space:nowrap!important;font-size:7pt!important;background:#dbe5ef!important;color:#17365d!important}#nobet .schedule td.rpysShiftCellCollapsed{visibility:hidden!important}';document.head.append(shiftStyle);
+const shiftStyle=document.createElement('style');shiftStyle.textContent='#nobet .schedule th.shift{cursor:context-menu!important}.rpysDutyHiddenShifts{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 7px}.rpysDutyHiddenShifts button{border:1px solid #94a3b8;border-radius:5px;background:#eef4f9;color:#17365d;padding:4px 8px;font-size:11px;cursor:pointer}';document.head.append(shiftStyle);
 function print(type,orientation){
  document.getElementById('rpysDutyPrint415Frame')?.remove();
  const frame=document.createElement('iframe');frame.id='rpysDutyPrint415Frame';
