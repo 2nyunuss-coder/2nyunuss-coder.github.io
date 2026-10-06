@@ -1,4 +1,4 @@
-/* Nöbet Listesi print controls only. Reads the existing document renderer. */
+/* Nöbet Listesi print controls and per-shift visibility. */
 (()=>{
 'use strict';
 if(window.rpysDutyPrint415)return;
@@ -32,79 +32,63 @@ function documentBody(type){
  return d.body.innerHTML;
 }
 
-const COLLAPSED_UNITS='rpys_duty_collapsed_units_v1';
-function unitName(th){return String(th?.dataset?.unitName||[...(th?.childNodes||[])].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()||th?.textContent?.replace(/\s*\(gizli\)\s*$/i,'').trim()||'')}
-function collapsedUnits(){try{return new Set(JSON.parse(sessionStorage.getItem(COLLAPSED_UNITS)||'[]'))}catch(_){return new Set()}}
-function saveCollapsedUnits(set){try{sessionStorage.setItem(COLLAPSED_UNITS,JSON.stringify([...set]))}catch(_){}}
-function applyUnitVisibility(table,unit,hidden){
- const head=table.tHead;if(!head?.rows?.length)return;
- const groups=[...head.rows[0].querySelectorAll('th.unitHeaderAction')];
- const group=groups.find(th=>unitName(th)===unit);
- if(!group)return;
- let start=2;
- for(const th of groups){if(th===group)break;start+=Math.max(1,Number(th.colSpan)||1)}
- const count=Math.max(1,Number(group.colSpan)||1),shiftRow=head.rows[1];
- for(let i=0;i<count;i++){
-  const shift=shiftRow?.cells[start-2+i];if(shift)shift.style.display=hidden?'none':'';
-  for(const row of [...table.rows].slice(2)){const cell=row.cells[start-1+i];if(cell)cell.style.display=hidden?'none':''}
+const COLLAPSED_SHIFTS='rpys_duty_collapsed_shifts_v1';
+function shiftName(th){return String(th?.dataset?.rpysShiftName||th?.textContent?.replace(/\s*\(gizli\)\s*$/i,'').trim()||'')}
+function collapsedShifts(){try{return new Set(JSON.parse(sessionStorage.getItem(COLLAPSED_SHIFTS)||'[]'))}catch(_){return new Set()}}
+function saveCollapsedShifts(set){try{sessionStorage.setItem(COLLAPSED_SHIFTS,JSON.stringify([...set]))}catch(_){}}
+function shiftInfo(th){
+ const table=th?.closest('table.schedule'),head=table?.tHead,shiftRow=head?.rows?.[1];if(!table||!shiftRow)return null;
+ const shifts=[...shiftRow.cells],index=shifts.indexOf(th);if(index<0)return null;
+ let offset=0,unit='',within=0;
+ for(const group of head.rows[0].querySelectorAll('th.unitHeaderAction')){
+  const span=Math.max(1,Number(group.colSpan)||1);
+  if(index>=offset&&index<offset+span){unit=[...group.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()||group.textContent.trim();within=index-offset;break}
+  offset+=span;
  }
- group.dataset.unitName=unit;group.setAttribute('aria-expanded',String(!hidden));
- group.title='Tıklayarak birimi '+(hidden?'göster':'gizle')+' • Sağ tık: birim ayını temizle';
- group.style.cursor='pointer';group.classList.toggle('rpysUnitCollapsed',hidden);
- let badge=group.querySelector('.rpysUnitHiddenBadge');
- if(hidden&&!badge){badge=table.ownerDocument.createElement('span');badge.className='rpysUnitHiddenBadge';badge.textContent=' (gizli)';group.append(badge)}
- if(!hidden)badge?.remove();
+ if(!unit)return null;
+ const type=table.closest('#acilGrid')?'acil':'pol',name=shiftName(th);
+ const same=[...shifts.slice(0,index)].filter(x=>{
+  const info=shiftInfoBase(x,head);return info?.unit===unit&&info?.name===name
+ }).length;
+ return {table,index,unit,name,type,key:[type,unit,name,same].join('|')}
 }
-function toggleUnit(group){
- const table=group?.closest('table.schedule'),unit=unitName(group);if(!table||!unit)return;
- const type=group.dataset.unitType||(table.closest('#acilGrid')?'acil':'pol'),key=type+'|'+unit,state=collapsedUnits(),hidden=!state.has(key);
- if(hidden)state.add(key);else state.delete(key);
- saveCollapsedUnits(state);applyUnitVisibility(table,unit,hidden);
+function shiftInfoBase(th,head){
+ const shifts=[...head.rows[1].cells],index=shifts.indexOf(th);if(index<0)return null;
+ let offset=0,unit='';for(const group of head.rows[0].querySelectorAll('th.unitHeaderAction')){const span=Math.max(1,Number(group.colSpan)||1);if(index>=offset&&index<offset+span){unit=[...group.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()||group.textContent.trim();break}offset+=span}
+ return {unit,name:shiftName(th)}
 }
-function scanUnitHeaders(){
- const state=collapsedUnits();
+function applyShiftVisibility(th,hidden){
+ const info=shiftInfo(th);if(!info)return;
+ for(const row of [...info.table.rows].slice(2)){const cell=row.cells[info.index+1];if(cell)cell.style.display=hidden?'none':''}
+ th.dataset.rpysShiftName=info.name;th.setAttribute('aria-expanded',String(!hidden));
+ th.title=(hidden?'Göster: ':'Gizle: ')+info.unit+' • '+info.name;
+ th.classList.toggle('rpysShiftCollapsed',hidden);th.style.cursor='pointer';
+ const label=hidden?'↔':info.name;if(th.textContent!==label)th.textContent=label;
+}
+function toggleShift(th){
+ const info=shiftInfo(th);if(!info)return;
+ const state=collapsedShifts(),hidden=!state.has(info.key);
+ if(hidden)state.add(info.key);else state.delete(info.key);
+ saveCollapsedShifts(state);applyShiftVisibility(th,hidden);
+}
+function scanShiftHeaders(){
+ const state=collapsedShifts();
  document.querySelectorAll('#nobet #polGrid table.schedule,#nobet #acilGrid table.schedule').forEach(table=>{
-  for(const group of table.tHead?.rows?.[0]?.querySelectorAll('th.unitHeaderAction')||[]){
-   const unit=unitName(group);
-   group.dataset.unitName=unit;group.style.cursor='pointer';
-   group.title='Tıklayarak birimi gizle/göster • Sağ tık: birim ayını temizle';
-   const type=group.dataset.unitType||(table.closest('#acilGrid')?'acil':'pol');
-   applyUnitVisibility(table,unit,state.has(type+'|'+unit));
+  for(const th of table.tHead?.rows?.[1]?.querySelectorAll('th.shift')||[]){
+   const info=shiftInfo(th);if(!info)continue;
+   th.dataset.rpysShiftName=info.name;th.style.cursor='pointer';
+   applyShiftVisibility(th,state.has(info.key));
   }
  });
 }
 document.addEventListener('click',event=>{
- const group=event.target.closest?.('#nobet #polGrid th.unitHeaderAction,#nobet #acilGrid th.unitHeaderAction');
- if(!group)return;
- toggleUnit(group);
+ const th=event.target.closest?.('#nobet #polGrid th.shift,#nobet #acilGrid th.shift');
+ if(th)toggleShift(th);
 },true);
-let dutyTouch=null;
-document.addEventListener('touchstart',event=>{
- const group=event.target.closest?.('#nobet #polGrid th.unitHeaderAction,#nobet #acilGrid th.unitHeaderAction');if(!group||event.touches.length!==1)return;
- const touch=event.touches[0],type=group.dataset.unitType||(group.closest('#acilGrid')?'acil':'pol');
- dutyTouch={group,x:touch.clientX,y:touch.clientY,moved:false,timer:setTimeout(()=>{
-  if(!dutyTouch||dutyTouch.group!==group||dutyTouch.moved)return;
-  dutyTouch.long=true;
-  if(typeof window.showUnitHeaderMenu==='function')window.showUnitHeaderMenu({preventDefault(){},stopPropagation(){},clientX:dutyTouch.x,clientY:dutyTouch.y},type,unitName(group));
- },540)};
- event.preventDefault();event.stopImmediatePropagation();
-},true);
-document.addEventListener('touchmove',event=>{
- if(!dutyTouch||event.touches.length!==1)return;
- const touch=event.touches[0];if(Math.abs(touch.clientX-dutyTouch.x)>12||Math.abs(touch.clientY-dutyTouch.y)>12){dutyTouch.moved=true;clearTimeout(dutyTouch.timer)}
- event.stopImmediatePropagation();
-},true);
-document.addEventListener('touchend',event=>{
- if(!dutyTouch)return;
- const current=dutyTouch;clearTimeout(current.timer);dutyTouch=null;
- event.preventDefault();event.stopImmediatePropagation();
- if(!current.moved&&!current.long)toggleUnit(current.group);
-},true);
-document.addEventListener('touchcancel',event=>{if(dutyTouch)clearTimeout(dutyTouch.timer);dutyTouch=null;event.stopImmediatePropagation()},true);
-const unitObserver=new MutationObserver(scanUnitHeaders);
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scanUnitHeaders();unitObserver.observe(document.documentElement,{childList:true,subtree:true})});
-else {scanUnitHeaders();unitObserver.observe(document.documentElement,{childList:true,subtree:true})}
-const unitStyle=document.createElement('style');unitStyle.textContent='#nobet .schedule th.unitHeaderAction{cursor:pointer!important}#nobet .schedule th.unitHeaderAction.rpysUnitCollapsed{font-size:8pt!important;opacity:.78;background:#dbe5ef!important}#nobet .schedule .rpysUnitHiddenBadge{font-size:.82em;font-weight:500;white-space:nowrap}';document.head.append(unitStyle);
+const shiftObserver=new MutationObserver(scanShiftHeaders);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})});
+else {scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})}
+const shiftStyle=document.createElement('style');shiftStyle.textContent='#nobet .schedule th.shift{cursor:pointer!important}#nobet .schedule th.shift.rpysShiftCollapsed{width:14px!important;min-width:14px!important;max-width:14px!important;padding:0!important;white-space:nowrap!important;font-size:7pt!important;background:#dbe5ef!important;color:#17365d!important}';document.head.append(shiftStyle);
 function print(type,orientation){
  document.getElementById('rpysDutyPrint415Frame')?.remove();
  const frame=document.createElement('iframe');frame.id='rpysDutyPrint415Frame';
