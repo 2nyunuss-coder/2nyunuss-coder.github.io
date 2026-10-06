@@ -237,7 +237,7 @@
     app=insertBeforeFinalBody(app,SAY_NAME_FIT_JS);
    }
    if(!app.includes('rpys-saymanlik-print-loader-v414'))app=insertBeforeFinalBody(app,'<script id="rpys-saymanlik-print-loader-v414" src="/rpys-saymanlik-print-v414.js?v=20261005-420"><'+ '/script>');
-   if(!app.includes('rpys-duty-print-loader-v415'))app=insertBeforeFinalBody(app,'<script id="rpys-duty-print-loader-v415" src="/rpys-duty-print-v415.js?v=20261006-421"><'+ '/script>');
+   if(!app.includes('rpys-duty-print-loader-v415'))app=insertBeforeFinalBody(app,'<script id="rpys-duty-print-loader-v415" src="/rpys-duty-print-v415.js?v=20261006-422"><'+ '/script>');
    if(!app.includes('rpys-sds-compare-loader-v1'))app=insertBeforeFinalBody(app,'<script id="rpys-sds-compare-loader-v1" src="/rpys-sds-compare-v1.js?v=20261005-8"><'+ '/script>');
    if(!app.includes('rpys-bulk-print-loader-v412'))app=insertBeforeFinalBody(app,'<script id="rpys-bulk-print-loader-v412" src="/rpys-print-center-v413.js?v=20261005-420"><'+ '/script>');
    if(!app.includes('rpys-print-note-guard-loader-v418'))app=insertBeforeFinalBody(app,'<script id="rpys-print-note-guard-loader-v418" src="/rpys-print-notes-guard-v418.js?v=20261005-420"><'+ '/script>');
@@ -245,7 +245,7 @@
    // Belge henüz document.write ile çalıştırılmadan önce tüm yazdırma script yollarını zorla güncel sürüme çevir.
    app=app
      .replace(/\/rpys-saymanlik-print-v414\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-print-v414.js?v=20261005-420')
-     .replace(/\/rpys-duty-print-v415\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-duty-print-v415.js?v=20261006-421')
+     .replace(/\/rpys-duty-print-v415\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-duty-print-v415.js?v=20261006-422')
      .replace(/\/rpys-print-center-v413\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-print-center-v413.js?v=20261005-420');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
