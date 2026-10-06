@@ -61,7 +61,7 @@ function applyShiftVisibility(th,hidden){
  const info=shiftInfo(th);if(!info)return;
  for(const row of [...info.table.rows].slice(2)){const cell=row.cells[info.index+1];if(cell)cell.classList.toggle('rpysShiftCellCollapsed',hidden)}
  th.dataset.rpysShiftName=info.name;th.setAttribute('aria-expanded',String(!hidden));
- th.title=(hidden?'Göster: ':'Gizle: ')+info.unit+' • '+info.name;
+ th.title='Sağ tık ile '+(hidden?'göster: ':'gizle: ')+info.unit+' • '+info.name;
  th.classList.toggle('rpysShiftCollapsed',hidden);th.style.cursor='pointer';
  const label=hidden?'↔':info.name;if(th.textContent!==label)th.textContent=label;
 }
@@ -76,19 +76,20 @@ function scanShiftHeaders(){
  document.querySelectorAll('#nobet #polGrid table.schedule,#nobet #acilGrid table.schedule').forEach(table=>{
   for(const th of table.tHead?.rows?.[1]?.querySelectorAll('th.shift')||[]){
    const info=shiftInfo(th);if(!info)continue;
-   th.dataset.rpysShiftName=info.name;th.style.cursor='pointer';
+   th.dataset.rpysShiftName=info.name;th.style.cursor='context-menu';
    applyShiftVisibility(th,state.has(info.key));
   }
  });
 }
-document.addEventListener('click',event=>{
+document.addEventListener('contextmenu',event=>{
  const th=event.target.closest?.('#nobet #polGrid th.shift,#nobet #acilGrid th.shift');
- if(th)toggleShift(th);
+ if(!th)return;
+ event.preventDefault();event.stopImmediatePropagation();toggleShift(th);
 },true);
 const shiftObserver=new MutationObserver(scanShiftHeaders);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})});
 else {scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})}
-const shiftStyle=document.createElement('style');shiftStyle.textContent='#nobet .schedule th.shift{cursor:pointer!important}#nobet .schedule th.shift.rpysShiftCollapsed,#nobet .schedule td.rpysShiftCellCollapsed{width:14px!important;min-width:14px!important;max-width:14px!important;padding:0!important;overflow:hidden!important}#nobet .schedule th.shift.rpysShiftCollapsed{white-space:nowrap!important;font-size:7pt!important;background:#dbe5ef!important;color:#17365d!important}#nobet .schedule td.rpysShiftCellCollapsed{visibility:hidden!important}';document.head.append(shiftStyle);
+const shiftStyle=document.createElement('style');shiftStyle.textContent='#nobet .schedule th.shift{cursor:context-menu!important}#nobet .schedule th.shift.rpysShiftCollapsed,#nobet .schedule td.rpysShiftCellCollapsed{width:14px!important;min-width:14px!important;max-width:14px!important;padding:0!important;overflow:hidden!important}#nobet .schedule th.shift.rpysShiftCollapsed{white-space:nowrap!important;font-size:7pt!important;background:#dbe5ef!important;color:#17365d!important}#nobet .schedule td.rpysShiftCellCollapsed{visibility:hidden!important}';document.head.append(shiftStyle);
 function print(type,orientation){
  document.getElementById('rpysDutyPrint415Frame')?.remove();
  const frame=document.createElement('iframe');frame.id='rpysDutyPrint415Frame';
