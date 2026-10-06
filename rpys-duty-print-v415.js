@@ -16,12 +16,33 @@ function note(){
  if(ta&&box.dataset.rpysNoteMonth===month())return ta.value.trim();
  try{const notes=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');return String(notes['nobet|'+month()]||'').trim()}catch(_){return ''}
 }
+function filterPrintedShifts(d,type){
+ const table=d.querySelector('table.stableDuty'),head=table?.tHead,shiftRow=head?.rows?.[1];if(!table||!shiftRow)return;
+ const hidden=collapsedShifts(),groups=[...head.rows[0].cells].filter(th=>th.rowSpan<2||th.colSpan>1),remove=[],adjust=[];let offset=0;
+ for(const group of groups){
+  if(group.rowSpan>1&&group.colSpan===1)continue;
+  const span=Math.max(1,Number(group.colSpan)||1),unit=group.textContent.trim(),seen=new Map();let keep=0;
+  for(let i=0;i<span;i++){
+   const shift=shiftRow.cells[offset+i],name=String(shift?.textContent||'').trim(),occ=seen.get(name)||0;seen.set(name,occ+1);
+   if(hidden.has([type,unit,name,occ].join('|')))remove.push(offset+i);else keep++
+  }
+  adjust.push({group,keep});offset+=span
+ }
+ for(const index of remove.sort((a,b)=>b-a)){
+  shiftRow.cells[index]?.remove();
+  for(const row of table.tBodies[0]?.rows||[])row.cells[index+1]?.remove();
+  table.querySelector('colgroup')?.children[index+1]?.remove();
+ }
+ for(const item of adjust){if(!item.keep)item.group.remove();else item.group.colSpan=item.keep}
+ const cols=table.querySelectorAll('colgroup col');cols.forEach((col,index)=>{if(index>0)col.style.width=''});
+}
 function documentBody(type){
  if(typeof stableDutyDoc!=='function')throw Error('Nöbet listesi henüz hazır değil.');
  const d=new DOMParser().parseFromString(stableDutyDoc(type),'text/html');
  const table=d.querySelector('table.stableDuty');
  if(!table)throw Error('Nöbet tablosu oluşturulamadı.');
  d.body.prepend(...d.head.querySelectorAll('style'));
+ filterPrintedShifts(d,type);
  const value=note();
  // v418 wraps stableDutyDoc and already adds the note. Avoid printing a second copy.
  if(value&&!d.querySelector('.rpysPrintNoteGuard418,.rpysDutyPrint415Note,.printNote,.rpysPrintNote')){
