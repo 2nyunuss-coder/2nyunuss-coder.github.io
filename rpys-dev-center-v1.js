@@ -183,10 +183,25 @@ function renderCustomNavigation(){
  root.innerHTML=items.map(x=>'<button class="rpysDevBtn" data-custom-nav="'+esc(x.id)+'">'+esc(x.label)+'</button>').join('');
  root.querySelectorAll('[data-custom-nav]').forEach(btn=>btn.onclick=()=>{let x=items.find(z=>z.id===btn.dataset.customNav);if(x)openMenuTarget(x)});
 }
+function renderPublishedModule(m){
+ let root=document.getElementById('rpysPublishedModule');
+ if(!root){root=document.createElement('div');root.id='rpysPublishedModule';document.body.appendChild(root)}
+ root.innerHTML='<div style="position:fixed;inset:0;z-index:10041;background:#f5f8fb;overflow:auto"><div style="max-width:1200px;margin:auto;min-height:100vh;background:#fff;padding:18px"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dce5ee;padding-bottom:12px;margin-bottom:15px"><strong>RPYS</strong><button class="rpysDevBtn" id="closePublishedModule">← RPYS Ana Sayfa</button></div><h1>'+esc(m.name)+'</h1><div id="publishedModuleBody"></div></div></div>';
+ let box=document.getElementById('publishedModuleBody');
+ box.innerHTML=renderModuleHTML(m);
+ wireModuleRuntime(box,m);
+ document.getElementById('closePublishedModule').onclick=()=>{root.remove();history.pushState({},'',location.pathname)};
+}
+function tryOpenPublishedModule(){
+ let m=location.search.match(/[?&]devmodule=([^&]+)/);if(!m)return false;
+ let mod=moduleById(decodeURIComponent(m[1]));if(!mod)return false;
+ renderPublishedModule(mod);return true;
+}
+
 function openMenuTarget(x){
  if(x.type==='page'){location.href=location.pathname+'?devpage='+encodeURIComponent(x.target);return}
- if(x.type==='module'){editModuleRuntime(x.target);open();return}
+ if(x.type==='module'){location.href=location.pathname+'?devmodule='+encodeURIComponent(x.target);return}
 }
 function rules(b){b.innerHTML='<div class="rpysDevCard"><button class="rpysDevBtn primary" id="nr">＋ Yeni Kural</button><p class="rpysDevMuted">Kurallar özel geliştirme katmanında tutulur. 6.1.1 dağıtım motoruna doğrudan müdahale etmez.</p></div><div class="rpysDevList" style="margin-top:10px">'+state.rules.map(x=>'<div class="rpysDevItem"><b>'+esc(x.name)+'</b><span class="rpysDevMuted">EĞER '+esc(x.when)+' → '+esc(x.then)+'</span></div>').join('')+'</div>';document.getElementById('nr').onclick=()=>{let n=prompt('Kural adı:','Yeni Kural');if(n){state.rules.push({id:uid('r'),name:n,when:prompt('EĞER:','Birim = BT')||'',then:prompt('O ZAMAN:','Göster')||''});sync('Kural oluşturuldu');render('rules')}}};function data(b){b.innerHTML='<div class="rpysDevGrid"><div class="rpysDevCard"><b>Okunabilir veri kaynakları</b><div class="rpysDevList" style="margin-top:8px">'+sources().map(x=>'<div class="rpysDevItem"><b>'+esc(x)+'</b><span class="rpysDevMuted">'+rows(x).length+' kayıt</span></div>').join('')+'</div></div><div class="rpysDevCard"><b>Koruma</b><p class="rpysDevMuted">Bu katman SQL çalıştırmaz, veri silmez ve 6.1.1 motorunu değiştirmez. Sorgular yalnızca okuma amaçlıdır.</p></div></div>'};function backup(b){b.innerHTML='<div class="rpysDevCard"><b>Geliştirme Merkezi yedeği</b><p class="rpysDevMuted">'+state.history.length+' sürüm geçmişi.</p><button class="rpysDevBtn primary" id="exp">JSON dışa aktar</button><input class="rpysDevInput" id="imp" type="file" accept="application/json" style="margin-top:8px"></div>';document.getElementById('exp').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));a.download='rpys-gelistirme-merkezi.json';a.click()};document.getElementById('imp').onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);sync('Geliştirme Merkezi içe aktarma');render('pages');alert('Yedek yüklendi.')}catch(x){alert('Yedek okunamadı')}};r.readAsText(f)}};
 function block(x,i){let p=x.props||{};let h=x.type==='heading'?'<h2>'+esc(p.text)+'</h2>':x.type==='text'?'<p>'+esc(p.text)+'</p>':x.type==='kpi'?'<div class="rpysDevCard"><span>'+esc(p.text)+'</span><h2>'+esc(p.value)+'</h2></div>':x.type==='button'?'<button class="rpysDevBtn primary">'+esc(p.text)+(p.actionId?' ⚡':'')+'</button>':x.type==='form'?'<div class="rpysDevCard"><b>'+esc(p.title||'Form')+'</b></div>':x.type==='query'?'<div class="rpysDevCard">Canlı sorgu: '+esc(p.queryId||'seçilmedi')+'</div>':'<div>'+x.type+'</div>';return '<div class="rpysDevBlock" data-select-block="'+i+'">'+h+' <button class="rpysDevBtn" data-up="'+i+'">↑</button><button class="rpysDevBtn" data-down="'+i+'">↓</button><button class="rpysDevBtn" data-del="'+i+'">Sil</button></div>'}
-function boot(){if(!document.body)return;build();renderCustomNavigation();setTimeout(()=>tryOpenPublished(),50)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else setTimeout(boot,250);window.rpysDevCenter={open:open,close:close,state:()=>clone(state),newPage:newPage,newQuery:newQuery};})();
+function boot(){if(!document.body)return;build();renderCustomNavigation();setTimeout(()=>{if(tryOpenPublished())return;tryOpenPublishedModule()},50)}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else setTimeout(boot,250);window.rpysDevCenter={open:open,close:close,state:()=>clone(state),newPage:newPage,newQuery:newQuery};})();
