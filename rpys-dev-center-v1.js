@@ -8,6 +8,10 @@ function render(tab){let body=document.getElementById('rpysDevBody');document.qu
 
 function publishedPages(){return (state.pages||[]).filter(p=>p.published)}
 function pageBySlug(slug){return publishedPages().find(p=>p.slug===slug)}
+function formById(id){return (state.forms||[]).find(f=>f.id===id)}
+function saveFormSubmission(formId,data){state.formData=state.formData||{};state.formData[formId]=state.formData[formId]||[];state.formData[formId].push({id:uid('submission'),at:new Date().toISOString(),data:clone(data)});sync('Form verisi kaydedildi')}
+function renderFormHTML(f){if(!f)return '<div class="rpysDevMuted">Form seçilmemiş veya bulunamadı.</div>';return '<form data-dev-form="'+esc(f.id)+'"><h3>'+esc(f.name)+'</h3>'+(f.fields||[]).map(x=>'<div class="rpysDevField"><label>'+esc(x.label)+(x.required?' *':'')+'</label>'+(x.type==='textarea'?'<textarea class="rpysDevInput" name="'+esc(x.id)+'" rows="4" '+(x.required?'required':'')+'></textarea>':'<input class="rpysDevInput" type="'+(x.type==='number'?'number':x.type==='date'?'date':'text')+'" name="'+esc(x.id)+'" '+(x.required?'required':'')+'>')+'</div>').join('')+'<button class="rpysDevBtn primary" type="submit">Kaydet</button><span class="rpysDevMuted" data-form-msg style="margin-left:8px"></span></form>'}
+function wireForms(root){(root||document).querySelectorAll('form[data-dev-form]').forEach(f=>f.onsubmit=e=>{e.preventDefault();let data={};new FormData(f).forEach((v,k)=>data[k]=v);saveFormSubmission(f.dataset.devForm,data);let m=f.querySelector('[data-form-msg]');if(m)m.textContent='Kaydedildi';})}
 function renderPublishedPage(p){
  let root=document.getElementById('rpysPublishedPage');
  if(!root){root=document.createElement('div');root.id='rpysPublishedPage';document.body.appendChild(root)}
@@ -20,7 +24,7 @@ function renderPublishedPage(p){
   else if(x.type==='text')html='<p>'+esc(q.text)+'</p>';
   else if(x.type==='kpi')html='<div class="rpysDevCard"><span>'+esc(q.text)+'</span><h2>'+esc(q.value)+'</h2></div>';
   else if(x.type==='button')html='<button class="rpysDevBtn primary">'+esc(q.text)+'</button>';
-  else if(x.type==='form')html='<div class="rpysDevCard"><h3>'+esc(q.title||'Form')+'</h3><input class="rpysDevInput" placeholder="Ad"><input class="rpysDevInput" style="margin-top:7px" placeholder="Açıklama"><button class="rpysDevBtn primary" style="margin-top:7px">Kaydet</button></div>';
+  else if(x.type==='form'){html=renderFormHTML(formById(q.formId));}
   else if(x.type==='query'){
     let qq=state.queries.find(z=>z.id===q.queryId);
     if(qq){let a=runq(qq),cols=qq.columns?.filter(Boolean)||fields(a).slice(0,6);
@@ -29,7 +33,7 @@ function renderPublishedPage(p){
   }
   el.innerHTML=html;box.appendChild(el);
  });
- document.getElementById('closePublished').onclick=()=>{root.remove();history.pushState({},'',location.pathname+location.search.replace(/[?&]devpage=[^&]*/,'').replace(/^&/,'?'))};
+ wireForms(box);document.getElementById('closePublished').onclick=()=>{root.remove();history.pushState({},'',location.pathname+location.search.replace(/[?&]devpage=[^&]*/,'').replace(/^&/,'?'))};
 }
 function tryOpenPublished(){
  let m=location.search.match(/[?&]devpage=([^&]+)/); if(!m)return false;
