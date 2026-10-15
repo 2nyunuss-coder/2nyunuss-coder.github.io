@@ -37,7 +37,7 @@ function decorate(){for(const id of IDS){const page=document.getElementById(id);
  }}
 let timer=0;function schedule(delay=100){clearTimeout(timer);timer=setTimeout(decorate,delay)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>schedule(0),{once:true});else schedule(0);
-document.addEventListener('click',e=>{if(e.target.closest('.sidebar .nav[data-p]')||e.target.closest('#rpysDesktopHome409 [data-view-action=launch]'))schedule(180)},{capture:true});
+document.addEventListener('click',e=>{if(e.target.closest('.sidebar .nav[data-p]')||e.target.closest('#rpysDesktopHome409 [data-view-action=launch]')||e.target.closest('#nobet,#saymanlik'))schedule(180)},{capture:true});
 addEventListener('resize',()=>schedule(80));addEventListener('rpys-direct-core-ready',()=>schedule(200));
 new MutationObserver(()=>schedule(100)).observe(document.body,{childList:true,subtree:true});
 })();
