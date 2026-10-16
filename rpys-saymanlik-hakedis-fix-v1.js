@@ -28,5 +28,11 @@ function installSaymanlik(){try{if(typeof editSelectedSayCellText!=='function'||
  try{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null}catch{}if(hours>0){try{if(typeof saveNowV245==='function')saveNowV245({label:'Saymanlık izin metni mükellef düşümü'});else save()}catch{try{save()}catch{}}try{renderAll()}catch{}}
  }catch(e){console.warn('RPYS Saymanlık mükellef düşümü',e)}}};wrapped.__rpysHakFixV1=true;editSelectedSayCellText=wrapped}catch(e){console.warn('RPYS Saymanlık edit kancası',e)}}
 function install(){installHours();installSaymanlik()}
-install();window.addEventListener('rpys-direct-core-ready',()=>{install();setTimeout(install,250)});let n=0,iv=setInterval(()=>{install();if(++n>=60)clearInterval(iv)},500);
+function refreshIfActive(){if(document.querySelector('#sua.page.active'))refreshHours()}
+install();window.rpysRefreshSuaHoursV1=refreshHours;
+window.addEventListener('rpys-direct-core-ready',()=>{install();setTimeout(install,250);setTimeout(refreshIfActive,250)});
+document.addEventListener('click',e=>{if(e.target.closest('.suaTabs [data-suatab="hours"]')){setTimeout(refreshHours,0);setTimeout(refreshHours,250)}else if(e.target.closest('.sidebar .nav[data-p="sua"],#rpysDesktopHome409 [data-view-action="launch"]')){setTimeout(refreshIfActive,350);setTimeout(refreshIfActive,900)}else if(e.target.closest('#sua .suaControls button')){setTimeout(refreshIfActive,100)}},true);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshIfActive,100)});
+setTimeout(refreshIfActive,800);setTimeout(refreshIfActive,3000);
+let n=0,iv=setInterval(()=>{install();if(++n>=60)clearInterval(iv)},500);
 })();
