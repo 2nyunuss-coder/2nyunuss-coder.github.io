@@ -237,6 +237,30 @@
       persist();render();
     }catch(e){alert(e.message||String(e))}
   }
+  function historyFor(m){
+    const year=Number(ym().slice(0,4)),cutoff=ym()+'-01';
+    const years=[year-1,year],data={};
+    for(const id of m.ids)data[id]=Object.fromEntries(years.map(y=>[y,empty()]));
+    const seen=new Set();
+    for(const a of allAssignmentsAllMonths()){
+      const id=Number(a.person?.id??a.personId??0),date=String(a.date||'').slice(0,10),y=Number(date.slice(0,4));
+      if(!data[id]||!years.includes(y)||date>=cutoff||a.col?.unit!==m.u||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))continue;
+      const unique=[date,id,a.col?.key||a.col?.shift||'',a.type||''].join('|');
+      if(seen.has(unique))continue;seen.add(unique);
+      data[id][y][kind(a.col)]++;
+    }
+    return {years,data};
+  }
+  let historyVisible=false;
+  function historyMarkup(m){
+    if(!historyVisible)return '';
+    const h=historyFor(m),[previous,current]=h.years;
+    return `<div class="rpysHistory399"><h4>Geçmiş görev toplamları — ${escape(m.u)}</h4>
+      <p class="smallhelp">Yalnız sistemde kayıtlı görevler; ${escape(ym())} ayı hariç. G / N: gündüz / nöbet. Eksik geçmiş kayıtlar sıfır görünebilir.</p>
+      <div class="rpysTargetTable399"><table><thead><tr><th>Personel</th><th>${previous} G / N</th><th>${current} (önceki aylar) G / N</th></tr></thead><tbody>
+      ${m.ids.map(id=>`<tr><th>${escape(getPersonById(id).name)}</th><td>${h.data[id][previous].day} / ${h.data[id][previous].night}</td><td>${h.data[id][current].day} / ${h.data[id][current].night}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
   function render(){
     const pick=document.getElementById('autoPeople'),layout=pick?.closest('.autoBox');if(!layout)return;
     const u=document.getElementById('autoUnit')?.value;if(!u)return;
@@ -252,8 +276,8 @@
         const p=getPersonById(id),v=cfg.people?.[id]||{};
         return `<tr><th scope="row">${escape(p.name)}<small>Uygun gün: ${fairness?fairness.availability[id].day+" G / "+fairness.availability[id].night+" N":"—"} · Korunan: ${m.fixed[id].day} G / ${m.fixed[id].night} N</small></th>${kinds.map(t=>`<td><input type="number" min="0" max="1000" step="1" inputmode="numeric" data-target-id="${id}" data-target-kind="${t}" aria-label="${escape(p.name)} ${labels[t]} hedefi" value="${v[t]==null?'':escape(v[t])}" placeholder="0" ${disabled}></td>`).join('')}<td>${m.actual[id].day} / ${m.actual[id].night}</td><td data-target-diff="${id}">${kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ')}</td></tr>`;
       }).join('')||'<tr><td colspan="5">Soldan personelleri seç.</td></tr>'}</tbody></table></div>
-      <div class="rpysTargetActions399"><button class="btn alt" data-target-action="equal" ${disabled}>İzinlere Göre Adil Hedef Öner</button><button class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button class="btn" data-target-action="run" ${disabled}>Hedeflere Göre Dağıt</button></div>
-      <p class="smallhelp">Hedefler otomatik kaydedilir. Elle hedefler açıkken dağıtım düğmeleri bu sayıları kullanır. Kilitli ve manuel hücreler değişmez; izin ve dinlenme kuralları korunur. Adil hedef önerisi seçilen personelin izinlerini ve korunan görevlerini hesaba katar; günlere uygunluk dağıtımda ayrıca kontrol edilir.</p>`;
+      <div class="rpysTargetActions399"><button class="btn alt" data-target-action="history">Geçmiş Görev İstatistikleri</button><button class="btn alt" data-target-action="equal" ${disabled}>İzinlere Göre Adil Hedef Öner</button><button class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button class="btn" data-target-action="run" ${disabled}>Hedeflere Göre Dağıt</button></div>
+      ${historyMarkup(m)}\n      <p class="smallhelp">Hedefler otomatik kaydedilir. Elle hedefler açıkken dağıtım düğmeleri bu sayıları kullanır. Kilitli ve manuel hücreler değişmez; izin ve dinlenme kuralları korunur. Adil hedef önerisi seçilen personelin izinlerini ve korunan görevlerini hesaba katar; günlere uygunluk dağıtımda ayrıca kontrol edilir.</p>`;
   }
   let queued=false;
   function queueRender(){if(queued)return;queued=true;setTimeout(()=>{queued=false;try{render()}catch(e){console.error('RPYS hedef paneli',e)}},0)}
@@ -279,7 +303,7 @@
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-target-action]');if(!b)return;
     if(isMonthLocked())return alert('Bu ay kilitli.');
-    if(b.dataset.targetAction==='equal')suggest();else if(b.dataset.targetAction==='current')suggest(true);else{const u=document.getElementById('autoUnit')?.value;editableConfig(u).enabled=true;persist();window.autoDistribute();queueRender();}
+    if(b.dataset.targetAction==='history'){historyVisible=!historyVisible;render();}else if(b.dataset.targetAction==='equal')suggest();else if(b.dataset.targetAction==='current')suggest(true);else{const u=document.getElementById('autoUnit')?.value;editableConfig(u).enabled=true;persist();window.autoDistribute();queueRender();}
   });
   const style=document.createElement('style');style.textContent=`
     .rpysTargetsLayout399{grid-template-columns:minmax(160px,.55fr) minmax(310px,1fr) minmax(390px,1.15fr)}
