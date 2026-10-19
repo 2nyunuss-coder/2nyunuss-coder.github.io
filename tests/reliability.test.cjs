@@ -155,7 +155,7 @@ test('RPYS: suitable personnel is click-only, single-menu and includes every act
  assert.match(runtime,/Object\.defineProperty\(window,'renderSuitableDutyPeopleV2413'/);
  assert.doesNotMatch(runtime,/wrap\.className='dutySuitableWrapV2413'/);
  assert.match(html,/rpys-interaction-guard-loader-v400/);assert.match(html,/rpys-manual-targets-loader-v399/);
- assert.match(html,/rpys-runtime-v400\.js\?v=20260929-2/);
+ assert.match(html,/rpys-runtime-v400\.js\?v=20261019-2/);
  assert.match(html,/__RPYS_EDIT_GUARD_UNTIL_V400__/);
 });
 test('RPYS: SDS doctor selection lists all doctors and provides select all',()=>{

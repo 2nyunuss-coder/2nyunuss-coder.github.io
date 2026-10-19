@@ -68,14 +68,20 @@
     const menu=document.querySelector('#dutyContextMenu');
     return {wrap,button:wrap?.querySelector('#rpysSuitableButtonV396')||(!menu?document.getElementById('rpysSuitableButtonV396'):null),box:wrap?.querySelector('#dutySuitableListV2413')||(!menu?document.getElementById('dutySuitableListV2413'):null)};
   }
+  const contentByBox=new WeakMap();
+  function setBoxContent(box,html){
+    const old=contentByBox.get(box);
+    if(old?.html===html&&box.innerHTML===old.actual)return;
+    box.innerHTML=html;contentByBox.set(box,{html,actual:box.innerHTML});
+  }
   function renderSuitable(){
     const {wrap,box}=canonicalParts();if(!box)return;
     if(!suitableOpen){wrap?.removeAttribute('data-rpys400-open');if(!box.childNodes||box.childNodes.length)box.replaceChildren();if(box.style.display!=='none')box.style.display='none';return}
     wrap?.setAttribute('data-rpys400-open','1');
-    const cell=currentCell();if(!cell){box.innerHTML='<div class="suitableNoneV2413">Önce bir nöbet günü hücresine sağ tıklayın.</div>';box.style.display='block';return}
+    const cell=currentCell();if(!cell){setBoxContent(box,'<div class="suitableNoneV2413">Önce bir nöbet günü hücresine sağ tıklayın.</div>');box.style.display='block';return}
     let col=null,date='';const type=cell.dataset.type,day=Number(cell.dataset.day);
     try{col=dutyColumnByKey(type,cell.dataset.col)}catch(_){}try{date=dateStr(day)}catch(_){date=monthKey()+'-'+String(day).padStart(2,'0')}
-    if(!col){box.innerHTML='<div class="suitableNoneV2413">Vardiya bilgisi bulunamadı.</div>';box.style.display='block';return}
+    if(!col){setBoxContent(box,'<div class="suitableNoneV2413">Vardiya bilgisi bulunamadı.</div>');box.style.display='block';return}
     const result=suitableRows(col),rows=result.rows;
     const scope='tüm aktif ve uygun personel';
     const count=`${rows.length} kişi`;
@@ -88,7 +94,7 @@
       let style='';try{style=personColorStyle(p.id,false)}catch(_){}
       return `<button type="button" class="suitablePersonV2413 rpys400SuitablePerson" data-rpys-suitable-person="${Number(p.id)}" style="${esc(style)}"><b>${esc(p.name)}</b><span>${esc(idleText+lastText+spouse)}</span></button>`;
     }).join(''):'<div class="suitableNoneV2413">Bu gün ve vardiya için aktif, izin/çakışma/dinlenme kurallarına uygun personel bulunamadı.</div>';
-    box.innerHTML=header+people;box.style.display='block';
+    setBoxContent(box,header+people);box.style.display='block';
   }
   function ensureSingleMenu(){
     if(repairing)return;repairing=true;

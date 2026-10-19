@@ -48,5 +48,36 @@ test('explicit obligation and puantaj overrides adjust by the edit delta once pe
  const f=fixture(),{w}=f;try{w.db.obligationOverride['2026-10|1']=100;w.db.puantajOverride['2026-10|1|muk']=90;f.pick([27,28]);f.edit('Eğitim');assert.equal(w.finalObligation(w.db.staff[0]),88);assert.equal(w.db.puantajOverride['2026-10|1|muk'],78);f.edit('Eğitim');assert.equal(w.finalObligation(w.db.staff[0]),88);f.edit('');assert.equal(w.finalObligation(w.db.staff[0]),100)}finally{f.dom.window.close()}
 });
 test('ŞUA renderer has a formatter and reads actual monthly hours; refresh never saves',()=>{
- const f=fixture(),{w}=f;try{w.db.assign={'2026-10|pol|5|day':1};w.rpysRefreshSuaHoursV1();assert.equal(w.document.querySelectorAll('#suaHoursTable tbody tr').length,2);assert.match(w.document.getElementById('suaHoursTable').textContent,/A7B0/);assert.equal(w.saves,0);assert.equal(w.rawPuantajValue({p:w.db.staff[0]},'muk'),145)}finally{f.dom.window.close()}
+ const f=fixture(),{w}=f;try{w.db.assign={'2026-10|pol|5|day':1};w.rpysRefreshSuaHoursV1();assert.equal(w.document.querySelectorAll('#suaHoursTable tbody tr').length,2);assert.equal(w.document.querySelector('[data-sua-hours-pid="1"][data-month="9"]').textContent,'7');assert.equal(w.document.querySelector('[data-sua-hours-pid="2"][data-month="9"]').textContent,'0');assert.equal(w.saves,0);assert.equal(w.rawPuantajValue({p:w.db.staff[0]},'muk'),145)}finally{f.dom.window.close()}
+});
+test('external monthly hours persist per person and year, add once and can be overridden and reset',()=>{
+ const f=fixture(),{w}=f;try{
+  w.db.assign={'2026-10|pol|5|day':1};const api=w.rpysSayHakedis419;
+  api.setMonthHours(1,2026,9,'160,5','');assert.equal(api.monthHours(w.db.staff[0],2026,9),167.5);
+  api.setMonthHours(1,2026,9,'160,5','200');assert.equal(api.monthHours(w.db.staff[0],2026,9),200);
+  assert.equal(api.monthHours(w.db.staff[1],2026,9),0);assert.equal(api.monthHours(w.db.staff[0],2027,9),0);
+  const saved=JSON.stringify(w.db);w.db=JSON.parse(saved);assert.equal(api.monthHours(w.db.staff[0],2026,9),200);
+  api.setMonthHours(1,2026,9,'160,5','');assert.equal(api.monthHours(w.db.staff[0],2026,9),167.5);
+  api.setMonthHours(1,2026,9,'','');assert.equal(api.monthHours(w.db.staff[0],2026,9),7);
+ }finally{f.dom.window.close()}
+});
+test('hours use actual shift minutes over corrupt stored decimals, strict person IDs and deduplicated records',()=>{
+ const f=fixture(),{w}=f;try{
+  w.allAssignmentsAllMonths=()=>[
+   {monthKey:'2026-10',date:'2026-10-05',day:5,person:{id:1,name:'A'},col:{unit:'TEST',shift:'08:00-16:00',hours:8.92}},
+   {monthKey:'2026-10',day:5,person:{id:1,name:'A'},col:{unit:'TEST',shift:'08:00-16:00',hours:8.92}},
+   {monthKey:'2026-10',date:'2026-10-06',person:{id:2,name:'A'},col:{shift:'08:00-16:00',hours:8}},
+   {monthKey:'2026-10',date:'2026-10-07',person:{id:1,name:'A'},col:{unit:'TEST',shift:'08:00-16:30',hours:8.91}},
+   {monthKey:'2026-10',date:'2026-10-08',person:{id:1,name:'A'},col:{unit:'TEST',shift:'08:00-08:00',hours:0}}
+  ];
+  assert.equal(w.rpysSayHakedis419.localMonthHours(w.db.staff[0],2026,9),40.5);
+ }finally{f.dom.window.close()}
+});
+test('bad input, impossible hours and viewer permissions leave monthly data unchanged',()=>{
+ const f=fixture(),{w}=f;try{
+  const api=w.rpysSayHakedis419,before=JSON.stringify(w.db);
+  for(const input of ['-1','1.600,92','wrong','800'])assert.throws(()=>api.setMonthHours(1,2026,9,input,''));
+  assert.throws(()=>api.setMonthHours(1,2026,9,'160','100'));
+  assert.equal(JSON.stringify(w.db),before);w.currentUser={role:'viewer'};assert.throws(()=>api.setMonthHours(1,2026,9,'160',''),/yetkiniz/);assert.equal(JSON.stringify(w.db),before);
+ }finally{f.dom.window.close()}
 });

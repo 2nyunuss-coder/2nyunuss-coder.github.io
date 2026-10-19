@@ -19,6 +19,7 @@
 <div class="small">Program GitHub Pages üzerinden açılır; uygulama ve ana veri güvenli Supabase katmanından gelir.</div>
 </div>
 <script src="/rpys-scheduler-v398.js?v=20260925-3"></script>
+<script src="/rpys-stability-v420.js?v=20261019-1"></script>
 <script>
 (async()=>{
  const APP_SOURCE='https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-app-source';
@@ -83,15 +84,16 @@
  const REST_16_HOURS_JS='<script id="rpys-rest-16-hours-loader-v397" src="/rpys-runtime-v397.js?v=20261019-1"><'+ '/script>';
  const SCHEDULER_SAFETY_JS='<script id="rpys-scheduler-safety-loader-v398" src="/rpys-scheduler-v398.js?v=20260925-3"><'+ '/script>';
  const MANUAL_TARGETS_JS='<script id="rpys-manual-targets-loader-v399" src="/rpys-targets-v399.js?v=20261001-3"><'+ '/script>';
- const INTERACTION_GUARD_JS='<script id="rpys-interaction-guard-loader-v400" src="/rpys-runtime-v400.js?v=20260929-2"><'+ '/script>';
+ const INTERACTION_GUARD_JS='<script id="rpys-interaction-guard-loader-v400" src="/rpys-runtime-v400.js?v=20261019-2"><'+ '/script>';
  const CUSTOM_SHIFT_JS='<script id="rpys-custom-shift-loader-v405" src="/rpys-runtime-v405.js?v=20260929-2"><'+ '/script>';
  const MONTHLY_LIST_VARIANTS_JS='<script id="rpys-monthly-list-variants-loader-v406" src="/rpys-runtime-v406.js?v=20260929-1"><'+ '/script>';
  const DESKTOP_VIEW_JS='<script id="rpys-desktop-view-loader-v409" src="/rpys-desktop-v409.js?v=20260930-5"><'+ '/script>';
  const PAGE_FIT_VIEW_JS='<script id="rpys-page-fit-loader-v1" src="/rpys-page-fit-v1.js?v=20261015-2"><'+ '/script>';
- const SAY_HAKEDIS_FIX_JS='<script id="rpys-say-hakedis-fix-loader-v1" src="/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-1"><'+ '/script>';
+ const SAY_HAKEDIS_FIX_JS='<script id="rpys-say-hakedis-fix-loader-v1" src="/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-2"><'+ '/script>';
  const SDS_ALL_DOCTORS_LOADER=`async function fixedSdsDoctors(slug,ver){const r=await fetch(base+'/functions/v1/'+slug+'?v='+encodeURIComponent(ver)+'&cb=157',{cache:'no-store'});if(!r.ok)throw new Error(slug+' HTTP '+r.status);let js=await r.text(),original=js;js=js.replace(/\\.slice\\(\\s*0\\s*,\\s*5\\s*\\)/g,'');js=js.replaceAll(".sort((a,b)=>b.count-a.count||a.doctor.localeCompare(b.doctor,'tr')).slice(0,5)",".sort((a,b)=>b.count-a.count||a.doctor.localeCompare(b.doctor,'tr'))");js=js.replaceAll(".filter(x=>ds.has(x)).slice(0,5)",".filter(x=>ds.has(x))");js=js.replaceAll('Bu branştaki en yüksek 5 hekim','Bu branştaki tüm hekimler');js=js.replaceAll('İlk 5 hekimi seç','Tümünü Seç');js=js.replaceAll('İlk 5 branşı seç','Tüm branşları seç');js=js.replaceAll('En yüksek 5 branşı seç','Tüm branşları seç');js=js.replaceAll('her seçili branşta en yüksek 5 hekim arasından işaretlediklerin','her seçili branşta tüm hekimler arasından işaretlediklerin');js=js.replace(/if\\([^{}]{0,180}\\.length\\s*>=\\s*5[^{}]*\\)\\s*\\{[^{}]*(?:alert|return)[^{}]*\\}/g,'');js=js.replaceAll("if(!a.includes(d)&&a.length>=5){el.checked=false;return alert('Bu branş için en fazla 5 hekim seçilebilir.')}",'');js=js.replaceAll('(rr?.doctors||[]).slice(0,5).map(x=>x.doctor)','(rr?.doctors||[]).map(x=>x.doctor)');installSdsSelectAll();if(js===original&&/\\.slice\\(\\s*0\\s*,\\s*5\\s*\\)/.test(js))console.warn('RPYS SDS beş kayıt sınırı kaldı');(0,eval)(js)}function installSdsSelectAll(){if(window.__RPYS_SDS_SELECT_ALL_V1__)return;window.__RPYS_SDS_SELECT_ALL_V1__=true;function scan(){const q='[role="dialog"],[class*="modal"],[class*="Modal"],[class*="dialog"],[class*="Dialog"]';const roots=[...document.querySelectorAll(q)].filter(root=>{const t=root.innerText||root.textContent||'';return /branş/i.test(t)&&/(word|hekim|doktor)/i.test(t)});for(const root of roots){const outer=root.parentElement?.closest(q);if(outer&&roots.includes(outer))continue;if(root.querySelector('[data-rpys-sds-select-all]'))continue;const b=document.createElement('button');b.type='button';b.className='btn alt';b.dataset.rpysSdsSelectAll='1';b.textContent='Tüm Branş ve Hekimleri Seç';b.addEventListener('click',async e=>{e.preventDefault();e.stopPropagation();let n=0;for(let i=0;i<20;i++){const todo=[...root.querySelectorAll('input[type="checkbox"]')].filter(x=>!x.disabled&&!x.checked);if(!todo.length)break;todo.forEach(x=>x.click());n+=todo.length;await new Promise(r=>setTimeout(r,80))}b.textContent=n?'Tüm Branş ve Hekimler Seçildi':'Seçilecek kayıt bulunamadı'},true);root.prepend(b)}}scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true})}`;
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
  function repair(app){
+   app=window.rpysStability420.repair(app);
    // Saymanlık yazdırma düzeltmesinin canlı pakette eski 383.3 sürümüne dönmesini engelle.
    app=replaceOnce(app,'["383.3","rpys-patch383","3833"]','["383.11","rpys-patch383","38311"]');
    // rpys-patch372 her sayfa acilisinda/focus olayinda MASTER verisini tekrar cekip
@@ -99,6 +101,7 @@
    // Canli revizyon takibi zaten rpys-live-sync-v319 + v400 kayit korumasi ile yapiliyor;
    // eski bulut cekme eklentisini yukleme listesinden tamamen cikar.
    app=replaceOnce(app,'["372.4","rpys-patch372","3724"],','');
+   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261019-1"><'+'/script>');
    // Only one revision watcher owns this page. Remote changes require an explicit refresh.
    app=app.replace(/<script\b[^>]*id=["']rpys-live-sync-v319["'][^>]*>[\s\S]*?<\/script>/i,
      '<script id="rpys-live-sync-v419" src="/rpys-live-sync-v419.js?v=20261019-1"><'+'/script>');
@@ -264,13 +267,20 @@
      .replace(/\/rpys-duty-print-v415\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-duty-print-v415.js?v=20261006-427')
      .replace(/\/rpys-print-center-v413\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-print-center-v413.js?v=20261005-420');
    app=app.replace(/\/rpys-runtime-v397\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v397.js?v=20261019-1')
-     .replace(/\/rpys-saymanlik-hakedis-fix-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-1');
+     .replace(/\/rpys-runtime-v400\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v400.js?v=20261019-2')
+     .replace(/\/rpys-saymanlik-hakedis-fix-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-2');
+   const uiLoader=`async function stableUiPatch420(slug,ver){const r=await fetch(base+'/functions/v1/'+slug+'?v='+encodeURIComponent(ver)+'&cb=420',{cache:'no-store'});if(!r.ok)throw new Error(slug+' HTTP '+r.status);(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug))}`;
+   app=app.replace("async function tag(slug,ver){",uiLoader+"async function tag(slug,ver){");
+   app=app.replace("else await tag(slug,ver);", "else if(['rpys-patch336','rpys-patch337','rpys-patch338','rpys-patch339','rpys-patch340','rpys-patch352','rpys-patch353','rpys-patch383'].includes(slug))await stableUiPatch420(slug,ver);else await tag(slug,ver);");
+   app=app.replace("(0,eval)(await r.text());if(test())", "(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug));if(test())");
+   app=app.replace("(0,eval)(js)}async function ensureCritical", "(0,eval)(window.rpysStability420.repairPatch(js,'rpys-patch332'))}async function ensureCritical");
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
  }
  function validate(app){
    const d=new DOMParser().parseFromString(app,'text/html');
+   if(!app.includes('stableUiPatch420')||!app.includes('rpys-stability-v420.js'))throw new Error('Ekran döngüsü koruması yüklenemedi.');
    if(!d.getElementById('rpys-live-sync-v419')||d.getElementById('rpys-live-sync-v319')||/\["[^"]+","rpys-patch372",/.test(app))throw new Error('Veri yenileme koruması yüklenemedi.');
    const main=d.querySelector('main.main');
    if(!main)throw new Error('Ana çalışma alanı bulunamadı.');
