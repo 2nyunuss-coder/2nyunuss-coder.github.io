@@ -1,6 +1,6 @@
 /* Targeted Saymanlık text-deduction and ŞUA hours refresh repair. */
 (()=>{'use strict';
-if(window.__RPYS_SAY_HAKEDIS_FIX_V2__)return;window.__RPYS_SAY_HAKEDIS_FIX_V2__=true;
+if(window.__RPYS_SAY_HAKEDIS_FIX_V3__)return;window.__RPYS_SAY_HAKEDIS_FIX_V3__=true;
 const round2=n=>Math.round((Number(n)||0)*100)/100;
 const norm=s=>String(s||'').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/\s+/g,' ').trim();
 function monthKeyOf(r){let k=String(r?.monthKey||r?.month||'');if(/^\d{4}-\d{2}$/.test(k))return k;let key=String(r?._assignKey||'').split('|')[0];if(/^\d{4}-\d{2}$/.test(key))return key;let d=String(r?.date||r?.tarih||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d.slice(0,7);return ''}
@@ -18,55 +18,78 @@ function monthHours(p,year,month){const mk=`${year}-${String(month+1).padStart(2
  // Last compatibility path for older normalized duty-record shapes.
  try{let pools=[db.tasks,db.assignments,db.duties,db.records,db.mainTasks,db.extraRecords,db.manualRecords].filter(Array.isArray).flat();for(const r of pools)if(monthKeyOf(r)===mk&&personMatches(r,p))total+=hoursOf(r)}catch{}
  return round2(total)}
-function refreshHours(){try{if(typeof suaPeople!=='function'||typeof renderSuaHours!=='function')return;try{_allAssignCache=null}catch{}try{_calcCache={}}catch{}const year=Number(db?.sua?.year)||2026,people=suaPeople();renderSuaHours(people,year);let hours=people.reduce((sum,p)=>sum+Array.from({length:12},(_,m)=>monthHours(p,year,m)).reduce((a,b)=>a+b,0),0);const stat=document.getElementById('suaStatHours');if(stat)stat.textContent=typeof fmt==='function'?fmt(round2(hours)):String(round2(hours))}catch(e){console.warn('RPYS ŞUA hakediş yenileme',e)}}
-function installHours(){try{if(typeof suaHoursForPersonMonth==='function'&&!suaHoursForPersonMonth.__rpysHakFixV1){const old=suaHoursForPersonMonth;const wrapped=function(p,y,m){let v=0;try{v=Number(old.apply(this,arguments))||0}catch{}return v>0?round2(v):monthHours(p,y,m)};wrapped.__rpysHakFixV1=true;suaHoursForPersonMonth=wrapped}if(typeof suaTab==='function'&&!suaTab.__rpysHakFixV1){const old=suaTab;const wrapped=function(tab){const out=old.apply(this,arguments);if(tab==='hours')setTimeout(refreshHours,0);return out};wrapped.__rpysHakFixV1=true;suaTab=wrapped}if(typeof renderSua==='function'&&!renderSua.__rpysHakFixV1){const old=renderSua;const wrapped=function(){try{_allAssignCache=null}catch{}const out=old.apply(this,arguments);return out};wrapped.__rpysHakFixV1=true;renderSua=wrapped}}catch(e){console.warn('RPYS ŞUA hakediş kancası',e)}}
-function deductionHours(entered,confirmText,selectedCount){
- const c=norm(confirmText),t=norm(entered),combined=`${c} ${t}`;
- const hourValues=[...c.matchAll(/(\d+(?:[.,]\d+)?)\s*saat/g)].map(m=>Number(m[1].replace(',','.')));
- if(hourValues.length)return Math.max(...hourValues);
- const dayValues=[...combined.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:is\s*)?gun/g)].map(m=>Number(m[1].replace(',','.')));
- if(dayValues.length)return Math.max(...dayValues)*7;
- const numeric=String(entered||'').trim().match(/^(\d+(?:[.,]\d+)?)$/);
- if(numeric)return Number(numeric[1].replace(',','.'))*7;
- return selectedCount>0&&/izin|rapor|gecici|ketem/.test(t)?selectedCount*7:0
+// The cloud renderer calls fmt(), but the original formatter is function-local elsewhere.
+if(typeof window.fmt!=='function')window.fmt=n=>new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(Number(n)||0);
+const absent=new Set(['izin','sua','yillik','idari','mazeret','rapor','gecici','ketem','ketemgecici']);
+function textAbsence(value){const t=String(value??'').trim();return !!t&&/[a-zçğıöşü]/i.test(t)&&!/^\s*\d{1,2}[:.]\d{2}\s*[-–—]/.test(t)}
+function leaveFor(name,day){
+ const p=(db.staff||[]).find(p=>p.name===name);if(!p)return null;const date=dateStr(Number(day));
+ // Explicit leave records take precedence over stale imported/manual display values.
+ return (db.leaves||[]).find(l=>String(l.personId)===String(p.id)&&l.start<=date&&l.end>=date&&!['saymanlik-status','excel-say-status'].includes(l.source))||null;
 }
-function installSaymanlik(){try{
- if(typeof editSelectedSayCellText!=='function'||editSelectedSayCellText.__rpysHakFixV2)return;
- const old=editSelectedSayCellText;
- const wrapped=function(){
-  const cells=(selectedSayCells||[]).map(el=>({name:el.dataset.person,day:Number(el.dataset.day)})).filter(x=>x.name&&x.day);
-  const byPerson=new Map();for(const x of cells){const p=(db.staff||[]).find(y=>norm(y.name)===norm(x.name));if(p&&!byPerson.has(String(p.id)))byPerson.set(String(p.id),{p,before:0});}
-  for(const row of byPerson.values())try{row.before=Number(finalObligation(row.p))||0}catch{}
-  let entered='',confirmText='',confirmed=false;const origPrompt=window.prompt,origConfirm=window.confirm;
-  try{
-   window.prompt=function(message,initial){const value=origPrompt.apply(this,arguments);if(value!==null)entered=String(value);return value};
-   window.confirm=function(message){const yes=origConfirm.apply(this,arguments);if(/mukellef/.test(norm(message))&&/saat|gun/.test(norm(message))){confirmText=String(message||'');confirmed=!!yes}return yes};
-   return old.apply(this,arguments)
-  }finally{
-   window.prompt=origPrompt;window.confirm=origConfirm;
-   const text=norm(entered),isLeave=/izin|rapor|gecici|ketem/.test(`${text} ${norm(confirmText)}`);
-   const selectedByPerson=new Map();for(const x of cells){const p=(db.staff||[]).find(y=>norm(y.name)===norm(x.name));if(p)selectedByPerson.set(String(p.id),(selectedByPerson.get(String(p.id))||0)+1)}
-   const groups=[...byPerson.values()];
-   for(const row of groups){
-    const pid=String(row.p.id),chosen=selectedByPerson.get(pid)||1;
-    const wanted=confirmed&&isLeave?deductionHours(entered,confirmText,chosen):0;
-    if(!wanted)continue;
-    let now=Number(finalObligation(row.p));if(!Number.isFinite(now))now=row.before;
-    const alreadyApplied=Math.max(0,row.before-now),remaining=Math.max(0,wanted-alreadyApplied);
-    if(remaining>0){db.obligationOverride=db.obligationOverride||{};db.obligationOverride[obligationKey(row.p.id)]=Math.max(0,round2(now-remaining))}
-   }
-   try{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null}catch{}
-   if(confirmed&&isLeave){try{if(typeof saveNowV245==='function')saveNowV245({label:'Saymanlık izin mükellef düşümü'});else save()}catch{try{save()}catch{}}try{renderAll()}catch{}}
+function leaveStatus(l){return l?(l.status||sayStatusFromText(l.type)||'izin'):''}
+function calendarHours(date){const d=new Date(date+'T12:00:00'),w=d.getDay();if(w===0||w===6)return 0;if(typeof isHolidayDate==='function'&&isHolidayDate(date))return 0;return typeof isHalfHolidayDate==='function'&&isHalfHolidayDate(date)?5:7}
+function absenceDates(p){
+ const dates=new Set();for(let d=1;d<=daysInMonth();d++){
+  const date=dateStr(d);if(!calendarHours(date))continue;
+  const key=sayOverrideKey(p.name,d),text=db.sayCellOverrides?.[key],status=getCellStatus(p.name,d);
+  const leave=(db.leaves||[]).some(l=>String(l.personId)===String(p.id)&&l.start<=date&&l.end>=date);
+  const special=['gecici','ketem'].some(k=>(db.specialAssignments?.[k]||[]).some(r=>String(r.personId)===String(p.id)&&r.start<=date&&r.end>=date));
+  if(leave||special||absent.has(status)||textAbsence(text))dates.add(date);
+ }return dates;
+}
+function refreshHours(){
+ try{
+  if(typeof suaPeople!=='function'||typeof renderSuaHours!=='function')return;
+  _allAssignCache=null;_calcCache={};
+  const year=Number(db?.sua?.year)||Number(ym().slice(0,4)),people=suaPeople();renderSuaHours(people,year);
+  const stat=document.getElementById('suaStatHours');if(stat)stat.textContent=window.fmt(people.reduce((n,p)=>n+Array.from({length:12},(_,m)=>monthHours(p,year,m)).reduce((a,b)=>a+b,0),0));
+ }catch(e){console.warn('RPYS ŞUA hakediş yenileme',e);const box=document.getElementById('suaHoursSummary');if(box)box.textContent='Hakediş tablosu hesaplanamadı: '+e.message}
+}
+function installHours(){
+ if(typeof suaHoursForPersonMonth==='function'&&!suaHoursForPersonMonth.__rpysHakFixV3){
+  const wrapped=function(p,y,m){return monthHours(p,y,m)};wrapped.__rpysHakFixV3=true;suaHoursForPersonMonth=wrapped;
+ }
+ if(typeof suaTab==='function'&&!suaTab.__rpysHakFixV3){const old=suaTab;const wrapped=function(tab){const result=old.apply(this,arguments);if(tab==='hours')refreshHours();return result};wrapped.__rpysHakFixV3=true;suaTab=wrapped}
+}
+function persist(){_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null;if(typeof saveNowV245==='function')saveNowV245({label:'Saymanlık metin ve takvim düşümü'});else save();renderAll()}
+function editText(){
+ if(!selectedSayCells.length)return;if(isMonthLocked())return alert('Bu ay kilitli.');
+ const cells=[...new Map(selectedSayCells.map(el=>[sayOverrideKey(el.dataset.person,Number(el.dataset.day)),el])).values()];
+ const first=cells[0],value=prompt(`Seçili ${cells.length} hücreye yazılacak metin / saat:`,sayData(first.dataset.person,Number(first.dataset.day)));if(value===null)return;
+ const text=String(value).trim(),status=sayStatusFromText(text),reduce=textAbsence(text);
+ const people=[...new Set(cells.map(el=>el.dataset.person))].map(n=>(db.staff||[]).find(p=>p.name===n)).filter(Boolean);
+ const before=new Map(people.map(p=>[p.id,automaticObligation(p)]));
+ pushUndoPoint('Saymanlık metin / takvim mükellef düşümü');db.sayTextObligation??={};db.cellStatus??={};db.sayCellOverrides??={};
+ for(const el of cells){
+  const n=el.dataset.person,d=Number(el.dataset.day),key=sayOverrideKey(n,d),sk=statusKey(n,d),oldText=db.sayCellOverrides[key];
+  if(status){db.cellStatus[sk]=status;delete db.sayCellOverrides[key];delete db.sayTextObligation[key]}
+  else{
+   if(text)db.sayCellOverrides[key]=text;else delete db.sayCellOverrides[key];
+   if(reduce){db.cellStatus[sk]='izin';db.sayTextObligation[key]=true}
+   else{if(textAbsence(oldText)||db.sayTextObligation[key]||absent.has(db.cellStatus[sk]))delete db.cellStatus[sk];delete db.sayTextObligation[key]}
   }
- };
- wrapped.__rpysHakFixV2=true;editSelectedSayCellText=wrapped
-}catch(e){console.warn('RPYS Saymanlık edit kancası',e)}}
-function install(){installHours();installSaymanlik()}
-function refreshIfActive(){if(document.querySelector('#sua.page.active'))refreshHours()}
-install();window.rpysRefreshSuaHoursV1=refreshHours;
-window.addEventListener('rpys-direct-core-ready',()=>{install();setTimeout(install,250);setTimeout(refreshIfActive,250)});
-document.addEventListener('click',e=>{if(e.target.closest('.suaTabs [data-suatab="hours"]')){setTimeout(refreshHours,0);setTimeout(refreshHours,250)}else if(e.target.closest('.sidebar .nav[data-p="sua"],#rpysDesktopHome409 [data-view-action="launch"]')){setTimeout(refreshIfActive,350);setTimeout(refreshIfActive,900)}else if(e.target.closest('#sua .suaControls button')){setTimeout(refreshIfActive,100)}},true);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshIfActive,100)});
-setTimeout(refreshIfActive,800);setTimeout(refreshIfActive,3000);
-let n=0,iv=setInterval(()=>{install();if(++n>=60)clearInterval(iv)},500);
+  if(db.sayStatusCleared)delete db.sayStatusCleared[key];
+ }
+ people.forEach(p=>syncSayStatusesToLeavePage(p.name));
+ // Existing explicit totals are adjusted only by this edit's delta, once per person.
+ for(const p of people){const delta=automaticObligation(p)-before.get(p.id),ok=obligationKey(p.id),pk=puantajOverrideKey(p.id,'muk');
+  if(db.obligationOverride?.[ok]!=null&&db.obligationOverride[ok]!=='')db.obligationOverride[ok]=Math.max(0,round2(Number(db.obligationOverride[ok])+delta));
+  if(db.puantajOverride?.[pk]!=null&&db.puantajOverride[pk]!=='')db.puantajOverride[pk]=Math.max(0,round2(Number(db.puantajOverride[pk])+delta));
+ }
+ const menu=document.getElementById('cellContextMenu');if(menu)menu.style.display='none';persist();
+}
+function install(){
+ installHours();
+ if(typeof getCellStatus==='function'&&!getCellStatus.__rpysHakFixV3){const old=getCellStatus;const f=function(n,d){const l=leaveFor(n,d);return l?leaveStatus(l):old.apply(this,arguments)};f.__rpysHakFixV3=true;getCellStatus=f}
+ if(typeof sayData==='function'&&!sayData.__rpysHakFixV3){const old=sayData;const f=function(n,d){const l=leaveFor(n,d);return l?String(l.type||sayStatusLabel(leaveStatus(l))).toLocaleUpperCase('tr-TR'):old.apply(this,arguments)};f.__rpysHakFixV3=true;sayData=f}
+ if(typeof automaticObligation==='function'&&!automaticObligation.__rpysHakFixV3){const f=function(p){let base=0;for(let d=1;d<=daysInMonth();d++)base+=calendarHours(dateStr(d));return Math.max(0,round2(base-[...absenceDates(p)].reduce((n,ds)=>n+calendarHours(ds),0)))};f.__rpysHakFixV3=true;automaticObligation=f}
+ if(typeof rawPuantajValue==='function'&&!rawPuantajValue.__rpysHakFixV3){const old=rawPuantajValue;const f=function(r,key){return key==='muk'?finalObligation(r.p):old.apply(this,arguments)};f.__rpysHakFixV3=true;rawPuantajValue=f}
+ if(typeof editSelectedSayCellText==='function'&&editSelectedSayCellText!==editText)editSelectedSayCellText=editText;
+}
+window.rpysSayHakedis419={install,absenceDates,calendarHours,monthHours,refreshHours,textAbsence};
+window.rpysRefreshSuaHoursV1=refreshHours;
+install();if(document.querySelector('#sua.page.active'))refreshHours();
+window.addEventListener('rpys-direct-core-ready',()=>{install();if(document.querySelector('#sua.page.active'))refreshHours()});
+document.addEventListener('click',e=>{if(e.target.closest?.('.suaTabs [data-suatab="hours"]'))setTimeout(refreshHours,0)},true);
 })();

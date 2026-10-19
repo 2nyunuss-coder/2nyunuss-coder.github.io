@@ -225,16 +225,20 @@ function rest16Runtime(){
  context.window=context;vm.createContext(context);vm.runInContext(source('rpys-runtime-v397.js'),context);
  return {context,columns,api:context.rpysRest16V397}
 }
-test('RPYS: 16-hour next-day rest is a central non-overridable rule',()=>{
+test('RPYS: next-day rest API is shared by eligibility and guarded automatic distribution',()=>{
  const html=source('index.html'),runtime=source('rpys-runtime-v397.js');
  assert.match(html,/rpys-rest-16-hours-loader-v397/);
  assert.match(html,/previousDayBlockingHours\(personId,d\)>=16/);
  assert.match(html,/if\(hours>=16\)return true/);
  assert.match(html,/00\.00 bitişi dinlenme kuralını kaldırmaz/);
  assert.match(runtime,/const REST_LIMIT=16/);
- for(const name of ['canTakeShift','canTakeShiftV2413','canTakeShiftV2414','setAssign','applyDutyBulkSelection','validateDutyMove','rpysApproveDutyConflict384'])assert.match(runtime,new RegExp(name));
- assert.match(runtime,/wrapTransaction\("autoDistribute"/);
- assert.match(runtime,/wrapTransaction\("distributeSkopiSequential"/);
+ for(const name of ['canTakeShift','canTakeShiftV2413','canTakeShiftV2414','setAssign','rpysApproveDutyConflict384'])assert.match(runtime,new RegExp(name));
+ // Automatic transactions belong to v398, which consumes this module's public API.
+ const scheduler=source('rpys-scheduler-v398.js');
+ assert.match(scheduler,/\['autoDistribute','runPolRotation2','distributeSkopiSequential'\]\.forEach\(wrapRun\)/);
+ for(const name of ['allViolations','runIndexed','validateMutations'])assert.match(scheduler,new RegExp('rpysRest16V397\\.'+name));
+ const {api}=rest16Runtime();
+ for(const name of ['allViolations','runIndexed','validateMutations'])assert.equal(typeof api[name],'function');
  new vm.Script(runtime,{filename:'rpys-runtime-v397.js'});
 });
 test('RPYS: rest calculation totals all work and crosses month boundaries',()=>{
