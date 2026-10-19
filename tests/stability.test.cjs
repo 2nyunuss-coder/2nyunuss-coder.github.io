@@ -52,3 +52,23 @@ test('legacy lock and clipboard maintenance keep existing controls instead of re
   const parsed=f.api.repairPatch("function noteFor(){}\\nfunction docFor(){}\\nfunction stripSignatures(){}",'rpys-patch383');new (require('node:vm').Script)(parsed);
  }finally{f.dom.window.close()}
 });
+test('SDS menu positioning never moves a button that is already in the correct place',()=>{
+ const f=fixture('<aside class="sidebar"><button id="rpysSdsPermanent">SDS</button> <button id="advancedMenuBtn">More</button></aside>');try{
+  const legacy="function lockMenu(){const b=document.getElementById('rpysSdsPermanent'),ref=document.getElementById('advancedMenuBtn');if(ref&&ref!==b&&ref.parentNode&&b.parentNode===ref.parentNode)ref.parentNode.insertBefore(b,ref)}";
+  f.w.eval(f.api.repairPatch(legacy,'rpys-patch388'));f.w.lockMenu();
+  const side=f.w.document.querySelector('aside'),button=f.w.document.getElementById('rpysSdsPermanent'),ref=f.w.document.getElementById('advancedMenuBtn'),obs=new f.w.MutationObserver(()=>{});obs.observe(side,{childList:true});
+  for(let n=0;n<40;n++)f.w.lockMenu();assert.equal(obs.takeRecords().length,0);
+  side.append(button);f.w.lockMenu();assert.equal(button.nextSibling,ref);obs.takeRecords();f.w.lockMenu();assert.equal(obs.takeRecords().length,0);obs.disconnect();
+ }finally{f.dom.window.close()}
+});
+test('legacy tracking panel preserves unsaved controls and presentation decorations between observer callbacks',()=>{
+ const f=fixture('<div id="tracking"></div>');try{
+  const legacy="var config='2026-10-01';function buildTracking322(){const x=document.getElementById('tracking');x.innerHTML=`<input id=\"p322Start\" value=\"${config}\"><div id=\"p322Summary\"></div>`;const h=document.getElementById('p322Summary');h.innerHTML=`<div class=\"p322chips\">${config}</div>`}";
+  f.w.eval(f.api.repairPatch(legacy,'rpys-patch322'));f.w.buildTracking322();
+  const input=f.w.document.getElementById('p322Start');input.value='UNSAVED DATE';
+  const decoration=f.w.document.createElement('button');f.w.document.getElementById('tracking').append(decoration);
+  const obs=new f.w.MutationObserver(()=>{});obs.observe(f.w.document.body,{childList:true,subtree:true});
+  for(let i=0;i<30;i++)f.w.buildTracking322();assert.equal(obs.takeRecords().length,0);assert.equal(f.w.document.getElementById('p322Start'),input);assert.equal(input.value,'UNSAVED DATE');assert.equal(decoration.isConnected,true);
+  f.w.config='2026-11-01';f.w.buildTracking322();assert.equal(f.w.document.getElementById('p322Start').value,'2026-11-01');obs.disconnect();
+ }finally{f.dom.window.close()}
+});

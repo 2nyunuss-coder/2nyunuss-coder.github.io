@@ -15,7 +15,7 @@ const css=document.createElement('style');css.id='rpysPageFitStyleV1';css.textCo
 const q=(s,r=document)=>r.querySelector(s),visible=el=>!!(el&&el.getClientRects().length);
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(prefs))}catch{}}
 function pageChildren(page,bar){return [...page.children].filter(el=>el!==bar&&!el.classList.contains('rpysWindowHead409'))}
-function setZoom(page,bar,zoom){const children=pageChildren(page,bar);for(const el of children)el.style.zoom=String(zoom);page.dataset.rpysPageFitZoomV1=String(zoom);const out=q('output',bar);if(out)out.value=Math.round(zoom*100)+'%';return children}
+function setZoom(page,bar,zoom){const children=pageChildren(page,bar);for(const el of children)if(el.style.zoom!==String(zoom))el.style.zoom=String(zoom);if(page.dataset.rpysPageFitZoomV1!==String(zoom))page.dataset.rpysPageFitZoomV1=String(zoom);const out=q('output',bar);if(out&&out.value!==Math.round(zoom*100)+'%')out.value=Math.round(zoom*100)+'%';return children}
 function fitScale(page,bar){
  const children=pageChildren(page,bar);for(const el of children)el.style.zoom='1';
  const rect=page.getBoundingClientRect(),desktop=document.body.classList.contains('rpysDesktop409');
@@ -39,5 +39,11 @@ let timer=0;function schedule(delay=100){clearTimeout(timer);timer=setTimeout(de
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>schedule(0),{once:true});else schedule(0);
 document.addEventListener('click',e=>{if(e.target.closest('.sidebar .nav[data-p]')||e.target.closest('#rpysDesktopHome409 [data-view-action=launch]')||e.target.closest('#nobet,#saymanlik'))schedule(180)},{capture:true});
 addEventListener('resize',()=>schedule(80));addEventListener('rpys-direct-core-ready',()=>schedule(200));
-new MutationObserver(()=>schedule(100)).observe(document.body,{childList:true,subtree:true});
+function affectsWorkPage(mutation){
+ const target=mutation.target.nodeType===1?mutation.target:mutation.target.parentElement;
+ if(target?.closest?.('.rpysPageFitBarV1,.rpysSignedArchiveBar'))return false;
+ if(target?.closest?.('#nobet,#saymanlik'))return true;
+ return [...mutation.addedNodes,...mutation.removedNodes].some(node=>node.nodeType===1&&(node.matches?.('#nobet,#saymanlik')||node.querySelector?.('#nobet,#saymanlik')));
+}
+new MutationObserver(mutations=>{if(mutations.some(affectsWorkPage))schedule(100)}).observe(document.body,{childList:true,subtree:true});
 })();

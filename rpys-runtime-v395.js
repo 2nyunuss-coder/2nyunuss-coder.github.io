@@ -153,7 +153,7 @@
   }
   function refreshBars(){
     bar("nobet");bar("saymanlik");
-    document.querySelectorAll(".rpysSignedArchiveBar").forEach(x=>{const n=archiveList(x.dataset.kind).length,el=x.querySelector("[data-arc-count]");if(el)el.textContent=n+" kayıt"});
+    document.querySelectorAll(".rpysSignedArchiveBar").forEach(x=>{const n=archiveList(x.dataset.kind).length,el=x.querySelector("[data-arc-count]");if(el&&el.textContent!==n+" kayıt")el.textContent=n+" kayıt"});
     document.querySelectorAll('#nobet [data-rpys383print="say"][onclick*="stablePrintDuty"]').forEach(b=>b.removeAttribute("data-rpys383print"))
   }
 

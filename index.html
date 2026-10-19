@@ -19,7 +19,7 @@
 <div class="small">Program GitHub Pages üzerinden açılır; uygulama ve ana veri güvenli Supabase katmanından gelir.</div>
 </div>
 <script src="/rpys-scheduler-v398.js?v=20260925-3"></script>
-<script src="/rpys-stability-v420.js?v=20261019-1"></script>
+<script src="/rpys-stability-v420.js?v=20261019-3"></script>
 <script>
 (async()=>{
  const APP_SOURCE='https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-app-source';
@@ -79,7 +79,7 @@
 </style>`;
  const MOBILE_JS='<script id="rpys-mobile-secure-runtime-v303">(()=>{function closeMenu(){document.body.classList.remove("rpysMobileMenuOpen")}function setup(){if(!document.querySelector(".sidebar")||document.getElementById("rpysMobileMenuBtn"))return;let b=document.createElement("button");b.id="rpysMobileMenuBtn";b.className="rpysMobileMenuBtn";b.type="button";b.setAttribute("aria-label","Menüyü aç");b.textContent="☰";b.onclick=()=>document.body.classList.toggle("rpysMobileMenuOpen");let o=document.createElement("div");o.className="rpysMobileBackdrop";o.onclick=closeMenu;document.body.append(o,b);document.querySelectorAll(".sidebar .nav").forEach(n=>n.addEventListener("click",()=>{if(innerWidth<=900)closeMenu()}));addEventListener("resize",()=>{if(innerWidth>900)closeMenu()});}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup);else setup()})();<'+ '/script>';
  const FIILI_PRINT_JS='<script id="rpys-fiili-print-isolation-v1">(()=>{const selector="#fiilihizmet";function repairFiiliPrintButtons(){let section=document.querySelector(selector);if(!section)return;section.querySelectorAll("[data-rpys383print=\\"say\\"]").forEach(b=>b.removeAttribute("data-rpys383print"));section.querySelectorAll(".rpys332Print").forEach(b=>{b.dataset.rpysFiiliPrint="1";b.title="Fiilî Hizmet belgesini yazdır"})}document.addEventListener("click",e=>{let b=e.target.closest?.(selector+" .rpys332Print");if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(typeof printFiiliDocument==="function")printFiiliDocument()},true);new MutationObserver(repairFiiliPrintButtons).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-rpys383print"]});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",repairFiiliPrintButtons);else repairFiiliPrintButtons();setTimeout(repairFiiliPrintButtons,2500)})();<'+ '/script>';
- const DATA_SAFETY_ARCHIVE_JS='<script id="rpys-data-safety-archive-loader-v395" src="/rpys-runtime-v395.js?v=20260917-1"><'+ '/script>';
+ const DATA_SAFETY_ARCHIVE_JS='<script id="rpys-data-safety-archive-loader-v395" src="/rpys-runtime-v395.js?v=20261019-3"><'+ '/script>';
  const DATA_INTEGRITY_PERSONNEL_JS='<script id="rpys-data-integrity-personnel-loader-v396" src="/rpys-runtime-v396.js?v=20260928-2"><'+ '/script>';
  const REST_16_HOURS_JS='<script id="rpys-rest-16-hours-loader-v397" src="/rpys-runtime-v397.js?v=20261019-1"><'+ '/script>';
  const SCHEDULER_SAFETY_JS='<script id="rpys-scheduler-safety-loader-v398" src="/rpys-scheduler-v398.js?v=20260925-3"><'+ '/script>';
@@ -88,7 +88,7 @@
  const CUSTOM_SHIFT_JS='<script id="rpys-custom-shift-loader-v405" src="/rpys-runtime-v405.js?v=20260929-2"><'+ '/script>';
  const MONTHLY_LIST_VARIANTS_JS='<script id="rpys-monthly-list-variants-loader-v406" src="/rpys-runtime-v406.js?v=20260929-1"><'+ '/script>';
  const DESKTOP_VIEW_JS='<script id="rpys-desktop-view-loader-v409" src="/rpys-desktop-v409.js?v=20260930-5"><'+ '/script>';
- const PAGE_FIT_VIEW_JS='<script id="rpys-page-fit-loader-v1" src="/rpys-page-fit-v1.js?v=20261015-2"><'+ '/script>';
+ const PAGE_FIT_VIEW_JS='<script id="rpys-page-fit-loader-v1" src="/rpys-page-fit-v1.js?v=20261019-3"><'+ '/script>';
  const SAY_HAKEDIS_FIX_JS='<script id="rpys-say-hakedis-fix-loader-v1" src="/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-2"><'+ '/script>';
  const SDS_ALL_DOCTORS_LOADER=`async function fixedSdsDoctors(slug,ver){const r=await fetch(base+'/functions/v1/'+slug+'?v='+encodeURIComponent(ver)+'&cb=157',{cache:'no-store'});if(!r.ok)throw new Error(slug+' HTTP '+r.status);let js=await r.text(),original=js;js=js.replace(/\\.slice\\(\\s*0\\s*,\\s*5\\s*\\)/g,'');js=js.replaceAll(".sort((a,b)=>b.count-a.count||a.doctor.localeCompare(b.doctor,'tr')).slice(0,5)",".sort((a,b)=>b.count-a.count||a.doctor.localeCompare(b.doctor,'tr'))");js=js.replaceAll(".filter(x=>ds.has(x)).slice(0,5)",".filter(x=>ds.has(x))");js=js.replaceAll('Bu branştaki en yüksek 5 hekim','Bu branştaki tüm hekimler');js=js.replaceAll('İlk 5 hekimi seç','Tümünü Seç');js=js.replaceAll('İlk 5 branşı seç','Tüm branşları seç');js=js.replaceAll('En yüksek 5 branşı seç','Tüm branşları seç');js=js.replaceAll('her seçili branşta en yüksek 5 hekim arasından işaretlediklerin','her seçili branşta tüm hekimler arasından işaretlediklerin');js=js.replace(/if\\([^{}]{0,180}\\.length\\s*>=\\s*5[^{}]*\\)\\s*\\{[^{}]*(?:alert|return)[^{}]*\\}/g,'');js=js.replaceAll("if(!a.includes(d)&&a.length>=5){el.checked=false;return alert('Bu branş için en fazla 5 hekim seçilebilir.')}",'');js=js.replaceAll('(rr?.doctors||[]).slice(0,5).map(x=>x.doctor)','(rr?.doctors||[]).map(x=>x.doctor)');installSdsSelectAll();if(js===original&&/\\.slice\\(\\s*0\\s*,\\s*5\\s*\\)/.test(js))console.warn('RPYS SDS beş kayıt sınırı kaldı');(0,eval)(js)}function installSdsSelectAll(){if(window.__RPYS_SDS_SELECT_ALL_V1__)return;window.__RPYS_SDS_SELECT_ALL_V1__=true;function scan(){const q='[role="dialog"],[class*="modal"],[class*="Modal"],[class*="dialog"],[class*="Dialog"]';const roots=[...document.querySelectorAll(q)].filter(root=>{const t=root.innerText||root.textContent||'';return /branş/i.test(t)&&/(word|hekim|doktor)/i.test(t)});for(const root of roots){const outer=root.parentElement?.closest(q);if(outer&&roots.includes(outer))continue;if(root.querySelector('[data-rpys-sds-select-all]'))continue;const b=document.createElement('button');b.type='button';b.className='btn alt';b.dataset.rpysSdsSelectAll='1';b.textContent='Tüm Branş ve Hekimleri Seç';b.addEventListener('click',async e=>{e.preventDefault();e.stopPropagation();let n=0;for(let i=0;i<20;i++){const todo=[...root.querySelectorAll('input[type="checkbox"]')].filter(x=>!x.disabled&&!x.checked);if(!todo.length)break;todo.forEach(x=>x.click());n+=todo.length;await new Promise(r=>setTimeout(r,80))}b.textContent=n?'Tüm Branş ve Hekimler Seçildi':'Seçilecek kayıt bulunamadı'},true);root.prepend(b)}}scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true})}`;
  function fail(e){document.querySelector('.spin').style.display='none';fill.style.width='12%';err.style.display='block';err.textContent='RPYS açılamadı:\n'+String(e&&e.message||e)+'\n\nSayfayı yenileyip tekrar deneyin.';status.textContent='Bulut bağlantısı kurulamadı.'}
@@ -101,7 +101,7 @@
    // Canli revizyon takibi zaten rpys-live-sync-v319 + v400 kayit korumasi ile yapiliyor;
    // eski bulut cekme eklentisini yukleme listesinden tamamen cikar.
    app=replaceOnce(app,'["372.4","rpys-patch372","3724"],','');
-   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261019-1"><'+'/script>');
+   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261019-3"><'+'/script>');
    // Only one revision watcher owns this page. Remote changes require an explicit refresh.
    app=app.replace(/<script\b[^>]*id=["']rpys-live-sync-v319["'][^>]*>[\s\S]*?<\/script>/i,
      '<script id="rpys-live-sync-v419" src="/rpys-live-sync-v419.js?v=20261019-1"><'+'/script>');
@@ -236,7 +236,7 @@
 }`);
    if(!app.includes('rpys-dev-center-loader-v1'))app=insertBeforeFinalBody(app,'<script id="rpys-dev-center-loader-v1" src="/rpys-dev-center-v1.js?v=20261007-1"><'+ '/script>');
    app=app.replace(/\/rpys-dev-center-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-dev-center-v1.js?v=20261007-4');
-   if(!app.includes('rpys-page-notes-external-v2'))app=insertBeforeFinalBody(app,'<script id="rpys-page-notes-external-v2" src="/rpys-page-notes-v2.js?v=20261002-414"><\/script>');
+   if(!app.includes('rpys-page-notes-external-v2'))app=insertBeforeFinalBody(app,'<script id="rpys-page-notes-external-v2" src="/rpys-page-notes-v2.js?v=20261019-3"><\/script>');
    if(!app.includes('rpys-mobile-secure-v303'))app=app.replace(/<\/head>/i,MOBILE_CSS+'</head>');
    if(!app.includes('rpys-mobile-secure-runtime-v303'))app=app.replace(/<\/body>/i,MOBILE_JS+'</body>');
    if(!app.includes('rpys-fiili-print-isolation-v1'))app=insertBeforeFinalBody(app,FIILI_PRINT_JS);
@@ -266,12 +266,15 @@
      .replace(/\/rpys-saymanlik-print-v414\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-print-v414.js?v=20261005-420')
      .replace(/\/rpys-duty-print-v415\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-duty-print-v415.js?v=20261006-427')
      .replace(/\/rpys-print-center-v413\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-print-center-v413.js?v=20261005-420');
+   app=app.replace(/\/rpys-runtime-v395\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v395.js?v=20261019-3')
+     .replace(/\/rpys-page-fit-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-page-fit-v1.js?v=20261019-3')
+     .replace(/\/rpys-page-notes-v2\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-page-notes-v2.js?v=20261019-3');
    app=app.replace(/\/rpys-runtime-v397\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v397.js?v=20261019-1')
      .replace(/\/rpys-runtime-v400\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v400.js?v=20261019-2')
      .replace(/\/rpys-saymanlik-hakedis-fix-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-2');
    const uiLoader=`async function stableUiPatch420(slug,ver){const r=await fetch(base+'/functions/v1/'+slug+'?v='+encodeURIComponent(ver)+'&cb=420',{cache:'no-store'});if(!r.ok)throw new Error(slug+' HTTP '+r.status);(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug))}`;
    app=app.replace("async function tag(slug,ver){",uiLoader+"async function tag(slug,ver){");
-   app=app.replace("else await tag(slug,ver);", "else if(['rpys-patch336','rpys-patch337','rpys-patch338','rpys-patch339','rpys-patch340','rpys-patch352','rpys-patch353','rpys-patch383'].includes(slug))await stableUiPatch420(slug,ver);else await tag(slug,ver);");
+   app=app.replace("else await tag(slug,ver);", "else if(['rpys-patch322','rpys-patch336','rpys-patch337','rpys-patch338','rpys-patch339','rpys-patch340','rpys-patch352','rpys-patch353','rpys-patch383','rpys-patch388'].includes(slug))await stableUiPatch420(slug,ver);else await tag(slug,ver);");
    app=app.replace("(0,eval)(await r.text());if(test())", "(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug));if(test())");
    app=app.replace("(0,eval)(js)}async function ensureCritical", "(0,eval)(window.rpysStability420.repairPatch(js,'rpys-patch332'))}async function ensureCritical");
    app=window.rpysScheduler398.repair(app);

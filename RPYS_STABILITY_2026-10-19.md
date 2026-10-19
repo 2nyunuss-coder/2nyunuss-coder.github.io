@@ -29,3 +29,21 @@ node --test tests/stability.test.cjs tests/say-hakedis.test.cjs tests/live-sync.
 ```
 
 Test ortamında jsdom gerekir. Canlı uygulama HTML'sinin yükleyici dönüşümü ve inline script sözdizimi de doğrulandı. Chromium'da gerçek uygulama çekirdeği, gömülü v319 ve on eski eklenti, v396/v400/masaüstü katmanları birlikte örnek verilerle çalıştırıldı. Kurulumdan sonra 2,5 saniyelik gözlemde iki alt toplam satırı ve açık menünün düğmeleri aynı kaldı; bu alanlarda sıfır child-list mutasyonu ve sıfır tarayıcı JavaScript hatası görüldü. Dış kurum saatini açılan pencereden kaydetme ve hatalı saat yerine gerçek vardiya süresini kullanma da doğrulandı. Bu gözlem kimlik doğrulanmış üretim oturumuyla yapılmadı.
+
+## Devam eden yenilenme: tüm ekran katmanlarıyla takip düzeltmesi
+
+İlk test yalnız alt toplam ve menü alanlarını izliyordu. Tam ekran katmanları birlikte çalıştırıldığında kalan üç kaynak ölçüldü:
+
+- İmza Arşivi sayacı, aynı metni yazıp kendi MutationObserver'ını tekrar tetikliyordu: 2,5 saniyede 66 yazım. Sayaç yalnız değer değişince yazılır.
+- SDS düğmesinin zaten doğru konumdayken `insertBefore` ile yeniden taşınması, tüm sayfanın izleyicilerini tetikliyordu: 15 saniyede 588 sidebar mutasyonu. Düğme yalnız konumu farklıysa taşınır.
+- Gizli v322 takip paneli ve özeti, her sayfa mutasyonunda yeniden kuruluyordu: 15 saniyede her iki alanda 122 yeniden yazım. Şablon/veri değişmedikçe mevcut alanlar ve kaydedilmemiş girişler korunur; gerçek değişiklikte panel/özet güncellenir.
+
+Sayfa sığdırma çubuğunun aynı `output.value` değerini yeniden yazması da engellendi. Sayfa dışındaki kayıt/durum bildirimleri artık uzun Saymanlık listesini yeniden ölçeklemez. Not stilinin mevcut kimliğiyle kontrol edilen kimliği eşleştirildi; gecikmeli başlangıç ve ay değişikliklerinde aynı stil tekrar eklenmez. Etkilenen dosyaların önbellek sürümleri yenilendi.
+
+Ek doğrulama: uygulama çekirdeği, yükleme listesindeki bütün eski eklentiler (kaldırılmış veri çekme eklentisi v372 hariç), yerel arşiv/zoom/not/yazdırma/liste/menü katmanları örnek verilerle Chromium'da birlikte çalıştırıldı. Başlangıç tamamlandıktan sonraki 15 saniyede **tüm body üzerinde sıfır child-list mutasyonu**, sıfır tarayıcı hatası görüldü. Saymanlık tablolarının her birinde iki toplam satırı ve açık menünün düğmeleri korundu. Bu, üretim hesabıyla yapılmış canlı oturum testi değildir.
+
+Güncel test komutu 89 test çalıştırır ve tamamı geçti:
+
+```
+node --test tests/page-idle.test.cjs tests/stability.test.cjs tests/say-hakedis.test.cjs tests/live-sync.test.cjs tests/scheduler-safety.test.cjs tests/first-edit-durability.test.cjs tests/opening-loader.test.cjs tests/monthly-list-variants.test.cjs tests/reliability.test.cjs tests/desktop-live.test.cjs
+```

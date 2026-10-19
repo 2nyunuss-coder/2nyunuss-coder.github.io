@@ -2,6 +2,11 @@
 (()=>{
  if(window.rpysStability420)return;
  const owner='if(window.__RPYS_INTERACTION_GUARD_V400__)return;';
+ const htmlByElement=new WeakMap();
+ function updateHtml(element,html,marker){
+  if(htmlByElement.get(element)===html&&(!marker||element.querySelector(marker)))return;
+  element.innerHTML=html;htmlByElement.set(element,html);
+ }
  function repairPatch(js,slug){
   const names={
    'rpys-patch332':['bindSuitable','stableSuitable','openSuitable332'],
@@ -11,6 +16,10 @@
    'rpys-patch339':['bindSuitable','suitableBox','renderSuitable339','scheduleContextRefresh']
   }[slug]||[];
   for(const name of names)js=js.replace(new RegExp('(function '+name+'\\([^)]*\\)\\{)'), '$1'+owner);
+  if(slug==='rpys-patch322'){
+   js=js.replace(/x\.innerHTML=(`[^\n]*`);/g,"window.rpysStability420.updateHtml(x,$1,'#p322Start');");
+   js=js.replace(/h\.innerHTML=(`[^\n]*`)/g,"window.rpysStability420.updateHtml(h,$1,'.p322chips')");
+  }
   if(slug==='rpys-patch337')js=js.replace('function renderPeopleChecks(){','function renderPeopleChecks(){if(window.__RPYS_PATCH339__)return false;');
   if(slug==='rpys-patch339')js=js.replace(/^ host\.innerHTML=(.+);$/m,
    ' const sig=JSON.stringify(staff.map(p=>[p.id,p.name,ids.has(Number(p.id))]));if(host.dataset.rpysPeople420!==sig){host.innerHTML=$1;host.dataset.rpysPeople420=sig;}');
@@ -21,6 +30,10 @@
   if(slug==='rpys-patch353'){
    js=js.replace("function menu(){","function menu(){if(document.getElementById('rpysCopy353')&&document.getElementById('rpysPaste353'))return;");
    js=js.replace('lab.textContent=String(meta.shift)',"if(lab.textContent!==String(meta.shift))lab.textContent=String(meta.shift)");
+  }
+  if(slug==='rpys-patch388'){
+   js=js.replace('b.parentNode===ref.parentNode)ref.parentNode.insertBefore(b,ref)', 'b.parentNode===ref.parentNode&&b.nextSibling!==ref)ref.parentNode.insertBefore(b,ref)');
+   js=js.replace("&&t)t.textContent='SDS / STD Görüntüleme Hizmetleri'","&&t&&t.textContent!=='SDS / STD Görüntüleme Hizmetleri')t.textContent='SDS / STD Görüntüleme Hizmetleri'");
   }
   if(slug==='rpys-patch383')js=js.replace(/\\nfunction (docFor|stripSignatures)\(/g,'\nfunction $1(').replace("else el.textContent='🖨 Listeyi Yazdır';","else if(el.textContent!=='🖨 Listeyi Yazdır')el.textContent='🖨 Listeyi Yazdır';");
   if(slug==='rpys-patch340')js=js.replaceAll("badge.textContent=String(meta.shift)+(meta.hours!=null?' • '+meta.hours+'s':'')", "{const text=String(meta.shift)+(meta.hours!=null?' • '+meta.hours+'s':'');if(badge.textContent!==text)badge.textContent=text}");
@@ -58,5 +71,5 @@
    }
   }
  }
- window.rpysStability420={repair,repairPatch,repairEmbedded,renderGrandTotals,hasEquivalent};
+ window.rpysStability420={updateHtml,repair,repairPatch,repairEmbedded,renderGrandTotals,hasEquivalent};
 })();

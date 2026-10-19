@@ -40,7 +40,7 @@ function mount(id){
 }
 
 function css(){
- if(document.getElementById('rpys-page-notes-style-v5'))return;
+ if(document.getElementById('rpys-page-notes-style-v4')||document.getElementById('rpys-page-notes-style-v5'))return;
  const st=document.createElement('style');st.id='rpys-page-notes-style-v4';
  st.textContent=`
 .rpysPageNote{display:block!important;width:100%!important;clear:both!important;margin:6px 0 10px!important;padding:7px 9px!important;background:#fff!important;border:1px solid #d7e1ec!important;border-radius:7px!important;box-sizing:border-box!important}
