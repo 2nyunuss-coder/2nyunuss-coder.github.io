@@ -201,12 +201,41 @@
     for(const id of m.ids)for(const t of kinds){const n=cfg.people?.[id]?.[t];if(n==null||n==='')missing++;else sum[t]+=Number(n)||0;}
     return `Gereken: ${m.required.day} gündüz / ${m.required.night} nöbet · Hedef: ${sum.day} / ${sum.night}${missing?` · ${missing} boş alan`:''}${m.lockedEmpty?` · ${m.lockedEmpty} boş kilitli hücre dağıtım dışında`:''}`;
   }
+  // Distribute by the selected employees' actual active days within this unit.
+  function fairTargets(m){
+    const result=Object.fromEntries(m.ids.map(id=>[id,{...m.fixed[id]}]));
+    const calendar={day:new Set(),night:new Set()};
+    for(const slot of unitSlots(m.u).filter(s=>!isShiftBlockedForMonth(s.type,s.col,ym())))
+      for(let d=1;d<=daysInMonth();d++)if(isDutyCellApplicable(slot.type,slot.col,d))calendar[kind(slot.col)].add(d);
+    const availability={},capacity={};
+    for(const id of m.ids){
+      availability[id]=empty();capacity[id]=empty();
+      const person=getPersonById(id);
+      for(const t of kinds){
+        const n=[...calendar[t]].filter(d=>personStatusAt(person,dateStr(d))==='Aktif').length;
+        availability[id][t]=n;capacity[id][t]=Math.max(n,m.fixed[id][t]);
+      }
+    }
+    for(const t of kinds){
+      let left=m.required[t]-m.ids.reduce((sum,id)=>sum+result[id][t],0);
+      if(left<0)throw Error('Korunan görevler gerekli toplamdan fazla.');
+      while(left>0){
+        const options=m.ids.filter(id=>availability[id][t]>0&&result[id][t]<capacity[id][t]);
+        if(!options.length)throw Error(labels[t]+' için yeterli uygun gün bulunmuyor.');
+        options.sort((a,b)=>result[a][t]/availability[a][t]-result[b][t]/availability[b][t]||availability[b][t]-availability[a][t]||a-b);
+        result[options[0]][t]++;left--;
+      }
+    }
+    return {targets:result,availability};
+  }
   function suggest(useCurrent=false){
     const u=document.getElementById('autoUnit')?.value;if(!u||isMonthLocked())return;
     const m=model(u),cfg=editableConfig(u);if(!m.ids.length)return;
-    for(const id of m.ids)cfg.people[id]={...(useCurrent?m.actual[id]:m.fixed[id])};
-    if(!useCurrent)for(const t of kinds){let left=m.required[t]-m.ids.reduce((n,id)=>n+cfg.people[id][t],0);while(left-->0){const id=m.ids.slice().sort((a,b)=>cfg.people[a][t]-cfg.people[b][t]||a-b)[0];cfg.people[id][t]++;}}
-    persist();render();
+    try{
+      const proposal=useCurrent?null:fairTargets(m);
+      for(const id of m.ids)cfg.people[id]={...(useCurrent?m.actual[id]:proposal.targets[id])};
+      persist();render();
+    }catch(e){alert(e.message||String(e))}
   }
   function render(){
     const pick=document.getElementById('autoPeople'),layout=pick?.closest('.autoBox');if(!layout)return;
@@ -214,16 +243,17 @@
     let host=document.getElementById('rpysTargetPanel399');if(!host){host=document.createElement('section');host.id='rpysTargetPanel399';layout.appendChild(host);layout.classList.add('rpysTargetsLayout399');}
     if(host.contains(document.activeElement)&&document.activeElement?.tagName==='INPUT')return;
     const m=model(u),cfg=config(u),locked=isMonthLocked(),disabled=locked?'disabled':'';
+    let fairness=null;try{fairness=fairTargets(m)}catch(e){console.warn('RPYS fair target preview',e)}
     host.innerHTML=`<h3>Personel Gündüz / Nöbet Hedefleri</h3><div class="smallhelp">${escape(ym())} · ${escape(u)}</div>
       <label class="rpysTargetsToggle399"><input type="checkbox" data-target-enable ${cfg.enabled?'checked':''} ${disabled}> Elle girdiğim hedeflere göre dağıt</label>
       <p class="smallhelp">Sayılar bu birimdeki <b>ayın toplam görevi</b> içindir. 16 saat ve üzeri nöbet; daha kısa vardiya gündüz sayılır. Mevcut ve korunan görevler toplamın içindedir.</p>
       <div class="rpysTargetSummary399" role="status">${escape(totals(m))}</div>
       <div class="rpysTargetTable399"><table><thead><tr><th>Personel</th><th>Gündüz<br>hedefi</th><th>Nöbet<br>hedefi</th><th>Mevcut<br>G / N</th><th>Kalan<br>G / N</th></tr></thead><tbody>${m.ids.map(id=>{
         const p=getPersonById(id),v=cfg.people?.[id]||{};
-        return `<tr><th scope="row">${escape(p.name)}<small>Korunan: ${m.fixed[id].day} G / ${m.fixed[id].night} N</small></th>${kinds.map(t=>`<td><input type="number" min="0" max="1000" step="1" inputmode="numeric" data-target-id="${id}" data-target-kind="${t}" aria-label="${escape(p.name)} ${labels[t]} hedefi" value="${v[t]==null?'':escape(v[t])}" placeholder="0" ${disabled}></td>`).join('')}<td>${m.actual[id].day} / ${m.actual[id].night}</td><td data-target-diff="${id}">${kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ')}</td></tr>`;
+        return `<tr><th scope="row">${escape(p.name)}<small>Uygun gün: ${fairness?fairness.availability[id].day+" G / "+fairness.availability[id].night+" N":"—"} · Korunan: ${m.fixed[id].day} G / ${m.fixed[id].night} N</small></th>${kinds.map(t=>`<td><input type="number" min="0" max="1000" step="1" inputmode="numeric" data-target-id="${id}" data-target-kind="${t}" aria-label="${escape(p.name)} ${labels[t]} hedefi" value="${v[t]==null?'':escape(v[t])}" placeholder="0" ${disabled}></td>`).join('')}<td>${m.actual[id].day} / ${m.actual[id].night}</td><td data-target-diff="${id}">${kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ')}</td></tr>`;
       }).join('')||'<tr><td colspan="5">Soldan personelleri seç.</td></tr>'}</tbody></table></div>
-      <div class="rpysTargetActions399"><button class="btn alt" data-target-action="equal" ${disabled}>Eşit Hedef Öner</button><button class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button class="btn" data-target-action="run" ${disabled}>Hedeflere Göre Dağıt</button></div>
-      <p class="smallhelp">Hedefler otomatik kaydedilir. Elle hedefler açıkken dağıtım düğmeleri bu sayıları kullanır. Kilitli ve manuel hücreler değişmez; izin ve dinlenme kuralları korunur. Eşit hedef önerisi yalnız sayı paylaşımıdır; uygunluk dağıtımda kontrol edilir.</p>`;
+      <div class="rpysTargetActions399"><button class="btn alt" data-target-action="equal" ${disabled}>İzinlere Göre Adil Hedef Öner</button><button class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button class="btn" data-target-action="run" ${disabled}>Hedeflere Göre Dağıt</button></div>
+      <p class="smallhelp">Hedefler otomatik kaydedilir. Elle hedefler açıkken dağıtım düğmeleri bu sayıları kullanır. Kilitli ve manuel hücreler değişmez; izin ve dinlenme kuralları korunur. Adil hedef önerisi seçilen personelin izinlerini ve korunan görevlerini hesaba katar; günlere uygunluk dağıtımda ayrıca kontrol edilir.</p>`;
   }
   let queued=false;
   function queueRender(){if(queued)return;queued=true;setTimeout(()=>{queued=false;try{render()}catch(e){console.error('RPYS hedef paneli',e)}},0)}
