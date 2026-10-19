@@ -88,3 +88,23 @@ test('alternate poliklinik motor validates next-day rest before any save',()=>{
 test('a locked month never enters either alternate motor',()=>{
  let runs=0;const f=fixture(()=>runs++);f.c.isMonthLocked=()=>true;f.c.runPolRotation2();f.c.distributeSkopiSequential();assert.equal(runs,0);assert.equal(f.saved.length,0);
 });
+for(const approved of [false,true])test('Skopi automatic distribution skips a long-shift rest violation'+(approved?' even with a leftover manual approval':''),()=>{
+ const f=fixture(c=>{
+  const col=c.dutyColumnByKey('pol','long');
+  const chosen=[1,3].find(id=>c.canTakeShift(id,6,col,'PORTABL + SKOPİ'));
+  if(chosen)c.db.assign['2026-10|pol|6|long']=chosen;
+  c.save();
+ });
+ f.cols.long.unit='PORTABL + SKOPİ';f.c.db.staff.push({id:3,name:'Rested person',status:'Aktif'});
+ f.c.db.assign['2026-10|pol|5|long']=1;
+ if(approved)f.c.__RPYS_MANUAL_16_APPROVED__='2026-10-06|1|long';
+ f.c.distributeSkopiSequential();
+ assert.equal(f.c.db.assign['2026-10|pol|5|long'],1);
+ assert.equal(f.c.db.assign['2026-10|pol|6|long'],3);
+ assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});
+test('Skopi leaves an unfillable shift empty instead of introducing a rest violation and rolling back',()=>{
+ const f=fixture(c=>{const col=c.dutyColumnByKey('pol','long');if(c.canTakeShift(1,6,col,'PORTABL + SKOPİ'))c.db.assign['2026-10|pol|6|long']=1;c.save()});
+ f.cols.long.unit='PORTABL + SKOPİ';f.c.db.assign['2026-10|pol|5|long']=1;
+ f.c.distributeSkopiSequential();assert.equal(f.c.db.assign['2026-10|pol|6|long'],undefined);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
+});
