@@ -195,8 +195,10 @@
     const requirements=requirementsFor(m);
     for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun hücre yok.`);
     for(const s of m.slots)if(!s.allowed.length)throw Error(`${s.day}. gün ${s.col.shift||s.col.key}: hedefi kalan uygun personel yok (izin, dinlenme, başka görev veya korunan kayıt).`);
-    const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,...searchAdapter(m)});
-    if(!result.ok)throw Error(result.timedOut?'Hedefler mevcut dinlenme/izin kurallarıyla kısa sürede yerleştirilemedi. Tarayıcının donmaması için arama durduruldu; liste korundu. Hedefleri veya kişi seçimini gözden geçir.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
+    const adapter=searchAdapter(m);
+    const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,...adapter});
+    console.info('RPYS hedef dağıtım teşhisi',{unit:u,month:ym(),slots:m.slots.length,nodes:result.nodes,timedOut:result.timedOut,reason:result.lastFailure});
+    if(!result.ok)throw Error(result.timedOut?'Hedef dağıtımı tamamlanamadı (incelenen ${result.nodes} olasılık). Son kural engeli: ${result.lastFailure||"Henüz tamamlanmış geçerli plan bulunamadı."} Önceki liste korundu.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
     clearCache();const actual=model(u,m.ids).actual;
     for(const id of m.ids)for(const t of kinds)if(actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
