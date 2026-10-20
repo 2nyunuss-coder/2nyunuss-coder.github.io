@@ -98,6 +98,25 @@
       return base.apply(this,arguments);
     };fn.__rpys398=true;window[name]=fn;
   }
+  function spouseDayViolations(month){
+    if(typeof spouseOf!=='function')return [];
+    const staff=db.staff||[],pairs=new Set(),rows=allAssignmentsAllMonths().filter(a=>a.monthKey===month);
+    const byId=new Map(),out=[];
+    for(const a of rows){const id=Number(a.person?.id||0),day=Number(a.day);if(!id||!day)continue;if(!byId.has(id))byId.set(id,new Set());byId.get(id).add(day)}
+    for(const p of staff){
+      const id=Number(p.id),other=Number(spouseOf(id)||0);if(!other||id===other||!staff.some(x=>Number(x.id)===other))continue;
+      const pair=[id,other].sort((a,b)=>a-b),pk=pair.join('|');if(pairs.has(pk))continue;pairs.add(pk);
+      const a=byId.get(id)||new Set(),b=byId.get(other)||new Set();
+      for(const d of new Set([...a,...b])){
+        if(a.has(d)===b.has(d))continue;
+        const missing=a.has(d)?other:id;
+        let leave=false;try{leave=typeof isOnLeave==='function'&&!!isOnLeave(missing,d)}catch(_){}
+        if(leave)continue;
+        out.push({key:pk+'|'+d,day:d,first:id,second:other,missing});
+      }
+    }
+    return out;
+  }
   function wrapRun(name){
     const base=window[name];if(typeof base!=='function'||base.__rpys398)return;
     const fn=function(){
@@ -161,9 +180,12 @@
         if(targetIds)run.targetIds=new Set(targetIds);
         const restCheck=()=>targetIds&&window.rpysRest16V397.allViolationsForMonth?window.rpysRest16V397.allViolationsForMonth(targetIds,month):window.rpysRest16V397.allViolations();
         const beforeRest=restCheck();
+        const beforeSpouses=new Set(spouseDayViolations(month).map(x=>x.key));
         value=window.rpysRest16V397.runIndexed(()=>window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
         if(value&&typeof value.then==='function')throw Error('Beklenmeyen asenkron motor; liste korunarak işlem durduruldu.');
         for(const key of restCheck().keys())if(!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
+        const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
+        if(newSpouseIssues.length){const x=newSpouseIssues[0];throw Error('Eşlerin aynı gün çalışma kuralı: '+(getPersonById(x.first)?.name||x.first)+' / '+(getPersonById(x.second)?.name||x.second)+', '+x.day+'. gün. İzinli olmayan eş tek başına görevlendirilemez.');}
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
         for(const key of new Set([...Object.keys(before.assign||{}),...Object.keys(db.assign||{}),...Object.keys(before.assignmentMeta||{}),...Object.keys(db.assignmentMeta||{}),...Object.keys(before.rpysCellLocks||{})])){
           if((protectedCell(key)||before.rpysCellLocks?.[key]||manualAssignmentCell(key,before))&&
