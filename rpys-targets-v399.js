@@ -198,7 +198,7 @@
     const adapter=searchAdapter(m);
     const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,...adapter});
     console.info('RPYS hedef dağıtım teşhisi',{unit:u,month:ym(),slots:m.slots.length,nodes:result.nodes,timedOut:result.timedOut,reason:result.lastFailure});
-    if(!result.ok)throw Error(result.timedOut?'Hedef dağıtımı tamamlanamadı (incelenen ${result.nodes} olasılık). Son kural engeli: ${result.lastFailure||"Henüz tamamlanmış geçerli plan bulunamadı."} Önceki liste korundu.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
+    if(!result.ok)throw Error(result.timedOut?`Hedef dağıtımı tamamlanamadı (${result.nodes} deneme). Son kural engeli: ${result.lastFailure||'Tamamlanmış geçerli plan bulunamadı.'} Önceki liste korundu.`:`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
     clearCache();const actual=model(u,m.ids).actual;
     for(const id of m.ids)for(const t of kinds)if(actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
