@@ -76,7 +76,7 @@
   }
   function finalRules(m){
     const r=unitRulesV251(m.u),rows=assignmentsMonth();
-    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u);if(gaps.length)return `Görev aralığı kuralı: ${gaps.length} uyuşmazlık.`}
+    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u);if(gaps.length)return gaps.map(g=>`${getPersonById(g.id)?.name||('#'+g.id)}: ${g.leftDate??g.left??g.from??'?'} – ${g.rightDate??g.right??g.to??'?'} arasında görev aralığı ${g.blank??g.gap??'?'} boş gün; izin verilen en fazla ${unitMaxGapDaysV251(m.u)||5}.`).join('\n')}
     if(r.spouseSameDay){
       for(const id of m.ids){const sp=spouseOf(id);if(!sp)continue;
         const a=new Set(rows.filter(x=>Number(x.person.id)===id).map(x=>Number(x.day))),b=new Set(rows.filter(x=>Number(x.person.id)===Number(sp)).map(x=>Number(x.day)));
@@ -131,7 +131,7 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261020-2',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261020-gap-4',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null;
   let feedback={text:'',tone:'',busy:false};
   function report(text,tone='progress',busy=preparing){
@@ -204,6 +204,31 @@
       }
       return _allAssignCache=rows;
     };
+  }
+  function gapRulesFor(m,rows){
+    if(!unitRulesV251(m.u).maxGapEnabled)return [];
+    const origin=Date.parse(ym()+'-01T00:00:00Z'),last=daysInMonth();
+    const offset=s=>Math.round((Date.parse(s+'T00:00:00Z')-origin)/86400000)+1;
+    const anchors=new Map(m.ids.map(id=>[id,{before:null,after:null,fixedDays:[]}]));
+    // Match the all-month runtime: raw assignments in this unit are real
+    // anchors. Imported statistics and a synthetic month edge are not duties.
+    const units={ar1:'ACİL RÖNTGEN',ar2:'ACİL RÖNTGEN',bt1:'BİLGİSAYARLI TOMOGRAFİ',bt2:'BİLGİSAYARLI TOMOGRAFİ',btW:'BİLGİSAYARLI TOMOGRAFİ',sk1:'PORTABL + SKOPİ',sk2:'PORTABL + SKOPİ',porS:'PORTABL + SKOPİ',porW:'RUTİN PORTABL',mam:'MAMOGRAFİ',kem:'KEMİK ÖLÇÜMÜ',sec:'SEKRETERLİK',sor:'BİRİM SORUMLUSU'};
+    for(let n=1;n<=5;n++)units['p'+n]='POLİKLİNİK RÖNTGEN';
+    for(const [key,raw] of Object.entries(db.assign||{})){
+      const a=anchors.get(Number(raw));if(!a)continue;
+      const [month,type,day,col]=key.split('|');if(!month)continue;
+      const u=units[col]||dutyColumnByKey(type,col)?.unit;if(u!==m.u)continue;
+      const d=offset(month+'-'+String(Number(day)).padStart(2,'0'));if(!Number.isFinite(d))continue;
+      if(month===ym())a.fixedDays.push(d);
+      if(d<1&&(a.before===null||d>a.before))a.before=d;
+      if(d>last&&(a.after===null||d<a.after))a.after=d;
+    }
+    return m.ids.map(id=>{
+      const {before,after,fixedDays}=anchors.get(id),from=before===null?1:before+1,to=after===null?last:after-1;
+      const leaves=(db.leaves||[]).filter(l=>Number(l.personId??l.idPerson??l.person?.id)===id&&l.start&&l.end).map(l=>[Math.max(from,offset(l.start)),Math.min(to,offset(l.end))]).filter(([a,b])=>a<=b).sort((a,b)=>a[0]-b[0]);
+      const runs=[];let next=from;for(const [a,b] of leaves){if(a>next)runs.push([next,a-1]);next=Math.max(next,b+1)}if(next<=to)runs.push([next,to]);
+      return {id,maxBlank:Number(unitMaxGapDaysV251(m.u)||5),includeEdges:!!window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__,segments:nonLeaveSegmentsV2414(id),fixedDays:rows.filter(a=>Number(a.person.id)===id&&a.col.unit===m.u).map(a=>Number(a.day)),crossMonth:{before,after,fixedDays,last,runs,month:ym()}};
+    });
   }
   async function planningData(u,{check=()=>{},progress=()=>{}}={}){
     const m=model(u),targets=readTargets(m);
@@ -287,7 +312,14 @@
         if(chosenDays.length>need)throw Error(`${getPersonById(id).name}: kalan hedef ${remaining[id].day} gündüz + ${remaining[id].night} nöbet = ${need} görev. Mevcut görev aralığı/izin dönüşü kuralları en az ${chosenDays.length} ek görev gerektiriyor. Hedef toplamı en az ${m.fixed[id].day+m.fixed[id].night+chosenDays.length} olmalı; diğer personellerin toplamları buna göre yeniden dengelenmeli. Hedefler değiştirilmedi.`);
       }
       const requirements=obligations.map(r=>({values:m.slots.filter(s=>r.days.has(s.day)&&s.allowed.includes(r.id)).map(s=>`${s.index}:${r.id}`)}));
-      return {m,targets,input:{ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,allowed:s.allowed})),conflicts,requirements,limits,gapRules:unitRulesV251(u).maxGapEnabled?m.ids.map(id=>({id,maxBlank:Number(unitMaxGapDaysV251(u)||5),segments:nonLeaveSegmentsV2414(id),fixedDays:rows.filter(a=>Number(a.person.id)===id&&a.col.unit===u).map(a=>Number(a.day))})):[]}};
+      const gapRules=gapRulesFor(m,rows);
+      for(const rule of gapRules.filter(r=>r.includeEdges)){
+        let minimum=0;
+        for(const [a,b] of rule.segments){const days=[a-1,...new Set(rule.fixedDays.filter(d=>d>=a&&d<=b)),b+1].sort((x,y)=>x-y);for(let i=1;i<days.length;i++)minimum+=Math.floor((days[i]-days[i-1]-1)/(rule.maxBlank+1));}
+        const need=remaining[rule.id].day+remaining[rule.id].night;
+        if(minimum>need)throw Error(`${getPersonById(rule.id).name}: hedef ${targets[rule.id].day} gündüz + ${targets[rule.id].night} nöbet = ${targets[rule.id].day+targets[rule.id].night} görev. Etkin ${rule.maxBlank} boş gün kuralı ay başını, ay sonunu ve izin dışı dönemleri de kapsıyor; korunan görevlerle birlikte en az ${m.fixed[rule.id].day+m.fixed[rule.id].night+minimum} görev gerekiyor. En az ${minimum-need} görev eksik. Öneri: bu kişinin toplam hedefini artırıp diğer kişilerin hedeflerini dengeleyin veya görev aralığı ayarını gözden geçirin. Hedefler ve liste değiştirilmedi.`);
+      }
+      return {m,targets,input:{ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,allowed:s.allowed})),conflicts,requirements,limits,gapRules}};
     }finally{db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache()}
   }
   function planningFingerprint(){

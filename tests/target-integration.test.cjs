@@ -68,7 +68,7 @@ function enableGapRule(f){
  f.c.unitRulesV251=()=>({maxGapEnabled:true});f.c.unitMaxGapDaysV251=()=>5;f.c.nonLeaveSegmentsV2414=()=>[[1,30]];f.c.spouseOf=()=>null;
  f.c.v251GapViolations=ids=>ids.flatMap(id=>{const days=f.c.assignmentsMonth().filter(a=>a.person.id===id&&a.col.unit===unit).map(a=>a.day).sort((a,b)=>a-b);return days.slice(1).flatMap((d,i)=>d-days[i]-1>5?[{id,left:days[i],right:d}]:[])});
 }
-test('active runtime gap rule allows low targets without synthetic month-boundary duties',async()=>{
+test('between-duty gap mode allows low targets without month-boundary requirements',async()=>{
  const f=fixture();enableGapRule(f);const r=await f.c.autoDistribute();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(f.c.v251GapViolations([1,2,3,4,5,6]).length,0);assert.equal(f.saved.length,1);assert.equal(Object.keys(f.c.db.assign).length,51);
 });
 test('fixed duties too far apart require intermediate tasks; failure never clears protected cells',async()=>{
@@ -113,4 +113,43 @@ test('thousands of historical assignments are not scanned by each candidate rest
  const f=fixture();for(let year=1995;year<2020;year++)for(let month=1;month<=12;month++)for(let day=1;day<=28;day++)f.c.db.assign[`${year}-${String(month).padStart(2,'0')}|acil|${day}|other`]=day%6+1;
  const original={...f.c.db.assign},candidates=f.c.rpysTargets399.recordCandidates;let queries=0,maxKeys=0;f.c.rpysTargets399.recordCandidates=(...args)=>{const result=candidates(...args);if(result){queries++;maxKeys=Math.max(maxKeys,result.keys.length)}return result};
  const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.plan.length,51);assert.ok(queries>300);assert.ok(maxKeys<100,`too many keys per indexed query: ${maxKeys}`);for(const [key,pid] of Object.entries(original))assert.equal(f.c.db.assign[key],pid);assert.equal(f.c.rpysTargets399.recordCandidates(1,null),null);assert.equal(f.saved.length,1);
+});
+
+// Independent date-by-date oracle for the active rules10 cross-month check.
+// Leave resets a blank run; both endpoints must be real duties, and at least
+// one must be in the selected month. No month-boundary duty is invented.
+function enableCrossMonthGaps(f){
+ enableGapRule(f);const intra=f.c.v251GapViolations;
+ f.c.v251GapViolations=ids=>intra(ids).concat(ids.flatMap(id=>{
+  const dates=[...new Set(f.c.allAssignmentsAllMonths().filter(a=>a.person.id===id&&a.col.unit===unit).map(a=>a.date))].sort(),out=[];
+  for(let i=1;i<dates.length;i++){
+   const a=dates[i-1],b=dates[i];if(a.slice(0,7)===b.slice(0,7)||![a.slice(0,7),b.slice(0,7)].includes(f.c.ym()))continue;
+   let run=0,blank=0;for(let t=Date.parse(a+'T00:00:00Z')+86400000;t<Date.parse(b+'T00:00:00Z');t+=86400000){const d=new Date(t).toISOString().slice(0,10);if(f.c.db.leaves.some(l=>Number(l.personId)===id&&l.start<=d&&l.end>=d))run=0;else blank=Math.max(blank,++run)}
+   if(blank>5)out.push({id,kind:'cross-month',leftDate:a,rightDate:b,blank});
+  }return out;
+ }));
+}
+test('cross-month anchors are solved up front: exact 51 duties and no rejected full-plan retries',async()=>{
+ const f=fixture();enableCrossMonthGaps(f);f.c.db.assign['2026-09|acil|30|day']=1;f.c.db.assign['2026-11|acil|1|day']=2;
+ const Native=f.c.Worker;let requests=0;f.c.Worker=class extends Native{postMessage(data){requests++;super.postMessage(data)}};
+ const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(requests,1);assert.equal(result.plan.length,51);assert.equal(f.saved.length,1);assert.equal(f.c.v251GapViolations([1,2,3,4,5,6]).length,0);assert.equal(f.c.db.assign['2026-09|acil|30|day'],1);assert.equal(f.c.db.assign['2026-11|acil|1|day'],2);
+});
+test('infeasible target between previous and next month explains person and preserves all data',async()=>{
+ const f=fixture();enableCrossMonthGaps(f);for(const k of ['2026-09|acil|30|day','2026-11|acil|1|day'])f.c.db.assign[k]=6;
+ const before=JSON.stringify(f.c.db),started=Date.now();assert.equal(await f.c.rpysTargets399.run(),false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Recep Duman/);assert.match(f.alerts[0],/görev aralığı|boş gün kuralı/);assert.doesNotMatch(f.alerts[0],/Verilen sürede/);assert.ok(Date.now()-started<2000);
+});
+
+function enableEdgeGaps(f){
+ enableCrossMonthGaps(f);f.c.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__=1;const old=f.c.v251GapViolations;
+ f.c.v251GapViolations=ids=>old(ids).concat(ids.flatMap(id=>f.c.nonLeaveSegmentsV2414(id).flatMap(([a,b])=>{
+  const days=f.c.assignmentsMonth().filter(x=>x.person.id===id&&x.col.unit===unit&&x.day>=a&&x.day<=b).map(x=>x.day).sort((x,y)=>x-y);
+  const edges=[a-1,...days,b+1];return edges.slice(1).flatMap((d,i)=>d-edges[i]-1>5?[{id,left:edges[i],right:d,blank:d-edges[i]-1}]:[]);
+ })));
+}
+test('effective rulepatch8: low monthly target fails before Worker with the exact missing count',async()=>{
+ const f=fixture();enableEdgeGaps(f);let workers=0;f.c.Worker=class{constructor(){workers++}};const before=JSON.stringify(f.c.db);assert.equal(await f.c.rpysTargets399.run(),false);assert.equal(workers,0);assert.equal(f.saved.length,0);assert.equal(JSON.stringify(f.c.db),before);assert.match(f.alerts[0],/Recep Duman.*1 gündüz.*2 nöbet/);assert.match(f.alerts[0],/ay başını, ay sonunu/);assert.match(f.alerts[0],/en az 5 görev/);assert.match(f.alerts[0],/En az 2 görev eksik/);
+});
+test('effective edge and cross-month rules: 51 exact duties with feasible manually edited targets',async()=>{
+ const f=fixture();enableEdgeGaps(f);const cfg=f.c.rpysTargets399.config(unit);cfg.people[1].night=5;cfg.people[6].night=4;f.c.db.assign['2026-09|acil|30|day']=1;f.c.db.assign['2026-11|acil|1|day']=2;
+ const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.plan.length,51);assert.equal(f.c.v251GapViolations([1,2,3,4,5,6]).length,0);assert.equal(f.saved.length,1);const m=f.c.rpysTargets399.model(unit);for(const id of m.ids)for(const kind of ['day','night'])assert.equal(m.actual[id][kind],cfg.people[id][kind]);
 });

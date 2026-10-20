@@ -37,6 +37,30 @@ test('browser Worker entry accepts a structured message and posts the result',()
  const vm=require('node:vm'),fs=require('node:fs');let result;const self={postMessage:value=>{result=value}};vm.runInNewContext(fs.readFileSync(require.resolve('../rpys-target-worker.js'),'utf8'),{self});const data=example();self.onmessage({data});validate(data,result);
 });
 
-test('gap constraints match active runtime: five blank days between real duties; no boundary minimum',()=>{
+test('between-duty mode: five blank days between real duties; no boundary minimum',()=>{
  const data={ids:[1],remaining:{1:{day:2,night:0}},slots:[{index:0,day:1,kind:'day',allowed:[1]},{index:1,day:7,kind:'day',allowed:[1]}],gapRules:[{id:1,maxBlank:5,segments:[[1,30]],fixedDays:[]}]};assert.equal(solveTargets(data).ok,true);data.slots[1].day=8;assert.equal(solveTargets(data).ok,false);data.slots[0].day=23;data.slots[1].day=29;assert.equal(solveTargets(data).ok,true);
+});
+
+test('cross-month gap propagation agrees with date-by-date enumeration across 200 leave calendars',()=>{
+ let seed=19;const rnd=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n};
+ for(let trial=0;trial<200;trial++){
+  const leave=new Set();for(let d=-1;d<=15;d++)if(rnd(9)===0)leave.add(d);
+  function runs(a,b){const out=[];let from=a;for(let d=a;d<=b;d++)if(leave.has(d)){if(from<d)out.push([from,d-1]);from=d+1}if(from<=b)out.push([from,b]);return out}
+  const count=rnd(6),rule={id:1,maxBlank:1+rnd(4),fixedDays:[],includeEdges:trial%2===0,segments:runs(1,12),crossMonth:{before:trial%3===0?null:-2,after:trial%4===0?null:16,last:12,runs:runs(-1,15),month:'2026-10'}};
+  const data={ids:[1,2],remaining:{1:{day:count,night:0},2:{day:6-count,night:0}},slots:[1,3,5,7,9,11].map((day,index)=>({index,day,kind:'day',allowed:leave.has(day)?[2]:[1,2]})),gapRules:[rule]};
+  function valid(days){
+   for(const [a,b] of rule.segments){const ds=days.filter(d=>d>=a&&d<=b);if(rule.includeEdges){ds.unshift(a-1);ds.push(b+1)}for(let n=1;n<ds.length;n++)if(ds[n]-ds[n-1]-1>rule.maxBlank)return false}
+   if(days.length)for(const [a,b] of [[rule.crossMonth.before,days[0]],[days.at(-1),rule.crossMonth.after]]){
+    if(a===null||b===null)continue;let run=0;for(let d=a+1;d<b;d++){run=leave.has(d)?0:run+1;if(run>rule.maxBlank)return false}
+   }return true;
+  }
+  let possible=false;for(let mask=0;mask<64;mask++){const days=data.slots.filter((s,i)=>mask&(1<<i));if(days.length===count&&days.every(s=>s.allowed.includes(1))&&valid(days.map(s=>s.day)))possible=true}
+  const result=solveTargets(data);assert.equal(result.timedOut,false);assert.equal(result.ok,possible,'cross-month trial '+trial);if(result.ok)assert.ok(valid(result.plan.filter(x=>x.id===1).map(x=>data.slots[x.slot].day).sort((a,b)=>a-b)));
+ }
+});
+
+test('real November calendar with leave, cross-month duties and two protected cells solves without search growth',()=>{
+ // Controlled six-person data compiled by the public application's real
+ // eligibility rules: 21 day + 30 night, including 2 protected assignments.
+ const data=require('./fixtures/target-51-cross-month.json');const result=solveTargets(data);validate(data,result);assert.equal(result.plan.length,49);assert.ok(result.nodes<1000,`excessive branching: ${result.nodes}`);console.log('51-duty constrained calendar:',result.nodes,'nodes,',result.elapsed,'ms');
 });
