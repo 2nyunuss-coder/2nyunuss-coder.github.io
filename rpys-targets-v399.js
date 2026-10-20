@@ -202,6 +202,15 @@
     return `Gereken: ${m.required.day} gündüz / ${m.required.night} nöbet · Hedef: ${sum.day} / ${sum.night}${missing?` · ${missing} boş alan`:''}${m.lockedEmpty?` · ${m.lockedEmpty} boş kilitli hücre dağıtım dışında`:''}`;
   }
   // Distribute by the selected employees' actual active days within this unit.
+  function availableOn(id,day){
+    const p=getPersonById(id);
+    if(!p||personStatusAt(p,dateStr(day))!=='Aktif')return false;
+    // Employment status alone does not reflect leave; consult the leave calendar.
+    if(typeof isOnLeave==='function'){
+      try{if(isOnLeave(id,day))return false}catch(e){console.warn('RPYS izin kontrolü',e)}
+    }
+    return true;
+  }
   function fairTargets(m){
     const result=Object.fromEntries(m.ids.map(id=>[id,{...m.fixed[id]}]));
     const calendar={day:new Set(),night:new Set()};
@@ -210,9 +219,8 @@
     const availability={},capacity={};
     for(const id of m.ids){
       availability[id]=empty();capacity[id]=empty();
-      const person=getPersonById(id);
       for(const t of kinds){
-        const n=[...calendar[t]].filter(d=>personStatusAt(person,dateStr(d))==='Aktif').length;
+        const n=[...calendar[t]].filter(d=>availableOn(id,d)).length;
         availability[id][t]=n;capacity[id][t]=Math.max(n,m.fixed[id][t]);
       }
     }
