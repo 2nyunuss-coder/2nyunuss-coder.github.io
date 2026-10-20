@@ -67,11 +67,24 @@ test('authoritative pair rule is compiled before search; alternative satisfies i
 
 function enableGapRule(f){
  f.c.unitRulesV251=()=>({maxGapEnabled:true});f.c.unitMaxGapDaysV251=()=>5;f.c.nonLeaveSegmentsV2414=()=>[[1,30]];f.c.spouseOf=()=>null;
- f.c.v251GapViolations=ids=>ids.flatMap(id=>{const days=f.c.assignmentsMonth().filter(a=>a.person.id===id&&a.col.unit===unit).map(a=>a.day).sort((a,b)=>a-b);let last=0;const bad=[];for(const d of [...days,31]){if(d-last>5)bad.push({id,left:last,right:d});last=d}return bad});
+ f.c.v251GapViolations=ids=>ids.flatMap(id=>{const days=f.c.assignmentsMonth().filter(a=>a.person.id===id&&a.col.unit===unit).map(a=>a.day).sort((a,b)=>a-b);return days.slice(1).flatMap((d,i)=>d-days[i]-1>5?[{id,left:days[i],right:d}]:[])});
 }
-test('actual five-day gap semantics diagnose low target before search; no late full-plan retry',async()=>{
- const f=fixture();enableGapRule(f);const before=JSON.stringify(f.c.db);assert.equal(await f.c.autoDistribute(),false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Recep Duman.*en az 6 ek görev/);
+test('active runtime gap rule allows low targets without synthetic month-boundary duties',async()=>{
+ const f=fixture();enableGapRule(f);const r=await f.c.autoDistribute();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(f.c.v251GapViolations([1,2,3,4,5,6]).length,0);assert.equal(f.saved.length,1);assert.equal(Object.keys(f.c.db.assign).length,51);
 });
-test('feasible 51-duty targets satisfy real head, middle and tail five-day gap semantics',async()=>{
- const f=fixture();enableGapRule(f);const off=new Set([3,4,10,11,17,18,24,25,30]);f.c.isDutyCellApplicable=(t,col,d)=>col.key!=='day'||!off.has(d);const people=f.c.db.manualDistributionTargetsV399['2026-10|'+unit].people;people[1].day=2;people[6].day=4;const r=await f.c.autoDistribute();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(f.c.v251GapViolations([1,2,3,4,5,6]).length,0);assert.equal(f.saved.length,1);assert.equal(Object.keys(f.c.db.assign).length,51);
+test('fixed duties too far apart require intermediate tasks; failure never clears protected cells',async()=>{
+ const f=fixture();enableGapRule(f);for(const d of [1,30]){const k=`2026-10|acil|${d}|night`;f.c.db.assign[k]=6;f.c.db.rpysCellLocks[k]={locked:true}}const before=JSON.stringify(f.c.db);assert.equal(await f.c.autoDistribute(),false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Recep Duman/);
+});
+test('dedicated target entry survives a later replacement of the global legacy autoDistribute',async()=>{
+ const f=fixture();let legacy=0;f.c.autoDistribute=()=>{legacy++};const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(legacy,0);assert.equal(f.saved.length,1);assert.equal(Object.keys(f.c.db.assign).length,51);
+});
+test('target button entry surfaces synchronous startup errors instead of silently returning',async()=>{
+ const f=fixture();f.c.rpysScheduler398.runTargets=()=>{throw Error('startup probe')};assert.equal(await f.c.rpysTargets399.run(),false);assert.match(f.controls.distResult.textContent,/startup probe/);assert.equal(f.saved.length,0);
+});
+
+test('empty lazy defaults and display preferences do not invalidate a pending plan',async()=>{
+ const f=fixture();delete f.c.db.rpysCellLocks;const pending=f.c.rpysTargets399.run();f.c.db.rpysCellLocks={};f.c.db.sayTextObligationReduction={};f.c.db.sayTextNoObligationReduction={};f.c.db.poliklinikTakipConfig={groups:['day'],start:'2026-10-01'};f.c.db.ui={panel:'targets'};f.c.db._meta={heartbeat:'changed'};const result=await pending;assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(f.saved.length,1);assert.equal(f.c.db.ui.panel,'targets');
+});
+test('manual empty overrides and actual assignment edits still reject stale plans',async()=>{
+ for(const field of ['assign','manualDutyOverrides']){const f=fixture(),pending=f.c.rpysTargets399.run();f.c.db[field]['2026-10|acil|1|day']=field==='assign'?null:{};const before=JSON.stringify(f.c.db);assert.equal(await pending,false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0)}
 });

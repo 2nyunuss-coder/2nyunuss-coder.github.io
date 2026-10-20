@@ -2,7 +2,7 @@
 (function(scope){
 'use strict';
 function solveTargets(input){
- const {slots,ids,remaining,conflicts=[],requirements=[],forbidden=[],limits=[],excluded=[]}=input;
+ const {slots,ids,remaining,conflicts=[],requirements=[],forbidden=[],limits=[],gapRules=[],excluded=[]}=input;
  const start=Date.now(),limit=input.timeLimit??3200,maxNodes=input.maxNodes??7000;
  const options=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`)),values=new Map();
  slots.forEach(s=>s.allowed.forEach(id=>values.set(`${s.index}:${id}`,{slot:s.index,id,kind:s.kind})));
@@ -41,6 +41,23 @@ function solveTargets(input){
    if(used===group.max){const banned=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!banned.has(v)));}
   }
   for(const r of requirements)if(!r.values.some(v=>picked.has(v))){const possible=r.values.filter(v=>domains[values.get(v)?.slot]?.includes(v));if(!possible.length)return null;if(possible.length===1)domains[values.get(possible[0]).slot]=[possible[0]]}
+  // The active 6.1.1 rule counts blank days BETWEEN real duties. Month
+  // boundaries do not create synthetic duties or minimum monthly targets.
+  for(const rule of gapRules){
+   const worked=new Set(rule.fixedDays);for(const v of chosen){const x=values.get(v);if(x.id===rule.id)worked.add(slots[x.slot].day)}
+   let minimum=0;
+   for(const [from,to] of rule.segments){const days=[...worked].filter(d=>d>=from&&d<=to).sort((a,b)=>a-b);
+    for(let n=1;n<days.length;n++){const a=days[n-1],b=days[n];if(b-a-1<=rule.maxBlank)continue;
+     minimum+=Math.ceil((b-a)/(rule.maxBlank+1))-1;
+     for(const [lo,hi] of [[a+1,a+rule.maxBlank+1],[b-rule.maxBlank-1,b-1]]){
+      const possible=slots.filter(s=>s.day>=lo&&s.day<=hi&&domains[s.index]!==null).flatMap(s=>domains[s.index].filter(v=>values.get(v).id===rule.id));
+      if(!possible.length){lastFailure=`${input.names?.[rule.id]||('#'+rule.id)}: ${a}. ve ${b}. gün görevleri arasındaki ${rule.maxBlank} boş gün sınırı karşılanamıyor.`;return null}
+      if(possible.length===1)domains[values.get(possible[0]).slot]=possible;
+     }
+    }
+   }
+   if(minimum>left[rule.id].day+left[rule.id].night){lastFailure=`${input.names?.[rule.id]||('#'+rule.id)}: görev aralığı için en az ${minimum} ek görev gerekiyor; kalan hedef ${left[rule.id].day} gündüz + ${left[rule.id].night} nöbet.`;return null}
+  }
   for(const d of domains)if(d!==null&&!d.length)return null;
   if(chosen.length===slots.length){if(excluded.some(p=>p.every(v=>picked.has(v))))return null;return chosen}
   const signature=domains.map(d=>d===null?'#':d.join(',')).join(';')+'|'+ids.map(id=>left[id].day+','+left[id].night).join(';')+'|'+chosen.slice().sort().join(',');

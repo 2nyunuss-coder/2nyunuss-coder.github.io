@@ -66,18 +66,11 @@
   function requirementsFor(m){
     const rows=assignmentsMonth(),requirements=[],rules=unitRulesV251(m.u);
     for(const id of m.ids){
-      const fixedDays=new Set(rows.filter(a=>Number(a.person.id)===id&&a.col.unit===m.u).map(a=>Number(a.day)));
       const workDays=new Set(rows.filter(a=>Number(a.person.id)===id).map(a=>Number(a.day)));
       const active=d=>personStatusAt(getPersonById(id),dateStr(d))==='Aktif';
       for(let d=1;d<=daysInMonth();d++)if(active(d)&&!workDays.has(d)&&
         ((rules.returnMonday&&isReturnMondayRequiredV251(id,d,m.u))||(rules.preLeaveThursday&&isPreLeaveThursdayRequiredV251(id,d,m.u))))requirements.push({id,days:new Set([d]),reason:'izin dönüşü/öncesi'});
-      if(rules.maxGapEnabled){
-        const gap=Number(unitMaxGapDaysV251(m.u)||5);
-        for(const [a,b] of nonLeaveSegmentsV2414(id))for(let left=a;left+gap-1<=b;left++){
-          const days=Array.from({length:gap},(_,i)=>left+i);
-          if(days.every(active)&&!days.some(d=>fixedDays.has(d)))requirements.push({id,days:new Set(days),reason:`${gap} gün görev aralığı`});
-        }
-      }
+
     }
     return requirements;
   }
@@ -138,8 +131,28 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261020-1',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261020-2',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null;
+  let feedback={text:'',tone:'',busy:false};
+  function report(text,tone='progress',busy=preparing){
+    feedback={text:String(text||''),tone,busy};
+    const panel=document.getElementById('rpysTargetPanel399'),box=panel?.querySelector?.('[data-target-feedback]');
+    if(box){box.hidden=!feedback.text;box.textContent=feedback.text;box.dataset.tone=tone;box.setAttribute('role',tone==='error'?'alert':'status')}
+    for(const b of panel?.querySelectorAll?.('[data-target-action="run"]')||[]){b.disabled=busy||isMonthLocked();b.textContent=busy?'Hesaplanıyor…':'Hedeflere Göre Dağıt';b.setAttribute('aria-busy',String(busy))}
+    const legacy=document.getElementById('distResult');if(legacy)legacy.textContent=feedback.text;
+  }
+  async function runTargets(){
+    try{
+      if(preparing){report('Dağıtım zaten hesaplanıyor. Sonuç bu panelde gösterilecek.','progress',true);return false}
+      if(isMonthLocked())throw Error('Bu ay kilitli. Liste değiştirilmedi.');
+      const u=document.getElementById('autoUnit')?.value;
+      if(!u)throw Error('Önce birimi ve personelleri seçin.');
+      report('Hedef dağıtımı başlatılıyor…','progress',true);
+      editableConfig(u).enabled=true;
+      if(typeof window.rpysScheduler398?.runTargets!=='function')throw Error('Güvenli hedef dağıtım motoru yüklenemedi. Sayfayı yenileyin.');
+      return await window.rpysScheduler398.runTargets();
+    }catch(e){report(e.message||String(e),'error',false);console.error('RPYS hedef düğmesi',e);return false}
+  }
   function hasPrepared(u){return prepared?.u===u}
   async function planningData(u){
     const m=model(u),targets=readTargets(m);
@@ -219,18 +232,30 @@
         if(chosenDays.length>need)throw Error(`${getPersonById(id).name}: kalan hedef ${remaining[id].day} gündüz + ${remaining[id].night} nöbet = ${need} görev. Mevcut görev aralığı/izin dönüşü kuralları en az ${chosenDays.length} ek görev gerektiriyor. Hedef toplamı en az ${m.fixed[id].day+m.fixed[id].night+chosenDays.length} olmalı; diğer personellerin toplamları buna göre yeniden dengelenmeli. Hedefler değiştirilmedi.`);
       }
       const requirements=obligations.map(r=>({values:m.slots.filter(s=>r.days.has(s.day)&&s.allowed.includes(r.id)).map(s=>`${s.index}:${r.id}`)}));
-      return {m,targets,input:{ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,kind:s.kind,allowed:s.allowed})),conflicts,requirements,limits}};
+      return {m,targets,input:{ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,allowed:s.allowed})),conflicts,requirements,limits,gapRules:unitRulesV251(u).maxGapEnabled?m.ids.map(id=>({id,maxBlank:Number(unitMaxGapDaysV251(u)||5),segments:nonLeaveSegmentsV2414(id),fixedDays:rows.filter(a=>Number(a.person.id)===id&&a.col.unit===u).map(a=>Number(a.day))})):[]}};
     }finally{db=live;clearCache()}
   }
+  function planningFingerprint(){
+    const ignored=new Set(['_meta','ui','auditLog','poliklinikTakipConfig','polTrackConfig']);
+    const exact=new Set(['assign','assignmentMeta','manualDutyOverrides','rpysCellLocks','unitPools','staff','leaves','importedRecords']);
+    function canonical(value,preserve=false){
+      if(value===null||typeof value!=='object')return value;
+      if(Array.isArray(value)){const result=value.map(v=>canonical(v,preserve));return result.length||preserve?result:undefined}
+      const result={};for(const k of Object.keys(value).sort()){const v=canonical(value[k],preserve);if(v!==undefined)result[k]=v}
+      return Object.keys(result).length||preserve?result:undefined;
+    }
+    const state={};for(const k of Object.keys(db).sort())if(!ignored.has(k)){const v=canonical(db[k],exact.has(k));if(v!==undefined&&!(v&&typeof v==='object'&&Object.keys(v).length===0))state[k]=v}
+    return JSON.stringify(state);
+  }
   async function prepare(u,resume){
-    if(preparing)return false;
-    if(isMonthLocked())return false;
+    if(preparing){report('Dağıtım zaten hesaplanıyor.','progress',true);return false;}
+    if(isMonthLocked()){report('Bu ay kilitli. Liste değiştirilmedi.','error',false);return false;}
     preparing=true;let worker,timer;
-    const box=document.getElementById('distResult');
-    if(box)box.textContent='Hedefler ve uygun günler denetleniyor; geçici plan arka planda hazırlanıyor…';
+    report('Hedefler ve uygun günler denetleniyor; geçici plan arka planda hazırlanıyor…','progress',true);
     try{
-      const fingerprint=JSON.stringify(db),month=ym(),data=await planningData(u);
+      const fingerprint=planningFingerprint(),month=ym(),data=await planningData(u);
       if(typeof Worker!=='function')throw Error('Bu tarayıcı arka plan hesaplamasını desteklemiyor. Güncel bir tarayıcı kullanın; liste değiştirilmedi.');
+      report('Uygunluk denetimi tamamlandı. Takvime yerleştirme hesaplanıyor…','progress',true);
       worker=new Worker(workerURL);
       const excluded=[];const started=Date.now();let result;
       for(;;){
@@ -247,7 +272,7 @@
           const details=data.m.ids.flatMap(id=>kinds.map(t=>`${getPersonById(id).name}: ${data.targets[id][t]} ${labels[t]} (korunan ${data.m.fixed[id][t]}, uygun gün ${new Set(data.m.slots.filter(s=>s.kind===t&&s.allowed.includes(id)).map(s=>s.day)).size})`));
           throw Error((result.timedOut?'Verilen sürede geçerli plan bulunamadı; bu sonuç hedeflerin imkânsız olduğunu kanıtlamaz.':'Hedefler ortak uygun günler ve görev çakışmalarıyla birlikte karşılanamıyor.')+'\n'+(result.error||result.lastFailure||'İzin, nöbet ertesi dinlenme ve özel kuralları kontrol edin.')+'\n'+explanation+'\n'+details.join('\n'));
         }
-        if(ym()!==month||JSON.stringify(db)!==fingerprint||document.getElementById('autoUnit')?.value!==u||JSON.stringify(selected(u))!==JSON.stringify(data.m.ids)||model(u).rebuild!==data.m.rebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Yeni bilgilerle dağıtımı tekrar başlatın; plan kaydedilmedi.');
+        if(ym()!==month||planningFingerprint()!==fingerprint||document.getElementById('autoUnit')?.value!==u||JSON.stringify(selected(u))!==JSON.stringify(data.m.ids)||model(u).rebuild!==data.m.rebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Yeni bilgilerle dağıtımı tekrar başlatın; plan kaydedilmedi.');
         // Full RPYS rules remain authoritative. Reject an invalid complete plan and
         // continue with a no-good constraint, without ever exposing draft assignments.
         const live=db;db=JSON.parse(JSON.stringify(live));clearCache();let verdict;
@@ -263,8 +288,8 @@
       }
       prepared={u,plan:result.plan.map(x=>({id:x.id,slot:data.m.slots[x.slot]})),nodes:result.nodes};
       return resume();
-    }catch(e){if(box)box.textContent=e.message||String(e);alert('Dağıtım uygulanmadı; mevcut liste ve hedefler korundu.\n\n'+(e.message||e));return false}
-    finally{clearTimeout(timer);worker?.terminate();preparing=false;prepared=null}
+    }catch(e){report(e.message||String(e),'error',false);alert('Dağıtım uygulanmadı; mevcut liste ve hedefler korundu.\n\n'+(e.message||e));return false}
+    finally{clearTimeout(timer);worker?.terminate();preparing=false;prepared=null;report(feedback.text,feedback.tone,false)}
   }
   function distribute(u){
     if(!window.rpysScheduler398?.running())throw Error('Güvenli dağıtım oturumu gerekli.');
@@ -300,7 +325,7 @@
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
     db.manualDistributionResultsV399??={};db.manualDistributionResultsV399[key(u)]={at:new Date().toISOString(),engine:'6.1.1-csp-worker',targets,actual,filled:result.plan.length};
     saveNowV245({allowAssignDrop:m.rebuild,label:`${u} elle gündüz/nöbet hedeflerine göre dağıtım`});
-    renderAll();render();const box=document.getElementById('distResult');if(box)box.textContent=`${u}: ${result.plan.length} görev yerleştirildi. Seçili ${m.ids.length} personelin gündüz ve nöbet hedefleri tam karşılandı. Manuel/kilitli kayıtlar korundu.`;
+    renderAll();render();report(`${u}: ${result.plan.length} görev yerleştirildi. Seçili ${m.ids.length} personelin gündüz ve nöbet hedefleri tam karşılandı. Manuel/kilitli kayıtlar korundu.`,'success',false);
     return result;
   }
   function totals(m){
@@ -382,7 +407,9 @@
     const pick=document.getElementById('autoPeople'),layout=pick?.closest('.autoBox');if(!layout)return;
     const u=document.getElementById('autoUnit')?.value;if(!u)return;
     let host=document.getElementById('rpysTargetPanel399');if(!host){host=document.createElement('section');host.id='rpysTargetPanel399';layout.appendChild(host);layout.classList.add('rpysTargetsLayout399');}
-    if(host.contains(document.activeElement)&&document.activeElement?.tagName==='INPUT')return;
+    // Keep the pressed run button alive until its click is delivered. A queued
+    // render between pointerdown and click otherwise replaces the event target.
+    if(host.contains(document.activeElement)&&(document.activeElement?.tagName==='INPUT'||document.activeElement?.matches?.('[data-target-action=run]')&&!preparing))return;
     const m=model(u),cfg=config(u),locked=isMonthLocked(),disabled=locked?'disabled':'';
     let fairness=null;try{fairness=fairTargets(m)}catch(e){console.warn('RPYS fair target preview',e)}
     host.innerHTML=`<h3>Personel Gündüz / Nöbet Hedefleri</h3><div class="smallhelp">${escape(ym())} · ${escape(u)}</div>
@@ -393,7 +420,8 @@
         const p=getPersonById(id),v=cfg.people?.[id]||{};
         return `<tr><th scope="row">${escape(p.name)}<small>Uygun gün: ${fairness?fairness.availability[id].day+" G / "+fairness.availability[id].night+" N":"—"} · Korunan: ${m.fixed[id].day} G / ${m.fixed[id].night} N</small></th>${kinds.map(t=>`<td><input type="number" min="0" max="1000" step="1" inputmode="numeric" data-target-id="${id}" data-target-kind="${t}" aria-label="${escape(p.name)} ${labels[t]} hedefi" value="${v[t]==null?'':escape(v[t])}" placeholder="0" ${disabled}></td>`).join('')}<td>${m.actual[id].day} / ${m.actual[id].night}</td><td data-target-diff="${id}">${kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ')}</td></tr>`;
       }).join('')||'<tr><td colspan="5">Soldan personelleri seç.</td></tr>'}</tbody></table></div>
-      <div class="rpysTargetActions399"><button class="btn alt" data-target-action="history">Geçmiş Görev İstatistikleri</button><button class="btn alt" data-target-action="equal" ${disabled}>İzinlere Göre Adil Hedef Öner</button><button class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button class="btn" data-target-action="run" ${disabled}>Hedeflere Göre Dağıt</button></div>
+      <div class="rpysTargetActions399"><button type="button" class="btn alt" data-target-action="history">Geçmiş Görev İstatistikleri</button><button type="button" class="btn alt" data-target-action="equal" ${disabled}>İzinlere Göre Adil Hedef Öner</button><button type="button" class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button type="button" class="btn" data-target-action="run" ${preparing?'disabled':disabled} aria-busy="${preparing}">${preparing?'Hesaplanıyor…':'Hedeflere Göre Dağıt'}</button></div>
+      <div data-target-feedback class="rpysTargetFeedback399" role="${feedback.tone==='error'?'alert':'status'}" aria-live="polite" data-tone="${escape(feedback.tone)}" ${feedback.text?'':'hidden'}>${escape(feedback.text)}</div>
       ${historyMarkup(m)}\n      <p class="smallhelp">Hedefler otomatik kaydedilir. Elle hedefler açıkken dağıtım düğmeleri bu sayıları kullanır. Kilitli ve manuel hücreler değişmez; izin ve dinlenme kuralları korunur. Adil hedef önerisi seçilen personelin izinlerini ve korunan görevlerini hesaba katar; günlere uygunluk dağıtımda ayrıca kontrol edilir.</p>`;
   }
   let queued=false;
@@ -415,14 +443,22 @@
     persist();const m=model(u),host=document.getElementById('rpysTargetPanel399');host.querySelector('.rpysTargetSummary399').textContent=totals(m);
     for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
   }
-  window.rpysTargets399={enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets};
+  window.rpysTargets399={enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,reportError:message=>report(message,'error',false)};
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
-  document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-target-action]');if(!b)return;
-    if(isMonthLocked()&&b.dataset.targetAction!=='history')return alert('Bu ay kilitli.');
-    if(b.dataset.targetAction==='history'){historyVisible=!historyVisible;render();}else if(b.dataset.targetAction==='equal')suggest();else if(b.dataset.targetAction==='current')suggest(true);else{const u=document.getElementById('autoUnit')?.value;editableConfig(u).enabled=true;persist();window.autoDistribute();queueRender();}
-  });
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#rpysTargetPanel399 [data-target-action]');if(!b)return;
+    e.preventDefault();e.stopPropagation();
+    try{
+      const action=b.dataset.targetAction;
+      if(action==='run'){void runTargets();return}
+      if(isMonthLocked()&&action!=='history'){report('Bu ay kilitli.','error',false);return}
+      if(action==='history'){historyVisible=!historyVisible;render()}
+      else if(action==='equal')suggest();else if(action==='current')suggest(true);
+    }catch(e){report(e.message||String(e),'error',false)}
+  },true);
   const style=document.createElement('style');style.textContent=`
+    .rpysTargetFeedback399{white-space:pre-wrap;padding:10px;margin-top:10px;border:1px solid var(--line,#cbd5e1);border-radius:8px;overflow-wrap:anywhere}.rpysTargetFeedback399[data-tone=error]{border-color:#dc2626}.rpysTargetFeedback399[hidden]{display:none}
     .rpysTargetsLayout399{grid-template-columns:minmax(160px,.55fr) minmax(310px,1fr) minmax(390px,1.15fr)}
     #rpysTargetPanel399{padding:14px;border:1px solid var(--line,#cbd5e1);border-radius:12px;background:var(--panel,var(--card,#fff));color:var(--text,#172b4d);min-width:0}
     #rpysTargetPanel399 h3{margin:0 0 8px}#rpysTargetPanel399 .rpysTargetsToggle399{display:flex;gap:8px;align-items:center;margin:12px 0;color:inherit}

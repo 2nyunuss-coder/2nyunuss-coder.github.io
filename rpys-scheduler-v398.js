@@ -1,7 +1,8 @@
 /* Safety repairs around the existing 6.1.1 engine; no data migration. */
 (()=>{
+  if(window.rpysScheduler398?.runTargets)return;
   const clone=x=>JSON.parse(JSON.stringify(x)), own=(o,k)=>Object.prototype.hasOwnProperty.call(o||{},k);
-  let run=null;
+  let run=null,targetRunner=null;
   const invalidate=()=>{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null};
   function sayHoursOnly(key,data=db){
     const override=data.manualDutyOverrides?.[key],meta=data.assignmentMeta?.[key];
@@ -166,10 +167,10 @@
         }
       }catch(e){db=before;invalidate();error=e}
       finally{for(const [key,original] of Object.entries(saved))window[key]=original;for(const [key,original] of Object.entries(staticQueries))window[key]=original;window.dutyColumnByKey=lookup;if(allMonths)window.allAssignmentsAllMonths=allMonths;if(overlap)window.personHasOverlap=overlap;run=null}
-      if(error){try{renderAll()}catch(_){}console.error('RPYS398 motor koruması',error,error.cellKey||'');alert('İşlem tamamlanamadı; önceki liste aynen korundu.\n\n'+(error.message||error));return false}
+      if(error){try{renderAll()}catch(_){}console.error('RPYS398 motor koruması',error,error.cellKey||'');window.rpysTargets399?.reportError?.(error.message||String(error));alert('İşlem tamamlanamadı; önceki liste aynen korundu.\n\n'+(error.message||error));return false}
       if(pending.length){const saveFn=saved.saveNowV245||saved.save;saveFn?.({allowAssignDrop:rebuild,label:'6.1.1 güvenli liste dağıtımı'});}
       invalidate();return value;
-    };fn.__rpys398=true;window[name]=fn;
+    };fn.__rpys398=true;window[name]=fn;if(name==='autoDistribute')targetRunner=fn;
   }
   function install(){
     if(typeof window.autoDistribute!=='function'||typeof window.canTakeShift!=='function')return;
@@ -177,7 +178,12 @@
     ['autoDistribute','runPolRotation2','distributeSkopiSequential'].forEach(wrapRun);
     document.documentElement.dataset.rpysSchedulerSafety='398';
   }
-  window.rpysScheduler398={repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,running:()=>!!run};
+  function runTargets(){
+    if(!targetRunner)install();
+    if(!targetRunner)throw Error('Güvenli hedef dağıtım motoru henüz yüklenemedi. Sayfayı yenileyin.');
+    return targetRunner();
+  }
+  window.rpysScheduler398={runTargets,repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);

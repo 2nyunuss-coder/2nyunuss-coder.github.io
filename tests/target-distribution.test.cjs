@@ -23,11 +23,11 @@ test('CSP feasibility agrees with exhaustive enumeration on 150 seeded small con
  let seed=904;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n};
  for(let trial=0;trial<150;trial++){
   const ids=[1,2,3],remaining=Object.fromEntries(ids.map(id=>[id,{day:0,night:0}]));
-  const slots=Array.from({length:6},(_,index)=>{const kind=index%2?'night':'day';remaining[1+random(3)][kind]++;return {index,kind,allowed:ids.filter(()=>random(4)!==0)}}),conflicts=[];
+  const slots=Array.from({length:6},(_,index)=>{const kind=index%2?'night':'day';remaining[1+random(3)][kind]++;return {index,day:index+1,kind,allowed:ids.filter(()=>random(4)!==0)}}),conflicts=[];
   for(let i=0;i<6;i++)for(let j=i+1;j<6;j++)for(const id of ids)if(random(5)===0)conflicts.push([`${i}:${id}`,`${j}:${id}`]);
   const requirements=trial%3===0?[{values:['0:1','2:1','4:1']}]:[],limits=trial%4===0?[{values:['1:2','3:2','5:2'],max:1}]:[];
-  const data={ids,remaining,slots,conflicts,requirements,limits};
-  function brute(i,picked,left){if(i===6)return ids.every(id=>left[id].day===0&&left[id].night===0)&&requirements.every(r=>r.values.some(v=>picked.has(v)))&&limits.every(r=>r.values.filter(v=>picked.has(v)).length<=r.max);
+  const gapRules=trial%5===0?[{id:1,maxBlank:1,segments:[[1,6]],fixedDays:[]}]:[];const data={ids,remaining,slots,conflicts,requirements,limits,gapRules};
+  function brute(i,picked,left){if(i===6)return ids.every(id=>left[id].day===0&&left[id].night===0)&&requirements.every(r=>r.values.some(v=>picked.has(v)))&&limits.every(r=>r.values.filter(v=>picked.has(v)).length<=r.max)&&gapRules.every(r=>{const days=[...picked].filter(v=>Number(v.split(':')[1])===r.id).map(v=>slots[Number(v.split(':')[0])].day).sort((a,b)=>a-b);return days.slice(1).every((d,n)=>d-days[n]-1<=r.maxBlank)});
    for(const id of slots[i].allowed){const kind=slots[i].kind,v=`${i}:${id}`;if(!left[id][kind]||conflicts.some(([a,b])=>(a===v&&picked.has(b))||(b===v&&picked.has(a))))continue;left[id][kind]--;picked.add(v);if(brute(i+1,picked,left))return true;picked.delete(v);left[id][kind]++}return false}
   const expected=brute(0,new Set(),structuredClone(remaining)),result=solveTargets(data);assert.equal(result.timedOut,false);assert.equal(result.ok,expected,'trial '+trial);
  }
@@ -35,4 +35,8 @@ test('CSP feasibility agrees with exhaustive enumeration on 150 seeded small con
 
 test('browser Worker entry accepts a structured message and posts the result',()=>{
  const vm=require('node:vm'),fs=require('node:fs');let result;const self={postMessage:value=>{result=value}};vm.runInNewContext(fs.readFileSync(require.resolve('../rpys-target-worker.js'),'utf8'),{self});const data=example();self.onmessage({data});validate(data,result);
+});
+
+test('gap constraints match active runtime: five blank days between real duties; no boundary minimum',()=>{
+ const data={ids:[1],remaining:{1:{day:2,night:0}},slots:[{index:0,day:1,kind:'day',allowed:[1]},{index:1,day:7,kind:'day',allowed:[1]}],gapRules:[{id:1,maxBlank:5,segments:[[1,30]],fixedDays:[]}]};assert.equal(solveTargets(data).ok,true);data.slots[1].day=8;assert.equal(solveTargets(data).ok,false);data.slots[0].day=23;data.slots[1].day=29;assert.equal(solveTargets(data).ok,true);
 });
