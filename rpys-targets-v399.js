@@ -64,20 +64,21 @@
     return targets;
   }
   // Bounded constraint search: place the most constrained remaining cell first.
-  function solve({slots,ids,remaining,canPlace,place,remove,requirements=[],finalCheck=()=>true,maxNodes=25000,timeLimit=9000}){
+  function solve({slots,ids,remaining,canPlace,place,remove,requirements=[],finalCheck=()=>true,maxNodes=80000,timeLimit=18000}){
     const start=Date.now(),plan=[],unitDays=Object.fromEntries(ids.map(id=>[id,new Set()]));let nodes=0,timedOut=false,lastFailure='';
     slots=slots.slice().sort((a,b)=>a.day-b.day||(a.kind==='night'?-1:1)-(b.kind==='night'?-1:1)||a.key.localeCompare(b.key));
     function feasible(i){
       for(const id of ids)for(const t of kinds)if(remaining[id][t]<0)return false;
       const available=new Map(),capacity=Object.fromEntries(ids.map(id=>[id,empty()]));
-      for(const s of slots.slice(i)){
+      for(let j=i;j<slots.length;j++){
+        const s=slots[j];
         const options=s.allowed.filter(id=>remaining[id][s.kind]>0&&!unitDays[id].has(s.day)&&canPlace(id,s));
         if(!options.length)return false;available.set(s,options);for(const id of options)capacity[id][s.kind]++;
       }
       for(const id of ids)for(const t of kinds)if(remaining[id][t]>capacity[id][t])return false;
       for(const r of requirements){
         if([...unitDays[r.id]].some(d=>r.days.has(d)))continue;
-        if(!slots.slice(i).some(s=>r.days.has(s.day)&&available.get(s)?.includes(r.id)))return false;
+        if(!slots.some((s,j)=>j>=i&&r.days.has(s.day)&&available.get(s)?.includes(r.id)))return false;
       }
       available.capacity=capacity;return available;
     }
@@ -187,7 +188,7 @@
     for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun hücre yok.`);
     for(const s of m.slots)if(!s.allowed.length)throw Error(`${s.day}. gün ${s.col.shift||s.col.key}: hedefi kalan uygun personel yok (izin, dinlenme, başka görev veya korunan kayıt).`);
     const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,...searchAdapter(m)});
-    if(!result.ok)throw Error(result.timedOut?'Hedefler için arama süresi doldu; listeye değişiklik uygulanmadı. Korunan kayıtları, izinleri ve hedef sayılarını kontrol et.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
+    if(!result.ok)throw Error(result.timedOut?'Hedef dağıtımı arama sınırına ulaştı; liste korunuyor. İzinler ve nöbet ertesi dinlenme nedeniyle hedefler yerleştirilemiyor olabilir. Hedef sayıları veya personel havuzunu gözden geçir.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
     clearCache();const actual=model(u,m.ids).actual;
     for(const id of m.ids)for(const t of kinds)if(actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
