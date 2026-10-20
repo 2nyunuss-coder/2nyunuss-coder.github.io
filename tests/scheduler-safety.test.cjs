@@ -108,3 +108,8 @@ test('Skopi leaves an unfillable shift empty instead of introducing a rest viola
  f.cols.long.unit='PORTABL + SKOPİ';f.c.db.assign['2026-10|pol|5|long']=1;
  f.c.distributeSkopiSequential();assert.equal(f.c.db.assign['2026-10|pol|6|long'],undefined);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
 });
+test('scoped monthly rest validation includes both month boundaries and excludes unrelated history',()=>{
+ const {c}=fixture();c.db.staff.push({id:3,name:'Other person',status:'Aktif'});
+ c.db.assign={'2026-08|pol|20|long':1,'2026-08|pol|21|day':1,'2026-09|pol|30|long':1,'2026-10|pol|1|day':1,'2026-10|pol|3|long':1,'2026-10|pol|4|day':1,'2026-10|pol|31|long':1,'2026-11|pol|1|day':1,'2026-10|pol|7|long':3,'2026-10|pol|8|day':3};
+ const scoped=c.rpysRest16V397.allViolationsForMonth([1],'2026-10');assert.equal(scoped.size,3);assert.ok([...scoped.keys()].some(k=>k.includes('2026-09-30|2026-10-01')));assert.ok([...scoped.keys()].some(k=>k.includes('2026-10-31|2026-11-01')));assert.equal(c.rpysRest16V397.allViolations().size,5);
+});

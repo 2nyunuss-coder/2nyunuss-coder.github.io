@@ -51,7 +51,7 @@ test('actual target button: queued render, legacy replacement, real Worker and v
   assert.equal(await page.evaluate(()=>{const old=document.querySelector('[data-target-action=run]');rpysTargets399.render();return old===document.querySelector('[data-target-action=run]')}),true,'a queued refresh must retain the pressed button');
   await page.mouse.up();
   const pending=await page.evaluate(()=>({busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy'),message:document.querySelector('[data-target-feedback]').textContent}));
-  assert.equal(pending.busy,'true');assert.match(pending.message,/denetleniyor|hesaplanıyor/);
+  assert.equal(pending.busy,'true');assert.match(pending.message,/denetleniyor|hesaplanıyor|Uygun günler|Görev çakışmaları/);
   await page.waitForFunction(()=>fixtureResult.saved.length===1);
   const result=await page.evaluate(()=>({filled:Object.keys(db.assign).length,saves:fixtureResult.saved.length,legacy:legacyCalls,actual:rpysTargets399.model(autoUnit.value).actual,feedback:document.querySelector('[data-target-feedback]').textContent,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
   assert.equal(result.filled,51);assert.equal(result.saves,1);assert.equal(result.legacy,0);assert.equal(result.busy,'false');assert.match(result.feedback,/tam karşılandı/);
@@ -61,9 +61,17 @@ test('actual target button: queued render, legacy replacement, real Worker and v
   await page.waitForFunction(()=>document.querySelector('[data-target-feedback]').dataset.tone==='error');
   const failed=await page.evaluate(()=>({text:document.querySelector('[data-target-feedback]').textContent,unchanged:JSON.stringify(db.assign)===successAssignments,saves:fixtureResult.saved.length,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
   assert.match(failed.text,/hedef toplamı/);assert.equal(failed.unchanged,true);assert.equal(failed.saves,1);assert.equal(failed.busy,'false');
-  await page.evaluate(()=>{rpysScheduler398.runTargets=()=>{throw Error('startup probe')}});
+  await page.evaluate(()=>{window.savedTargetRunner=rpysScheduler398.runTargets;rpysScheduler398.runTargets=()=>{throw Error('startup probe')}});
   await button.click();
   await page.waitForFunction(()=>document.querySelector('[data-target-feedback]').textContent.includes('startup probe'));
+  await page.evaluate(()=>{rpysScheduler398.runTargets=savedTargetRunner;rpysTargets399.config(autoUnit.value).people[1].day=5;window.Worker=class{postMessage(){window.stallStarted=true}terminate(){window.stallTerminated=true}}});
+  await button.click();await page.waitForFunction(()=>window.stallStarted===true);
+  const cancelButton=page.locator('[data-target-action=cancel]');await cancelButton.scrollIntoViewIfNeeded();const cancelBounds=await cancelButton.boundingBox();await page.mouse.move(cancelBounds.x+cancelBounds.width/2,cancelBounds.y+cancelBounds.height/2);await page.mouse.down();
+  assert.equal(await page.evaluate(()=>{const old=document.querySelector('[data-target-action=cancel]');rpysTargets399.render();return old===document.querySelector('[data-target-action=cancel]')}),true);
+  await page.mouse.up();
+  await page.waitForFunction(()=>document.querySelector('[data-target-feedback]').textContent.includes('iptal edildi'));
+  const cancelled=await page.evaluate(()=>({unchanged:JSON.stringify(db.assign)===successAssignments,saves:fixtureResult.saved.length,terminated:window.stallTerminated,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy'),hidden:document.querySelector('[data-target-action=cancel]').hidden}));
+  assert.equal(cancelled.unchanged,true);assert.equal(cancelled.saves,1);assert.equal(cancelled.terminated,true);assert.equal(cancelled.busy,'false');assert.equal(cancelled.hidden,true);
   assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });

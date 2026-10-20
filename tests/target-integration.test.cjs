@@ -58,11 +58,10 @@ test('selection and month changes during work reject plan without restoring stal
 test('special monthly limit is diagnosed before worker search and leaves all data intact',async()=>{
  const f=fixture();f.c.db.customTextRules=[{active:true,unit,kind:'personUnitMonthlyMax',personId:1,max:2}];const before=JSON.stringify(f.c.db);assert.equal(await f.c.autoDistribute(),false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Berk Yaşar.*özel kural/);
 });
-test('authoritative pair rule is compiled before search; alternative satisfies it before one commit',async()=>{
- const f=fixture(),data=await f.c.rpysTargets399.planningData(unit),first=require('../rpys-target-worker.js').solveTargets(data.input),mine=first.plan.filter(x=>x.id===1).slice(0,2).map(x=>data.m.slots[x.slot].day);
- const base=f.c.canTakeShiftV2414;let rejected=0;
- f.c.canTakeShiftV2414=(id,d,col,u)=>{if(id===1&&mine.includes(d)&&f.c.assignmentsMonth().some(a=>a.person.id===1&&mine.includes(a.day)&&a.day!==d)){rejected++;return false}return base(id,d,col,u)};
- const result=await f.c.autoDistribute();assert.equal(result.ok,true,f.alerts.join('\n'));assert.ok(rejected>0);assert.equal(f.saved.length,1);const rows=f.c.assignmentsMonth().filter(a=>a.person.id===1&&mine.includes(a.day));assert.ok(rows.length<2);
+test('supported consecutive-duty rule is compiled without all-pairs eligibility rescans',async()=>{
+ const f=fixture();f.c.db.customTextRules=[{active:true,kind:'unitConsecutive',unit,maxConsecutive:1}];const base=f.c.canTakeShiftV2414;let calls=0;f.c.canTakeShiftV2414=(...args)=>{calls++;return base(...args)};
+ const result=await f.c.autoDistribute();assert.equal(result.ok,true,f.alerts.join('\n'));assert.ok(calls<1000,`too many eligibility queries: ${calls}`);assert.equal(f.saved.length,1);
+ for(const id of [1,2,3,4,5,6]){const days=f.c.assignmentsMonth().filter(a=>a.person.id===id).map(a=>a.day).sort((a,b)=>a-b);assert.ok(days.slice(1).every((d,i)=>d-days[i]>1))}
 });
 
 function enableGapRule(f){
@@ -87,4 +86,31 @@ test('empty lazy defaults and display preferences do not invalidate a pending pl
 });
 test('manual empty overrides and actual assignment edits still reject stale plans',async()=>{
  for(const field of ['assign','manualDutyOverrides']){const f=fixture(),pending=f.c.rpysTargets399.run();f.c.db[field]['2026-10|acil|1|day']=field==='assign'?null:{};const before=JSON.stringify(f.c.db);assert.equal(await pending,false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0)}
+});
+
+test('draft history and assignment caches survive every cooperative yield',async()=>{
+ const f=fixture();let tick=0,builds=0;f.c.Date=class extends Date{static now(){return tick}};
+ const all=f.c.allAssignmentsAllMonths,eligibility=f.c.canTakeShiftV2414;f.c.allAssignmentsAllMonths=()=>{builds++;return all()};f.c.canTakeShiftV2414=(...args)=>{tick+=2;return eligibility(...args)};
+ const before=JSON.stringify(f.c.db),original=f.c.allAssignmentsAllMonths;await f.c.rpysTargets399.planningData(unit);assert.equal(builds,1);assert.equal(f.c.allAssignmentsAllMonths,original);assert.equal(f.c.rpysTargets399.isPlanning(),false);assert.equal(JSON.stringify(f.c.db),before);
+});
+test('preparation deadline restores state and prevents an unbounded calculating screen',async()=>{
+ const f=fixture();let tick=0;f.c.Date=class extends Date{static now(){return tick}};const base=f.c.canTakeShiftV2414;f.c.canTakeShiftV2414=(...args)=>{tick+=1100;return base(...args)};const before=JSON.stringify(f.c.db);assert.equal(await f.c.rpysTargets399.run(),false);assert.match(f.controls.distResult.textContent,/hazırlığı zamanında tamamlanamadı/);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.c.rpysTargets399.isPlanning(),false);assert.equal(f.saved.length,0);
+});
+test('cancel during preparation restores the complete original state',async()=>{
+ const f=fixture(),before=JSON.stringify(f.c.db),pending=f.c.rpysTargets399.run();assert.equal(f.c.rpysTargets399.cancel(),true);assert.equal(await pending,false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.controls.distResult.textContent,/iptal edildi/);assert.equal(f.c.rpysTargets399.cancel(),false);
+});
+test('cancel while Worker is pending immediately terminates it and releases the button',async()=>{
+ const f=fixture();let signal,terminated=false;const started=new Promise(r=>{signal=r});f.c.Worker=class{postMessage(){signal()}terminate(){terminated=true}};const before=JSON.stringify(f.c.db),pending=f.c.rpysTargets399.run();await started;assert.equal(f.c.rpysTargets399.cancel(),true);assert.equal(await pending,false);assert.equal(terminated,true);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.controls.distResult.textContent,/iptal edildi/);
+});
+
+test('cache signature scans are bypassed only while an isolated draft is active',async()=>{
+ const f=fixture();f.c.signatureChecks=0;const source="(()=>{let lastSig='';function sig(){window.signatureChecks++;return 'live'}function invalidate(){}const old=()=>true;return function(){let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)}})()";f.c.probe=vm.runInContext(f.c.rpysScheduler398.repairCache(source),f.c);const base=f.c.canTakeShiftV2414;f.c.canTakeShiftV2414=(...args)=>{f.c.probe();return base(...args)};await f.c.rpysTargets399.planningData(unit);assert.equal(f.c.signatureChecks,0);f.c.probe();assert.equal(f.c.signatureChecks,1);
+});
+test('indexed draft checks retain previous-month rest and next-month imported-duty protection',async()=>{
+ const f=fixture();f.c.daysInMonth=()=>31;f.c.db.manualDistributionTargetsV399['2026-10|'+unit].people[6].night=3;f.c.db.assign['2026-09|acil|30|night']=1;f.c.db.importedRecords=[{monthKey:'2026-11',type:'acil',day:1,date:'2026-11-01',personId:1,col:f.cols.day}];const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.plan.length,52);assert.notEqual(f.c.db.assign['2026-10|acil|1|day'],1);assert.notEqual(f.c.db.assign['2026-10|acil|1|night'],1);assert.notEqual(f.c.db.assign['2026-10|acil|31|night'],1);assert.equal(f.c.rpysRest16V397.allViolations().size,0);assert.equal(f.c.db.assign['2026-09|acil|30|night'],1);
+});
+test('thousands of historical assignments are not scanned by each candidate rest query',async()=>{
+ const f=fixture();for(let year=1995;year<2020;year++)for(let month=1;month<=12;month++)for(let day=1;day<=28;day++)f.c.db.assign[`${year}-${String(month).padStart(2,'0')}|acil|${day}|other`]=day%6+1;
+ const original={...f.c.db.assign},candidates=f.c.rpysTargets399.recordCandidates;let queries=0,maxKeys=0;f.c.rpysTargets399.recordCandidates=(...args)=>{const result=candidates(...args);if(result){queries++;maxKeys=Math.max(maxKeys,result.keys.length)}return result};
+ const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.plan.length,51);assert.ok(queries>300);assert.ok(maxKeys<100,`too many keys per indexed query: ${maxKeys}`);for(const [key,pid] of Object.entries(original))assert.equal(f.c.db.assign[key],pid);assert.equal(f.c.rpysTargets399.recordCandidates(1,null),null);assert.equal(f.saved.length,1);
 });

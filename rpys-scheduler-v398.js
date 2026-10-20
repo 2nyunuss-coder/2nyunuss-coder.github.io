@@ -32,11 +32,12 @@
     if(!key.startsWith(run.month+'|'))return true;
     const parts=key.split('|'),col=dutyColumnByKey(parts[1],parts.slice(3).join('|'));
     if(col?.unit!==run.unit)return true;
+    if(run.targetIds&&Number(reference.assign?.[key]||0)&&!run.targetIds.has(Number(reference.assign[key])))return true;
     return !run.rebuild&&own(run.before.assign,key);
   }
   function mayClear(key){return !!run?.rebuild&&!protectedCell(key)}
   function repairCache(source){
-    return source.replace("let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)","if(window.rpysScheduler398?.running())return old.apply(this,arguments);let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)");
+    return source.replace("let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)","if(window.rpysScheduler398?.running()||window.rpysTargets399?.isPlanning?.())return old.apply(this,arguments);let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)");
   }
   function repair(source){
     const change=(name,next,edits)=>{
@@ -156,10 +157,13 @@
         window[name]=function(){const k=JSON.stringify(Array.from(arguments));if(!cache.has(k))cache.set(k,baseQuery.apply(this,arguments));return cache.get(k)};
       }
       for(const key of ['save','saveNowV245','flushSave'])if(typeof window[key]==='function'){saved[key]=window[key];window[key]=(...args)=>{pending.push(args);return null}}
-        const beforeRest=window.rpysRest16V397.allViolations();
+        const targetIds=window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.model(unit).ids:null;
+        if(targetIds)run.targetIds=new Set(targetIds);
+        const restCheck=()=>targetIds&&window.rpysRest16V397.allViolationsForMonth?window.rpysRest16V397.allViolationsForMonth(targetIds,month):window.rpysRest16V397.allViolations();
+        const beforeRest=restCheck();
         value=window.rpysRest16V397.runIndexed(()=>window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
         if(value&&typeof value.then==='function')throw Error('Beklenmeyen asenkron motor; liste korunarak işlem durduruldu.');
-        for(const key of window.rpysRest16V397.allViolations().keys())if(!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
+        for(const key of restCheck().keys())if(!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
         for(const key of new Set([...Object.keys(before.assign||{}),...Object.keys(db.assign||{}),...Object.keys(before.assignmentMeta||{}),...Object.keys(db.assignmentMeta||{}),...Object.keys(before.rpysCellLocks||{})])){
           if((protectedCell(key)||before.rpysCellLocks?.[key]||manualAssignmentCell(key,before))&&
