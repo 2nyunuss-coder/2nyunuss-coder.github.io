@@ -238,28 +238,30 @@
     }catch(e){alert(e.message||String(e))}
   }
   function historyFor(m){
-    const year=Number(ym().slice(0,4)),cutoff=ym()+'-01';
-    const years=[year-1,year],data={};
-    for(const id of m.ids)data[id]=Object.fromEntries(years.map(y=>[y,empty()]));
-    const seen=new Set();
+    const cutoff=ym()+'-01',data={},years=new Set(),seen=new Set();
+    for(const id of m.ids)data[id]={};
     for(const a of allAssignmentsAllMonths()){
-      const id=Number(a.person?.id??a.personId??0),date=String(a.date||'').slice(0,10),y=Number(date.slice(0,4));
-      if(!data[id]||!years.includes(y)||date>=cutoff||a.col?.unit!==m.u||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))continue;
-      const unique=[date,id,a.col?.key||a.col?.shift||'',a.type||''].join('|');
-      if(seen.has(unique))continue;seen.add(unique);
-      data[id][y][kind(a.col)]++;
+      const id=Number(a.person?.id??a.personId??0),date=String(a.date||'').slice(0,10);
+      if(!own(data,id)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>=cutoff||a.col?.unit!==m.u)continue;
+      const y=Number(date.slice(0,4)),signature=[date,id,a.col?.key||a.col?.shift||'',a.type||''].join('|');
+      if(seen.has(signature))continue;seen.add(signature);years.add(y);
+      data[id][y]??=empty();data[id][y][kind(a.col)]++;
     }
-    return {years,data};
+    return {years:[...years].sort((a,b)=>b-a),data};
   }
   let historyVisible=false;
   function historyMarkup(m){
     if(!historyVisible)return '';
-    const h=historyFor(m),[previous,current]=h.years;
-    return `<div class="rpysHistory399"><h4>Geçmiş görev toplamları — ${escape(m.u)}</h4>
-      <p class="smallhelp">Yalnız sistemde kayıtlı görevler; ${escape(ym())} ayı hariç. G / N: gündüz / nöbet. Eksik geçmiş kayıtlar sıfır görünebilir.</p>
-      <div class="rpysTargetTable399"><table><thead><tr><th>Personel</th><th>${previous} G / N</th><th>${current} (önceki aylar) G / N</th></tr></thead><tbody>
-      ${m.ids.map(id=>`<tr><th>${escape(getPersonById(id).name)}</th><td>${h.data[id][previous].day} / ${h.data[id][previous].night}</td><td>${h.data[id][current].day} / ${h.data[id][current].night}</td></tr>`).join('')}
-      </tbody></table></div></div>`;
+    const h=historyFor(m);
+    const headings=h.years.map(y=>'<th>'+y+'<br>G / N</th>').join('');
+    const rows=m.ids.map(id=>{
+      const sum=empty(),cells=h.years.map(y=>{const v=h.data[id][y]||empty();sum.day+=v.day;sum.night+=v.night;return '<td>'+v.day+' / '+v.night+'</td>'}).join('');
+      return '<tr><th>'+escape(getPersonById(id).name)+'</th>'+cells+'<td><b>'+sum.day+' / '+sum.night+'</b></td></tr>';
+    }).join('');
+    return '<div class="rpysHistory399"><h4>Seçili birim: '+escape(m.u)+' · Seçili personel: '+m.ids.length+'</h4>'+
+      '<p class="smallhelp">Yalnız seçilen personelin bu birimdeki kayıtlı geçmiş çalışmaları; seçili ay ve sonrası hariç. Eksik geçmiş kayıtlar toplamları eksik gösterebilir.</p>'+
+      '<div class="rpysTargetTable399"><table><thead><tr><th>Personel</th>'+headings+'<th>Geçmiş toplam<br>G / N</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      (h.years.length?'':'<p class="smallhelp">Bu birim ve personeller için geçmiş kayıt bulunamadı.</p>')+'</div>';
   }
   function render(){
     const pick=document.getElementById('autoPeople'),layout=pick?.closest('.autoBox');if(!layout)return;
@@ -302,7 +304,7 @@
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-target-action]');if(!b)return;
-    if(isMonthLocked())return alert('Bu ay kilitli.');
+    if(isMonthLocked()&&b.dataset.targetAction!=='history')return alert('Bu ay kilitli.');
     if(b.dataset.targetAction==='history'){historyVisible=!historyVisible;render();}else if(b.dataset.targetAction==='equal')suggest();else if(b.dataset.targetAction==='current')suggest(true);else{const u=document.getElementById('autoUnit')?.value;editableConfig(u).enabled=true;persist();window.autoDistribute();queueRender();}
   });
   const style=document.createElement('style');style.textContent=`
