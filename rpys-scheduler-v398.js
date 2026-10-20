@@ -100,6 +100,8 @@
     const base=window[name];if(typeof base!=='function'||base.__rpys398)return;
     const fn=function(){
       if(run)return base.apply(this,arguments);
+      const targetUnit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
+      if(window.rpysTargets399?.enabledFor(targetUnit)&&!window.rpysTargets399.hasPrepared(targetUnit))return window.rpysTargets399.prepare(targetUnit,()=>fn.apply(this,arguments));
       if(isMonthLocked()){alert('Bu ay kilitli. Liste değiştirilmedi.');return false}
       const before=clone(db),month=ym(),rebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
       const unit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
