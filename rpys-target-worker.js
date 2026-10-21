@@ -54,6 +54,11 @@ function solveTargets(input){
    const used=group.values.filter(v=>picked.has(v)).length;
    if(used>group.max)return null;
    if(used===group.max){const banned=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!banned.has(v)));}
+   if(group.min!=null&&used<group.min){
+    const possible=group.values.filter(v=>domains[values.get(v)?.slot]?.includes(v));
+    if(used+possible.length<group.min){lastFailure=group.reason||'Görev alt hedefi için yeterli uygun hücre kalmadı.';return null}
+    if(used+possible.length===group.min)for(const v of possible)domains[values.get(v).slot]=[v];
+   }
   }
   for(const r of requirements)if(!r.values.some(v=>picked.has(v))){const possible=r.values.filter(v=>domains[values.get(v)?.slot]?.includes(v));if(!possible.length)return null;if(possible.length===1)domains[values.get(possible[0]).slot]=[possible[0]]}
   // Real duties, including the nearest assignments on either side of the

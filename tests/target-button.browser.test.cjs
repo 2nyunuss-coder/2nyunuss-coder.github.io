@@ -88,3 +88,15 @@ test('actual partial button applies feasible duties, displays saved shortages an
   assert.equal(await page.evaluate(()=>JSON.stringify(db.assign)===originalAssignments&&fixtureResult.saved.length===1),true);assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });
+
+test('weekend target inputs persist and the real button applies exact weekend counts within night totals',async()=>{
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const context=await browser.newContext();await context.route('**/*',route=>{const u=new URL(route.request().url()),name=u.pathname.slice(1);if(u.hostname==='rpys.test'&&!name)return route.fulfill({contentType:'text/html; charset=utf-8',body:fixtureHTML()});if(u.hostname==='rpys.test'&&['rpys-runtime-v397.js','rpys-scheduler-v398.js','rpys-targets-v399.js','rpys-target-worker.js'].includes(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,name),'utf8')});return route.fulfill({status:404,body:''})});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://rpys.test/');await page.waitForSelector('[data-target-action=run]');assert.equal(await page.locator('[data-target-kind=weekendNight]').count(),6);assert.equal(await page.locator('[data-target-id="1"][data-target-kind=weekendNight]').getAttribute('placeholder'),'Serbest');
+  for(const id of [1,2,3,4,5,6])await page.locator(`[data-target-id="${id}"][data-target-kind=weekendNight]`).fill(String([2,2,1,1,1,1][id-1]));
+  assert.match(await page.locator('.rpysTargetSummary399').textContent(),/Hafta sonu nöbet: 8 gereken \/ 8 hedef/);const before=await page.evaluate(()=>fixtureResult.saved.length);await page.locator('[data-target-action=run]').click();await page.waitForFunction(n=>fixtureResult.saved.length>n,before);
+  const state=await page.evaluate(()=>({actual:rpysTargets399.model(autoUnit.value).actual,targets:rpysTargets399.config(autoUnit.value).people,text:document.querySelector('[data-target-feedback]').textContent,count:Object.keys(db.assign).length}));assert.equal(state.count,51);assert.deepEqual(Object.values(state.actual).map(x=>x.weekendNight),[2,2,1,1,1,1]);for(const id of [1,2,3,4,5,6])assert.equal(state.actual[id].night,state.targets[id].night);assert.match(state.text,/tam karşılandı/);
+  await page.locator('[data-target-id="1"][data-target-kind=weekendNight]').fill('');assert.equal(await page.evaluate(()=>rpysTargets399.config(autoUnit.value).people[1].weekendNight),null);assert.match(await page.locator('.rpysTargetSummary399').textContent(),/1 kişi serbest/);assert.deepEqual(errors,[]);
+ }finally{await browser.close()}
+});

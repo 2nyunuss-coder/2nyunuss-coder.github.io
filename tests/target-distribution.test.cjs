@@ -75,3 +75,13 @@ test('partial search maximizes safe coverage against exhaustive enumeration on 1
   brute(0,structuredClone(remaining),new Set());const result=solveTargets(data);assert.equal(result.ok,true);assert.equal(result.timedOut,false);assert.equal(result.plan.length,optimum,'partial trial '+trial);const picked=new Set(result.plan.map(x=>`${x.slot}:${x.id}`));for(const [a,b] of conflicts)assert.ok(!picked.has(a)||!picked.has(b));for(const group of limits)assert.ok(group.values.filter(v=>picked.has(v)).length<=group.max);for(const id of ids)for(const kind of ['day','night'])assert.ok(result.plan.filter(x=>x.id===id&&x.kind===kind).length<=remaining[id][kind]);
  }
 });
+
+test('exact weekend/weekday night subsets agree with exhaustive enumeration on 200 calendars',()=>{
+ let seed=963;const rnd=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n};
+ for(let trial=0;trial<200;trial++){
+  const ids=[1,2,3],remaining=Object.fromEntries(ids.map(id=>[id,{day:0,night:0}])),slots=Array.from({length:6},(_,index)=>{const kind=index%2?'night':'day';remaining[1+rnd(3)][kind]++;return {index,day:index+1,kind,allowed:ids.filter(()=>rnd(5)!==0)}}),limits=[];
+  for(const id of ids)if(rnd(3)!==0){const weekend=rnd(remaining[id].night+1);for(const yes of [true,false]){const n=yes?weekend:remaining[id].night-weekend;limits.push({values:slots.filter(s=>s.kind==='night'&&[1,5].includes(s.index)===yes&&s.allowed.includes(id)).map(s=>`${s.index}:${id}`),min:n,max:n})}}
+  function brute(i,left,picked){if(i===slots.length)return ids.every(id=>left[id].day===0&&left[id].night===0)&&limits.every(g=>{const n=g.values.filter(v=>picked.has(v)).length;return n>=g.min&&n<=g.max});for(const id of slots[i].allowed){const k=slots[i].kind;if(!left[id][k])continue;left[id][k]--;picked.add(`${i}:${id}`);if(brute(i+1,left,picked))return true;picked.delete(`${i}:${id}`);left[id][k]++}return false}
+  const expected=brute(0,structuredClone(remaining),new Set()),r=solveTargets({ids,remaining,slots,limits});assert.equal(r.timedOut,false);assert.equal(r.ok,expected,'weekend trial '+trial);
+ }
+});

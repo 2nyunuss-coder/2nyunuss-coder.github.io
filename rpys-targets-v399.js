@@ -1,12 +1,13 @@
 /* Per-person monthly targets using the existing 6.1.1 eligibility and transaction guards. */
 (()=>{
   if(window.rpysTargets399)return;
-  const kinds=['day','night'],labels={day:'gündüz',night:'nöbet'};
+  const kinds=['day','night'],metrics=[...kinds,'weekendNight'],labels={day:'gündüz',night:'nöbet',weekendNight:'hafta sonu nöbeti'};
   const own=(o,k)=>Object.prototype.hasOwnProperty.call(o||{},k);
-  const empty=()=>({day:0,night:0});
+  const empty=()=>({day:0,night:0,weekendNight:0});
   const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const clearCache=()=>{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null};
   const kind=col=>Number(col.hours||0)>=16?'night':'day';
+  const weekendOn=(day,month=ym())=>[0,6].includes(new Date(month+'-'+String(day).padStart(2,'0')+'T12:00:00Z').getUTCDay());
   const key=u=>ym()+'|'+u;
   const config=u=>db.manualDistributionTargetsV399?.[key(u)]||{enabled:false,people:{}};
   const enabledFor=u=>config(u).enabled===true;
@@ -29,7 +30,7 @@
         ?window.rpysScheduler398.manualAssignmentCell(k)
         :!!(db.assign[k]&&(db.manualDutyOverrides?.[k]||db.assignmentMeta?.[k]?.manual));
       const protectedCell=!!(db.rpysCellLocks?.[k]||manualProtected);
-      if(!protectedCell&&(!db.assign[k]||ids.includes(Number(db.assign[k])))&&(rebuild||!own(db.assign,k))){mutable.add(k);slots.push({key:k,day:d,type:s.type,col:s.col,kind:kind(s.col)});}
+      if(!protectedCell&&(!db.assign[k]||ids.includes(Number(db.assign[k])))&&(rebuild||!own(db.assign,k))){mutable.add(k);slots.push({key:k,day:d,type:s.type,col:s.col,kind:kind(s.col),weekendNight:kind(s.col)==='night'&&weekendOn(d)});}
       else if(!db.assign[k])lockedEmpty++;
     }
     // Aynı hücreyi yalnız bir kez say; kaynak db.assign + unitSlots() olsun.
@@ -41,13 +42,15 @@
       counted.add(k);
       const t=kind(s.col);
       actual[id][t]++;
+      const weekendNight=t==='night'&&weekendOn(d);if(weekendNight)actual[id].weekendNight++;
       const manualProtected=window.rpysScheduler398?.manualAssignmentCell
         ?window.rpysScheduler398.manualAssignmentCell(k)
         :!!(db.manualDutyOverrides?.[k]||db.assignmentMeta?.[k]?.manual);
-      if(!mutable.has(k)||manualProtected)fixed[id][t]++;
+      if(!mutable.has(k)||manualProtected){fixed[id][t]++;if(weekendNight)fixed[id].weekendNight++}
     }
     const required=empty();for(const id of ids)for(const t of kinds)required[t]+=fixed[id][t];
     for(const s of slots)required[s.kind]++;
+    required.weekendNight=ids.reduce((n,id)=>n+fixed[id].weekendNight,0)+slots.filter(s=>s.weekendNight).length;
     return {u,ids,rebuild,actual,fixed,required,slots,mutable,lockedEmpty};
   }
   function readTargets(m,{partial=false}={}){
@@ -59,7 +62,17 @@
       if(!partial&&Number(v)<m.fixed[id][t])problems.push(`${getPersonById(id).name}: korunan ${m.fixed[id][t]} ${labels[t]} kaydı var; ${v} hedefi uygulanamaz. Manuel/kilitli kayıt korunur. Mevcutları koru modundaysan yeniden dağıt seçeneğini kontrol et.`);
     }}
     if(problems.length)throw Error(problems.slice(0,8).join('\n'));
+    for(const id of m.ids){
+      const v=cfg.people?.[id]?.weekendNight;
+      targets[id].weekendNight=v==null||v===''?null:Number(v);
+      if(targets[id].weekendNight===null)continue;
+      if(!Number.isInteger(Number(v))||Number(v)<0||Number(v)>targets[id].night)problems.push(`${getPersonById(id).name}: hafta sonu nöbet hedefi 0 ile toplam nöbet hedefi (${targets[id].night}) arasında bir tam sayı olmalı.`);
+      else if(!partial&&(Number(v)<m.fixed[id].weekendNight||targets[id].night-Number(v)<m.fixed[id].night-m.fixed[id].weekendNight))problems.push(`${getPersonById(id).name}: hafta sonu hedefi korunan hafta sonu/hafta içi nöbet sayılarıyla uyuşmuyor. Mevcut kayıtlar korunur.`);
+    }
+    if(problems.length)throw Error(problems.join('\n'));
     for(const t of kinds){const total=m.ids.reduce((n,id)=>n+targets[id][t],0);if(!partial&&total!==m.required[t])problems.push(`${labels[t]} hedef toplamı ${total}; seçili personeller için gereken ${m.required[t]}. Fark: ${total-m.required[t]}.`)}
+    const specified=m.ids.filter(id=>targets[id].weekendNight!==null),weekendTotal=specified.reduce((n,id)=>n+targets[id].weekendNight,0);
+    if(!partial&&(weekendTotal>m.required.weekendNight||specified.length===m.ids.length&&weekendTotal!==m.required.weekendNight))problems.push(`Hafta sonu nöbet hedef toplamı ${weekendTotal}; gereken ${m.required.weekendNight}. Bu sayı toplam nöbet hedefinin içindedir.`);
     if(problems.length)throw Error(problems.join('\n'));
     return targets;
   }
@@ -131,7 +144,7 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261021-partial-5',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261021-weekend-6',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null,bestEffortRequested=false;
   let feedback={text:'',tone:'',busy:false};
   function report(text,tone='progress',busy=preparing){
@@ -300,6 +313,14 @@
         finally{adapter.remove(id,a)}
         if(Date.now()-sliceStart>=8)await yieldIfNeeded();
       }
+      for(const id of m.ids)if(targets[id].weekendNight!==null){
+        for(const weekend of [true,false]){
+          const total=weekend?targets[id].weekendNight:targets[id].night-targets[id].weekendNight;
+          const fixed=weekend?m.fixed[id].weekendNight:m.fixed[id].night-m.fixed[id].weekendNight;
+          const need=Math.max(0,total-fixed),values=m.slots.filter(s=>s.kind==='night'&&s.weekendNight===weekend&&s.allowed.includes(id)).map(s=>`${s.index}:${id}`);
+          limits.push({values,min:partial?0:need,max:need,reason:`${getPersonById(id).name}: ${weekend?'hafta sonu':'hafta içi'} nöbet hedefi için ${need} ek görev gerekiyor; uygun günler, izin/dinlenme ve diğer görevler birlikte yetmiyor.`});
+        }
+      }
       for(const rule of (db.customTextRules||[]).filter(r=>r.active!==false&&r.unit===u&&['unitPersonMonthlyMax','personUnitMonthlyMax'].includes(r.kind)))for(const id of m.ids)if(rule.kind==='unitPersonMonthlyMax'||Number(rule.personId)===id)limits.push({values:m.slots.filter(s=>s.allowed.includes(id)).map(s=>`${s.index}:${id}`),max:Math.max(0,Number(rule.max||0)-m.fixed[id].day-m.fixed[id].night)});
       const obligations=partial?[]:requirementsFor(m);
       for(const id of m.ids){
@@ -330,6 +351,11 @@
     for(const x of plan){
       const s=m.slots[x.slot];
       if(!s||seen.has(s.key)||!s.allowed.includes(x.id)||!used[x.id]||++used[x.id][s.kind]>Math.max(0,targets[x.id][s.kind]-m.fixed[x.id][s.kind]))throw Error('Kısmi planın hücre/hedef doğrulaması başarısız. Liste korunuyor.');
+      if(s.kind==='night'&&targets[x.id].weekendNight!==null){
+        if(s.weekendNight)used[x.id].weekendNight++;
+        const weekend=used[x.id].weekendNight,weekday=used[x.id].night-weekend,fixed=m.fixed[x.id],t=targets[x.id];
+        if(weekend>Math.max(0,t.weekendNight-fixed.weekendNight)||weekday>Math.max(0,t.night-t.weekendNight-(fixed.night-fixed.weekendNight)))throw Error('Hafta sonu/hafta içi nöbet alt hedefi aşılamaz. Liste korunuyor.');
+      }
       seen.add(s.key);db.assign[s.key]=x.id;retained.push(x);
     }
     clearCache();
@@ -462,10 +488,10 @@
       const verdict=adapter.finalCheck();if(verdict!==true)throw Error(String(verdict));
     }
     clearCache();const actual=model(u,m.ids,{preserveExisting:partial}).actual;
-    for(const id of m.ids)for(const t of kinds)if(partial?actual[id][t]>Math.max(targets[id][t],m.fixed[id][t]):actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
-    result.shortfalls=m.ids.flatMap(id=>kinds.filter(t=>actual[id][t]<targets[id][t]).map(t=>({id,kind:t,target:targets[id][t],actual:actual[id][t],missing:targets[id][t]-actual[id][t]})));
+    for(const id of m.ids)for(const t of metrics.filter(t=>targets[id][t]!=null))if(partial?actual[id][t]>Math.max(targets[id][t],m.fixed[id][t]):actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
+    result.shortfalls=m.ids.flatMap(id=>metrics.filter(t=>targets[id][t]!=null&&actual[id][t]<targets[id][t]).map(t=>({id,kind:t,target:targets[id][t],actual:actual[id][t],missing:targets[id][t]-actual[id][t]})));
     result.unfilled=m.slots.filter(s=>!db.assign[s.key]).map(s=>({day:s.day,kind:s.kind,key:s.key,reason:s.allowed.length&&s.allowed.every(id=>actual[id][s.kind]>=targets[id][s.kind])?'Uygun personellerin ilgili hedefleri doldu.':'İzin, dinlenme, mevcut görev veya özel kurallar kalan hedeflerle birlikte yerleşmedi; elle kontrol edilebilir.'}));
-    if(partial&&!result.shortfalls.length&&!result.unfilled.length&&!unresolved.length&&m.ids.every(id=>kinds.every(t=>actual[id][t]===targets[id][t]))){result.partial=false;result.notes=[]}
+    if(partial&&!result.shortfalls.length&&!result.unfilled.length&&!unresolved.length&&m.ids.every(id=>metrics.every(t=>targets[id][t]==null||actual[id][t]===targets[id][t]))){result.partial=false;result.notes=[]}
     console.info('RPYS hedef dağıtım teşhisi',{unit:u,month:ym(),slots:m.slots.length,nodes:result.nodes,partial,filled:result.plan.length,engine:'csp-worker'});
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
     db.manualDistributionResultsV399??={};db.manualDistributionResultsV399[key(u)]={at:new Date().toISOString(),engine:'6.1.1-csp-worker',targets,actual,filled:result.plan.length,status:result.partial?'partial':'complete',notes:result.notes||[],shortfalls:result.shortfalls,unfilled:result.unfilled};
@@ -473,15 +499,16 @@
     renderAll();render();
     if(result.partial){
       const shortages=result.shortfalls.map(x=>`${getPersonById(x.id).name}: ${x.actual} / ${x.target} ${labels[x.kind]}; ${x.missing} eksik (izin, dinlenme, diğer görevler, özel kurallar veya ortak uygun gün kapasitesi).`);
-      const overages=m.ids.flatMap(id=>kinds.filter(t=>actual[id][t]>targets[id][t]).map(t=>`${getPersonById(id).name}: mevcut ${actual[id][t]} ${labels[t]}, hedef ${targets[id][t]}; mevcut kayıtlar korundu.`));
+      const overages=m.ids.flatMap(id=>metrics.filter(t=>targets[id][t]!=null&&actual[id][t]>targets[id][t]).map(t=>`${getPersonById(id).name}: mevcut ${actual[id][t]} ${labels[t]}, hedef ${targets[id][t]}; mevcut kayıtlar korundu.`));
       report(`${u}: Kısmi dağıtım uygulandı. ${result.plan.length} yeni görev yerleştirildi; ${result.unfilled.length} hücre boş kaldı. Mevcut liste ve hedef değerleri korundu.\n${shortages.length?shortages.join('\n'):'Eksik personel hedefi kalmadı; aşağıdaki koşullar hâlâ düzeltilmeli.'}\n${[...overages,...result.notes].join('\n')}`,'warning',false);
-    }else report(`${u}: ${result.plan.length} görev yerleştirildi. Seçili ${m.ids.length} personelin gündüz ve nöbet hedefleri tam karşılandı. Manuel/kilitli kayıtlar korundu.`,'success',false);
+    }else report(`${u}: ${result.plan.length} görev yerleştirildi. Seçili ${m.ids.length} personelin ${m.ids.some(id=>targets[id].weekendNight!=null)?'gündüz, nöbet ve hafta sonu nöbet':'gündüz ve nöbet'} hedefleri tam karşılandı. Manuel/kilitli kayıtlar korundu.`,'success',false);
     return result;
   }
   function totals(m){
     const cfg=config(m.u),sum=empty();let missing=0;
     for(const id of m.ids)for(const t of kinds){const n=cfg.people?.[id]?.[t];if(n==null||n==='')missing++;else sum[t]+=Number(n)||0;}
-    return `Gereken: ${m.required.day} gündüz / ${m.required.night} nöbet · Hedef: ${sum.day} / ${sum.night}${missing?` · ${missing} boş alan`:''}${m.lockedEmpty?` · ${m.lockedEmpty} boş kilitli hücre dağıtım dışında`:''}`;
+    const specified=m.ids.filter(id=>cfg.people?.[id]?.weekendNight!=null&&cfg.people[id].weekendNight!==''),weekend=specified.reduce((n,id)=>n+Number(cfg.people[id].weekendNight||0),0);
+    return `Gereken: ${m.required.day} gündüz / ${m.required.night} nöbet · Hedef: ${sum.day} / ${sum.night} · Hafta sonu nöbet: ${m.required.weekendNight} gereken / ${weekend} hedef${specified.length<m.ids.length?` (${m.ids.length-specified.length} kişi serbest)`:''}${missing?` · ${missing} boş alan`:''}${m.lockedEmpty?` · ${m.lockedEmpty} boş kilitli hücre dağıtım dışında`:''}`;
   }
   // Distribute by the selected employees' actual active days within this unit.
   function availableOn(id,day){
@@ -494,28 +521,18 @@
     return true;
   }
   function fairTargets(m){
-    const result=Object.fromEntries(m.ids.map(id=>[id,{...m.fixed[id]}]));
-    const calendar={day:new Set(),night:new Set()};
-    for(const slot of unitSlots(m.u).filter(s=>!isShiftBlockedForMonth(s.type,s.col,ym())))
-      for(let d=1;d<=daysInMonth();d++)if(isDutyCellApplicable(slot.type,slot.col,d))calendar[kind(slot.col)].add(d);
-    const availability={},capacity={};
-    for(const id of m.ids){
-      availability[id]=empty();capacity[id]=empty();
-      for(const t of kinds){
-        const n=[...calendar[t]].filter(d=>availableOn(id,d)).length;
-        availability[id][t]=n;capacity[id][t]=Math.max(n,m.fixed[id][t]);
-      }
-    }
-    for(const t of kinds){
-      let left=m.required[t]-m.ids.reduce((sum,id)=>sum+result[id][t],0);
-      if(left<0)throw Error('Korunan görevler gerekli toplamdan fazla.');
-      while(left>0){
-        const options=m.ids.filter(id=>availability[id][t]>0&&result[id][t]<capacity[id][t]);
-        if(!options.length)throw Error(labels[t]+' için yeterli uygun gün bulunmuyor.');
-        options.sort((a,b)=>result[a][t]/availability[a][t]-result[b][t]/availability[b][t]||availability[b][t]-availability[a][t]||a-b);
-        result[options[0]][t]++;left--;
-      }
-    }
+    const result=Object.fromEntries(m.ids.map(id=>[id,{...m.fixed[id]}])),calendar={day:new Set(),night:new Set(),weekendNight:new Set()};
+    for(const slot of unitSlots(m.u).filter(s=>!isShiftBlockedForMonth(s.type,s.col,ym())))for(let d=1;d<=daysInMonth();d++)if(isDutyCellApplicable(slot.type,slot.col,d)){const t=kind(slot.col);calendar[t].add(d);if(t==='night'&&weekendOn(d))calendar.weekendNight.add(d)}
+    const availability={};for(const id of m.ids){availability[id]=empty();for(const t of metrics)availability[id][t]=[...calendar[t]].filter(d=>availableOn(id,d)).length;}
+    const allocate=(type,total,get,set,available,fixed)=>{
+      let left=total-m.ids.reduce((n,id)=>n+get(id),0);if(left<0)throw Error('Korunan görevler gerekli toplamdan fazla.');
+      while(left>0){const options=m.ids.filter(id=>available(id)>0&&get(id)<Math.max(available(id),fixed(id)));if(!options.length)throw Error(type+' için yeterli uygun gün bulunmuyor.');options.sort((a,b)=>get(a)/available(a)-get(b)/available(b)||available(b)-available(a)||a-b);set(options[0],get(options[0])+1);left--;}
+    };
+    allocate('gündüz',m.required.day,id=>result[id].day,(id,n)=>{result[id].day=n},id=>availability[id].day,id=>m.fixed[id].day);
+    allocate('hafta sonu nöbeti',m.required.weekendNight,id=>result[id].weekendNight,(id,n)=>{result[id].weekendNight=n},id=>availability[id].weekendNight,id=>m.fixed[id].weekendNight);
+    const weekday=Object.fromEntries(m.ids.map(id=>[id,m.fixed[id].night-m.fixed[id].weekendNight]));
+    allocate('hafta içi nöbeti',m.required.night-m.required.weekendNight,id=>weekday[id],(id,n)=>{weekday[id]=n},id=>availability[id].night-availability[id].weekendNight,id=>m.fixed[id].night-m.fixed[id].weekendNight);
+    for(const id of m.ids)result[id].night=weekday[id]+result[id].weekendNight;
     return {targets:result,availability};
   }
   function suggest(useCurrent=false){
@@ -535,7 +552,7 @@
       if(!own(data,id)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>=cutoff||a.col?.unit!==m.u)continue;
       const y=Number(date.slice(0,4)),signature=[date,id,a.col?.key||a.col?.shift||'',a.type||''].join('|');
       if(seen.has(signature))continue;seen.add(signature);years.add(y);
-      data[id][y]??=empty();data[id][y][kind(a.col)]++;
+      data[id][y]??=empty();data[id][y][kind(a.col)]++;if(kind(a.col)==='night'&&weekendOn(Number(date.slice(8)),date.slice(0,7)))data[id][y].weekendNight++;
     }
     return {years:[...years].sort((a,b)=>b-a),data};
   }
@@ -572,13 +589,13 @@
     let fairness=null;try{fairness=fairTargets(m)}catch(e){console.warn('RPYS fair target preview',e)}
     host.innerHTML=`<h3>Personel Gündüz / Nöbet Hedefleri</h3><div class="smallhelp">${escape(ym())} · ${escape(u)} · Hedef motoru 21.10.2026</div>
       <label class="rpysTargetsToggle399"><input type="checkbox" data-target-enable ${cfg.enabled?'checked':''} ${disabled}> Elle girdiğim hedeflere göre dağıt</label>
-      <p class="smallhelp">Sayılar bu birimdeki <b>ayın toplam görevi</b> içindir. 16 saat ve üzeri nöbet; daha kısa vardiya gündüz sayılır. Mevcut ve korunan görevler toplamın içindedir.</p>
+      <p class="smallhelp">Sayılar bu birimdeki <b>ayın toplam görevi</b> içindir. 16 saat ve üzeri nöbet; daha kısa vardiya gündüz sayılır. Mevcut ve korunan görevler toplamın içindedir. <b>Hafta sonu nöbeti</b>, Cumartesi/Pazar başlayan nöbetlerin sayısıdır ve toplam nöbet hedefinin içindedir. Bu alanı boş bırakırsanız hafta sonu için ayrı sayı kısıtı uygulanmaz.</p>
       <p class="smallhelp">Tam dağıtım mümkün değilse mevcut kayıtlar korunur, yerleşebilen yeni görevler uygulanır. Eksik hedefler ve sağlanamayan görev aralığı koşulları aşağıda gösterilir.</p>
       <div class="rpysTargetSummary399" role="status">${escape(totals(m))}</div>
-      <div class="rpysTargetTable399"><table><thead><tr><th>Personel</th><th>Gündüz<br>hedefi</th><th>Nöbet<br>hedefi</th><th>Mevcut<br>G / N</th><th>Kalan<br>G / N</th></tr></thead><tbody>${m.ids.map(id=>{
+      <div class="rpysTargetTable399"><table><thead><tr><th>Personel</th><th>Gündüz<br>hedefi</th><th>Nöbet<br>hedefi</th><th>Hafta sonu<br>nöbet hedefi</th><th>Mevcut<br>G / N / HS</th><th>Kalan<br>G / N / HS</th></tr></thead><tbody>${m.ids.map(id=>{
         const p=getPersonById(id),v=cfg.people?.[id]||{};
-        return `<tr><th scope="row">${escape(p.name)}<small>Uygun gün: ${fairness?fairness.availability[id].day+" G / "+fairness.availability[id].night+" N":"—"} · Korunan: ${m.fixed[id].day} G / ${m.fixed[id].night} N</small></th>${kinds.map(t=>`<td><input type="number" min="0" max="1000" step="1" inputmode="numeric" data-target-id="${id}" data-target-kind="${t}" aria-label="${escape(p.name)} ${labels[t]} hedefi" value="${v[t]==null?'':escape(v[t])}" placeholder="0" ${disabled}></td>`).join('')}<td>${m.actual[id].day} / ${m.actual[id].night}</td><td data-target-diff="${id}">${kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ')}</td></tr>`;
-      }).join('')||'<tr><td colspan="5">Soldan personelleri seç.</td></tr>'}</tbody></table></div>
+        return `<tr><th scope="row">${escape(p.name)}<small>Uygun gün: ${fairness?fairness.availability[id].day+" G / "+fairness.availability[id].night+" N / "+fairness.availability[id].weekendNight+" HS":"—"} · Korunan: ${m.fixed[id].day} G / ${m.fixed[id].night} N / ${m.fixed[id].weekendNight} HS</small></th>${metrics.map(t=>`<td><input type="number" min="0" max="1000" step="1" inputmode="numeric" data-target-id="${id}" data-target-kind="${t}" aria-label="${escape(p.name)} ${labels[t]} hedefi" value="${v[t]==null?'':escape(v[t])}" placeholder="${t==='weekendNight'?'Serbest':'0'}" ${disabled}></td>`).join('')}<td>${m.actual[id].day} / ${m.actual[id].night} / ${m.actual[id].weekendNight}</td><td data-target-diff="${id}">${metrics.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ')}</td></tr>`;
+      }).join('')||'<tr><td colspan="6">Soldan personelleri seç.</td></tr>'}</tbody></table></div>
       <div class="rpysTargetActions399"><button type="button" class="btn alt" data-target-action="history">Geçmiş Görev İstatistikleri</button><button type="button" class="btn alt" data-target-action="equal" ${disabled}>İzinlere Göre Adil Hedef Öner</button><button type="button" class="btn alt" data-target-action="current" ${disabled}>Mevcut Sayıları Al</button><button type="button" class="btn" data-target-action="run" ${preparing?'disabled':disabled} aria-busy="${preparing}">${preparing?'Hesaplanıyor…':'Hedeflere Göre Dağıt'}</button><button type="button" class="btn alt" data-target-action="cancel" ${preparing?'':'hidden'}>İptal</button></div>
       <div data-target-feedback class="rpysTargetFeedback399" role="${feedback.tone==='error'?'alert':'status'}" aria-live="polite" data-tone="${escape(feedback.tone)}" ${feedback.text?'':'hidden'}>${escape(feedback.text)}</div>
       ${lastResultMarkup(m)}${historyMarkup(m)}\n      <p class="smallhelp">Hedefler otomatik kaydedilir. Elle hedefler açıkken dağıtım düğmeleri bu sayıları kullanır. Kilitli ve manuel hücreler değişmez; izin ve dinlenme kuralları korunur. Adil hedef önerisi seçilen personelin izinlerini ve korunan görevlerini hesaba katar; günlere uygunluk dağıtımda ayrıca kontrol edilir.</p>`;
@@ -600,9 +617,9 @@
     if(el.hasAttribute('data-target-enable'))cfg.enabled=el.checked;
     else {cfg.people[el.dataset.targetId]??={};cfg.people[el.dataset.targetId][el.dataset.targetKind]=el.value===''?null:Number(el.value);}
     persist();const m=model(u),host=document.getElementById('rpysTargetPanel399');host.querySelector('.rpysTargetSummary399').textContent=totals(m);
-    for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=kinds.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
+    for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=metrics.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
   }
-  window.rpysTargets399={version:'20261021-partial-5',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
+  window.rpysTargets399={version:'20261021-weekend-6',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{
