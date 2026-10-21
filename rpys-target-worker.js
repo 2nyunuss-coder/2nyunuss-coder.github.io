@@ -118,8 +118,8 @@ function payrollScores(input,values,chosen){
  for(const v of chosen){const x=values.get(v);added.set(x.id,(added.get(x.id)||0)+increment(x))}
  return v=>{const x=values.get(v),p=input.payroll?.[x.id];if(!p||p.obligation==null)return 0;const projected=Number(p.worked||0)+(added.get(x.id)||0)+increment(x),over=Math.max(0,projected-p.obligation);return (p.cap==null?0:Math.max(0,over-p.cap)*100)+over+projected/Math.max(1,p.obligation)};
 }
-// A person may receive a partial set only when that person's mandatory days
-// and gap rules are satisfied. Other people can stay unassigned and be reported.
+// First try calendar-complete people. Proven impossible calendar conditions are
+// reported by the caller; they must not remove a person's eligible duties.
 function partialCalendar(input,values,domains,left,chosen){
  const {slots}=input,picked=new Set(chosen),active=new Set(chosen.map(v=>values.get(v).id)),complete=new Set(active);let feasible=true;
  function requireValues(id,tokens){
@@ -127,9 +127,9 @@ function partialCalendar(input,values,domains,left,chosen){
   complete.delete(id);const possible=tokens.filter(v=>domains[values.get(v)?.slot]?.includes(v));
   if(!possible.length)feasible=false;else if(possible.length===1)domains[values.get(possible[0]).slot]=possible;
  }
- for(const r of input.requirements||[])if(active.has(r.id))requireValues(r.id,r.values);
+ for(const r of input.requirements||[])if(!r.soft&&active.has(r.id))requireValues(r.id,r.values);
  for(const rule of input.gapRules||[]){
-  if(!active.has(rule.id))continue;
+  if(rule.soft||!active.has(rule.id))continue;
   const worked=new Set(rule.fixedDays);for(const v of chosen){const x=values.get(v);if(x.id===rule.id)worked.add(slots[x.slot].day)}
   const edge=rule.crossMonth;
   if(edge){
@@ -149,35 +149,40 @@ function partialCalendar(input,values,domains,left,chosen){
  }
  return {feasible,complete};
 }
-// A separate maximum-coverage search uses quotas as upper bounds. Missing
-// targets for people who cannot meet calendar rules are reported by the caller;
-// eligibility, gap/mandatory days and special upper bounds remain hard constraints.
+// Keep a calendar-complete seed, then maximize eligible coverage if that seed
+// leaves cells empty. Both passes share the original time/node budget. A missing
+// monthly gap/return condition is an explicit partial-plan warning, never a
+// reason to discard all otherwise eligible assignments for that person.
 function solvePartial(input){
  const {slots,ids,remaining,conflicts=[],limits=[]}=input,start=Date.now(),budget=input.timeLimit??1200,maxNodes=input.maxNodes??7000;
  const values=new Map(),clashes=new Map();for(const s of slots)for(const id of s.allowed){const v=`${s.index}:${id}`;values.set(v,{slot:s.index,id,kind:s.kind});clashes.set(v,new Set())}
  for(const [a,b] of conflicts){clashes.get(a)?.add(b);clashes.get(b)?.add(a)}
- const initial=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`));let best=[],nodes=0,timedOut=false;
+ const initial=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`));let best=[],nodes=0,timedOut=false,phaseStopped=false;
+ const strictUntil=start+budget*.35,strictNodes=Math.max(1,Math.floor(maxNodes*.35));
  function upper(domains,left){let n=0;for(const kind of ['day','night']){const owners=new Map();function add(i,seen){for(const v of domains[i]||[]){const id=values.get(v).id;if(seen.has(id))continue;seen.add(id);const mine=owners.get(id)||[];if(mine.length<left[id][kind]){mine.push(i);owners.set(id,mine);return true}for(let k=0;k<mine.length;k++)if(add(mine[k],seen)){mine[k]=i;return true}}return false}for(const s of slots)if(s.kind===kind&&domains[s.index]?.length&&add(s.index,new Set()))n++}return n}
  const personCeilings=Object.fromEntries(ids.map(id=>[id,remaining[id].day+remaining[id].night]));
  for(const group of limits){const set=new Set(group.values),first=values.get(group.values[0]);if(first&&group.values.every(v=>values.get(v)?.id===first.id)&&[...values].filter(([,x])=>x.id===first.id).every(([v])=>set.has(v)))personCeilings[first.id]=Math.min(personCeilings[first.id],Math.max(0,group.max))}
  const goal=Math.min(upper(initial,remaining),ids.reduce((n,id)=>n+personCeilings[id],0));
- function visit(domains,left,chosen){
+ function visit(domains,left,chosen,strict){
   if(best.length===goal)return;
   if(++nodes>maxNodes||Date.now()-start>budget){timedOut=true;return}
+  if(strict&&(nodes>strictNodes||Date.now()>strictUntil)){phaseStopped=true;return}
   domains=domains.map(d=>d===null?null:d.filter(v=>left[values.get(v).id][values.get(v).kind]>0));
   const picked=new Set(chosen);for(const group of limits){const used=group.values.filter(v=>picked.has(v)).length;if(used>group.max)return;if(used===group.max){const ban=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!ban.has(v)))}}
-  const calendar=partialCalendar(input,values,domains,left,chosen),valid=chosen.filter(v=>calendar.complete.has(values.get(v).id));
+  const calendar=strict?partialCalendar(input,values,domains,left,chosen):null,valid=strict?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen;
   if(valid.length>best.length)best=valid.slice();if(best.length===goal)return;
-  if(!calendar.feasible)return;
+  if(calendar&&!calendar.feasible)return;
   const cells=slots.filter(s=>domains[s.index]?.length);if(!cells.length||chosen.length+Math.min(cells.length,ids.reduce((n,id)=>n+left[id].day+left[id].night,0))<=best.length)return;
   let s=cells[0];for(const x of cells)if(domains[x.index].length<domains[s.index].length||(domains[x.index].length===domains[s.index].length&&x.day<s.day))s=x;
   const cost=v=>domains.reduce((n,d)=>n+(d?.length?d.filter(w=>clashes.get(v).has(w)).length/d.length:0),0),costs=new Map(domains[s.index].map(v=>[v,cost(v)]));
   const payroll=payrollScores(input,values,chosen);
   const candidates=domains[s.index].slice().sort((a,b)=>{const x=values.get(a),y=values.get(b);return costs.get(a)-costs.get(b)||left[y.id][y.kind]/Math.max(1,remaining[y.id][y.kind])-left[x.id][x.kind]/Math.max(1,remaining[x.id][x.kind])||payroll(a)-payroll(b)||x.id-y.id});
-  for(const v of candidates){const x=values.get(v),next=domains.map(d=>d===null?null:d.filter(w=>!clashes.get(v).has(w)));next[s.index]=null;const rest=Object.fromEntries(ids.map(id=>[id,{...left[id]}]));rest[x.id][x.kind]--;visit(next,rest,[...chosen,v]);if(best.length===goal||timedOut)return}
-  const skipped=domains.slice();skipped[s.index]=null;visit(skipped,left,chosen);
+  for(const v of candidates){const x=values.get(v),next=domains.map(d=>d===null?null:d.filter(w=>!clashes.get(v).has(w)));next[s.index]=null;const rest=Object.fromEntries(ids.map(id=>[id,{...left[id]}]));rest[x.id][x.kind]--;visit(next,rest,[...chosen,v],strict);if(best.length===goal||timedOut||phaseStopped)return}
+  const skipped=domains.slice();skipped[s.index]=null;visit(skipped,left,chosen,strict);
  }
- visit(initial,remaining,[]);return {ok:true,partial:true,plan:best.map(v=>values.get(v)),nodes,timedOut,optimal:!timedOut||best.length===goal,elapsed:Date.now()-start};
+ if((input.requirements||[]).some(r=>!r.soft)||(input.gapRules||[]).some(r=>!r.soft))visit(initial,remaining,[],true);
+ if(best.length<goal&&!timedOut){phaseStopped=false;visit(initial,remaining,[],false)}
+ return {ok:true,partial:true,plan:best.map(v=>values.get(v)),nodes,timedOut,optimal:!timedOut||best.length===goal,elapsed:Date.now()-start};
 }
 if(typeof module!=='undefined')module.exports={solveTargets};
 else scope.onmessage=e=>{try{scope.postMessage(solveTargets(e.data))}catch(error){scope.postMessage({ok:false,error:String(error.message||error)})}};

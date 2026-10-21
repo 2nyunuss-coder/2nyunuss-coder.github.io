@@ -91,18 +91,22 @@ test('payroll is a soft tie-breaker: exact targets survive overtime and heavier 
  const before=JSON.stringify(data),r=solveTargets(data);validate(data,r);assert.equal(r.plan.find(x=>x.slot===0).id,2);assert.equal(r.plan.find(x=>x.slot===1).id,1);assert.equal(JSON.stringify(data),before);
 });
 
-test('partial mandatory days and gap edges match the largest safe plan on 120 enumerated calendars',()=>{
+test('partial fallback maximizes eligible coverage on 120 calendars with incomplete gap and return conditions',()=>{
  let seed=870;const rnd=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n};
  for(let trial=0;trial<120;trial++){
   const ids=[1,2,3],remaining=Object.fromEntries(ids.map(id=>[id,{day:rnd(5),night:0}])),slots=Array.from({length:6},(_,index)=>({index,day:index+1,kind:'day',allowed:ids.filter(()=>rnd(4)!==0)})),conflicts=[];
   for(let a=0;a<6;a++)for(let b=a+1;b<6;b++)for(const id of ids)if(rnd(9)===0)conflicts.push([`${a}:${id}`,`${b}:${id}`]);
   const requirements=[{id:2,values:['0:2','1:2']}],limits=[{values:['2:3','3:3','4:3','5:3'],max:trial%3}],gapRules=[{id:1,maxBlank:1,segments:[[1,6]],fixedDays:[],includeEdges:true}],data={ids,remaining,slots,conflicts,requirements,limits,gapRules,allowPartial:true};let optimum=0;
-  function valid(picked){
-   const active=new Set([...picked].map(v=>Number(v.split(':')[1])));
-   if(requirements.some(r=>active.has(r.id)&&!r.values.some(v=>picked.has(v))))return false;
-   for(const r of gapRules)if(active.has(r.id)){const days=[0,...[...picked].filter(v=>Number(v.split(':')[1])===r.id).map(v=>slots[Number(v.split(':')[0])].day).sort((a,b)=>a-b),7];if(days.slice(1).some((d,i)=>d-days[i]-1>r.maxBlank))return false}return true;
-  }
-  function brute(i,left,picked){if(limits.some(g=>g.values.filter(v=>picked.has(v)).length>g.max))return;if(i===6){if(valid(picked))optimum=Math.max(optimum,picked.size);return}brute(i+1,left,picked);for(const id of slots[i].allowed){const v=`${i}:${id}`;if(!left[id].day||conflicts.some(([a,b])=>(a===v&&picked.has(b))||(b===v&&picked.has(a))))continue;left[id].day--;picked.add(v);brute(i+1,left,picked);picked.delete(v);left[id].day++}}
-  brute(0,structuredClone(remaining),new Set());const result=solveTargets(data);assert.equal(result.timedOut,false);assert.equal(result.plan.length,optimum,'conditional calendar trial '+trial);assert.ok(valid(new Set(result.plan.map(x=>`${x.slot}:${x.id}`))),'unsafe partial trial '+trial);
+  function brute(i,left,picked){if(limits.some(g=>g.values.filter(v=>picked.has(v)).length>g.max))return;if(i===6){optimum=Math.max(optimum,picked.size);return}brute(i+1,left,picked);for(const id of slots[i].allowed){const v=`${i}:${id}`;if(!left[id].day||conflicts.some(([a,b])=>(a===v&&picked.has(b))||(b===v&&picked.has(a))))continue;left[id].day--;picked.add(v);brute(i+1,left,picked);picked.delete(v);left[id].day++}}
+  brute(0,structuredClone(remaining),new Set());const result=solveTargets(data);assert.equal(result.timedOut,false);assert.equal(result.plan.length,optimum,'conditional calendar trial '+trial);
  }
+});
+
+test('partial calendar seed still satisfies mandatory days and gaps when full coverage permits them',()=>{
+ const data={allowPartial:true,ids:[1,2],remaining:{1:{day:3,night:0},2:{day:3,night:0}},slots:Array.from({length:6},(_,index)=>({index,day:index+1,kind:'day',allowed:[1,2]})),conflicts:[],requirements:[{id:2,values:['0:2']}],gapRules:[{id:1,segments:[[1,6]],fixedDays:[],includeEdges:true,maxBlank:1}]};
+ const result=solveTargets(data);validate(data,result);assert.equal(result.plan.find(x=>x.slot===0).id,2);const days=[0,...result.plan.filter(x=>x.id===1).map(x=>x.slot+1).sort((a,b)=>a-b),7];assert.ok(days.slice(1).every((d,i)=>d-days[i]-1<=1));
+});
+test('an impossible calendar condition never deletes all of a persons eligible partial duties',()=>{
+ const data={allowPartial:true,ids:[1,2],remaining:{1:{day:2,night:0},2:{day:2,night:0}},slots:Array.from({length:4},(_,index)=>({index,day:index+1,kind:'day',allowed:[1,2]})),conflicts:[],requirements:[{id:1,values:[]}],gapRules:[{id:2,segments:[[1,30]],fixedDays:[],includeEdges:true,maxBlank:5}]};
+ const before=JSON.stringify(data),r=solveTargets(data);validate(data,r);assert.equal(r.plan.length,4);assert.equal(r.timedOut,false);assert.ok(r.nodes<7000);assert.equal(JSON.stringify(data),before);
 });

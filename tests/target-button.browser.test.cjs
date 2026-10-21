@@ -115,3 +115,24 @@ test('real button respects dated leave, Thursday preparation, first working day,
   assert.deepEqual(Object.values(result.actual).map(x=>[x.day,x.night]),[[5,7],[4,6],[4,5],[4,6],[3,4],[1,2]]);assert.ok(result.berk.includes(1));assert.ok(result.berk.includes(8));for(const d of [2,3,4,5,6,7])assert.ok(!result.berk.includes(d),'blocked day '+d);assert.equal(result.previous,2);assert.equal(result.erdFirst,0);assert.equal(result.rest,0);assert.equal(result.payroll['2026-10|1|total'],220);assert.equal(result.payroll['2026-10|1|muk'],140);assert.equal(result.targetsUnchanged,true);assert.match(result.html,/Dağıtım sonrası Saymanlık kontrolü/);assert.match(result.html,/mükellef 140 saat \/ görünen toplam 220 saat/);assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });
+
+test('Berk and Ulaş are retained through the real button when cleared cells and incomplete calendar conditions coexist',async()=>{
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const context=await browser.newContext();await context.route('**/*',route=>{const u=new URL(route.request().url()),name=u.pathname.slice(1);if(u.hostname==='rpys.test'&&!name)return route.fulfill({contentType:'text/html; charset=utf-8',body:fixtureHTML()});if(u.hostname==='rpys.test'&&['rpys-runtime-v397.js','rpys-scheduler-v398.js','rpys-targets-v399.js','rpys-target-worker.js'].includes(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,name),'utf8')});return route.fulfill({status:404,body:''})});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://rpys.test/');await page.waitForSelector('[data-target-action=run]');
+  await page.evaluate(()=>{
+   db.staff[1].name='Ulaş';const cfg=rpysTargets399.config(autoUnit.value);cfg.people[2]={day:1,night:2};cfg.people[6]={day:4,night:6};document.getElementById('rebuildSelectedUnitV246').checked=false;
+   db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-06'}];window.isOnLeave=(id,d)=>db.leaves.some(l=>l.personId===id&&l.start<=dateStr(d)&&l.end>=dateStr(d));
+   window.unitRulesV251=()=>({maxGapEnabled:true});window.unitMaxGapDaysV251=()=>5;window.nonLeaveSegmentsV2414=()=>[[1,30]];window.spouseOf=()=>null;window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__=1;
+   window.v251GapViolations=ids=>ids.flatMap(id=>{const days=[0,...assignmentsMonth().filter(a=>a.person.id===id&&a.col.unit===autoUnit.value).map(a=>a.day).sort((a,b)=>a-b),31];return days.slice(1).flatMap((d,i)=>d-days[i]-1>5?[{id,left:days[i],right:d,blank:d-days[i]-1}]:[])});
+   const base=window.canTakeShiftV2414;window.canTakeShiftV2414=(id,d,...args)=>!(id===1&&d===7)&&base(id,d,...args);
+   Object.assign(db.assign,{'2026-10|acil|1|day':1,'2026-10|acil|3|night':2,'2026-10|acil|9|other':4,'2026-09|acil|30|night':3});db.assignmentMeta['2026-10|acil|1|day']={manual:true};db.rpysCellLocks['2026-10|acil|3|night']={exists:true,value:2};
+   for(let d=1;d<=30;d++)for(const k of ['day','night'])if((k==='night'||d<=21)&&!db.assign[`2026-10|acil|${d}|${k}`])db.assign[`2026-10|acil|${d}|${k}`]=null;
+   window.targetSnapshot=JSON.stringify(cfg.people);window.guardSnapshot=JSON.stringify([db.assignmentMeta,db.rpysCellLocks]);
+  });
+  await page.locator('[data-target-action=run]').click();await page.waitForFunction(()=>fixtureResult.saved.length===1);
+  const result=await page.evaluate(()=>({actual:rpysTargets399.model(autoUnit.value).actual,text:document.querySelector('[data-target-feedback]').textContent,report:document.querySelector('.rpysTargetLastResult399').textContent,protected:[db.assign['2026-10|acil|1|day'],db.assign['2026-10|acil|3|night'],db.assign['2026-10|acil|9|other'],db.assign['2026-09|acil|30|night']],guards:JSON.stringify([db.assignmentMeta,db.rpysCellLocks])===guardSnapshot,targets:JSON.stringify(rpysTargets399.config(autoUnit.value).people)===targetSnapshot,rest:rpysRest16V397.allViolations().size,blocked:assignmentsMonth().filter(a=>a.person.id===1&&[2,3,4,5,6,7].includes(a.day)).length,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
+  assert.deepEqual(Object.values(result.actual).map(x=>[x.day,x.night]),[[5,7],[1,2],[4,5],[4,6],[3,4],[4,6]]);assert.deepEqual(result.protected,[1,2,4,3]);assert.equal(result.guards,true);assert.equal(result.targets,true);assert.equal(result.blocked,0);assert.equal(result.rest,0);assert.equal(result.busy,'false');assert.match(result.text,/Kısmi dağıtım uygulandı/);assert.match(result.report,/Berk Yaşar.*7.*izin dönüşü/);assert.match(result.report,/Ulaş.*boş gün/);assert.deepEqual(errors,[]);
+ }finally{await browser.close()}
+});

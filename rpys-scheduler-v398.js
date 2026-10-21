@@ -33,7 +33,7 @@
     const parts=key.split('|'),col=dutyColumnByKey(parts[1],parts.slice(3).join('|'));
     if(col?.unit!==run.unit)return true;
     if(run.targetIds&&Number(reference.assign?.[key]||0)&&!run.targetIds.has(Number(reference.assign[key])))return true;
-    return !run.rebuild&&own(run.before.assign,key);
+    return !run.rebuild&&!!Number(run.before.assign?.[key]||0);
   }
   function mayClear(key){return !!run?.rebuild&&!protectedCell(key)}
   function repairCache(source){
