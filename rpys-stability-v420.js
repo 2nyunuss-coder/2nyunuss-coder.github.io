@@ -8,6 +8,7 @@
   element.innerHTML=html;htmlByElement.set(element,html);
  }
  function repairPatch(js,slug){
+  if(slug==='rpys-patch319fixed')js=js.replace("if(!m||$('#'+id))continue;", "if(!m||$('#'+id)||window.rpysStability420.hasEquivalent(m,lab))continue;");
   const names={
    'rpys-patch332':['bindSuitable','stableSuitable','openSuitable332'],
    'rpys-patch336':['bindSuitable336','render336'],
@@ -40,6 +41,7 @@
   return js;
  }
  function repairEmbedded(js){
+  if(js.includes('rpysF20PolTrackSummary'))js=js.replace(/(function summary\(\)\{[^\n]*?)h\.innerHTML=(`[^\n]*`)/g,"$1window.rpysStability420.updateHtml(h,$2,'.tablewrap')");
   if(!js.includes('__RPYS_FIXPACK_319__'))return js;
   js=js.replace(/  function addSayGrandTotals\(\)\{[^\n]*\}/,'  function addSayGrandTotals(){window.rpysStability420.renderGrandTotals()}');
   js=js.replace('function enrichSuitable(){','function enrichSuitable(){'+owner);
@@ -50,8 +52,8 @@
   return js;
  }
  function repair(html){
-  return html.replace(/((?:const|let|var)\s+\w+\s*=\s*)(["'])([A-Za-z0-9+/=]{200,})\2/g,(whole,prefix,quote,b64)=>{
-   try{const original=new TextDecoder().decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))),next=repairEmbedded(original);if(next===original)return whole;const bytes=new TextEncoder().encode(next);let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return prefix+quote+btoa(binary)+quote}catch{return whole}
+  return html.replace(/(["'])([A-Za-z0-9+/=]{200,})\1/g,(whole,quote,b64)=>{
+   try{const original=new TextDecoder().decode(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))),next=repairEmbedded(original);if(next===original)return whole;const bytes=new TextEncoder().encode(next);let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return quote+btoa(binary)+quote}catch{return whole}
   });
  }
  function action(text){text=String(text).toLocaleUpperCase('tr-TR');if(text.includes('KİLİTLE')||text.includes('KİLİDİ AÇ'))return 'lock';if(text.includes('SEÇİLİ')&&/ÇALIŞMAYI DEĞİŞTİR|HÜCREYİ DEĞİŞTİR/.test(text))return 'swap';return ''}

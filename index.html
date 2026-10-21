@@ -19,7 +19,7 @@
 <div class="small">Program GitHub Pages üzerinden açılır; uygulama ve ana veri güvenli Supabase katmanından gelir.</div>
 </div>
 <script src="/rpys-scheduler-v398.js?v=20261021-fill-8"></script>
-<script src="/rpys-stability-v420.js?v=20261019-3"></script>
+<script src="/rpys-stability-v420.js?v=20261021-idle-9"></script>
 <script>
 (async()=>{
  const APP_SOURCE='https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-app-source';
@@ -101,7 +101,7 @@
    // Canli revizyon takibi zaten rpys-live-sync-v319 + v400 kayit korumasi ile yapiliyor;
    // eski bulut cekme eklentisini yukleme listesinden tamamen cikar.
    app=replaceOnce(app,'["372.4","rpys-patch372","3724"],','');
-   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261019-3"><'+'/script>');
+   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261021-idle-9"><'+'/script>');
    // Only one revision watcher owns this page. Remote changes require an explicit refresh.
    app=app.replace(/<script\b[^>]*id=["']rpys-live-sync-v319["'][^>]*>[\s\S]*?<\/script>/i,
      '<script id="rpys-live-sync-v419" src="/rpys-live-sync-v419.js?v=20261019-1"><'+'/script>');
@@ -274,7 +274,7 @@
      .replace(/\/rpys-saymanlik-hakedis-fix-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-2');
    const uiLoader=`async function stableUiPatch420(slug,ver){const r=await fetch(base+'/functions/v1/'+slug+'?v='+encodeURIComponent(ver)+'&cb=420',{cache:'no-store'});if(!r.ok)throw new Error(slug+' HTTP '+r.status);(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug))}`;
    app=app.replace("async function tag(slug,ver){",uiLoader+"async function tag(slug,ver){");
-   app=app.replace("else await tag(slug,ver);", "else if(['rpys-patch322','rpys-patch336','rpys-patch337','rpys-patch338','rpys-patch339','rpys-patch340','rpys-patch352','rpys-patch353','rpys-patch383','rpys-patch388'].includes(slug))await stableUiPatch420(slug,ver);else await tag(slug,ver);");
+   app=app.replace("else await tag(slug,ver);", "else if(['rpys-patch319fixed','rpys-patch322','rpys-patch336','rpys-patch337','rpys-patch338','rpys-patch339','rpys-patch340','rpys-patch352','rpys-patch353','rpys-patch383','rpys-patch388'].includes(slug))await stableUiPatch420(slug,ver);else await tag(slug,ver);");
    app=app.replace("(0,eval)(await r.text());if(test())", "(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug));if(test())");
    app=app.replace("(0,eval)(js)}async function ensureCritical", "(0,eval)(window.rpysStability420.repairPatch(js,'rpys-patch332'))}async function ensureCritical");
    app=app.replace(/\/rpys-scheduler-v398\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-scheduler-v398.js?v=20261021-fill-8');

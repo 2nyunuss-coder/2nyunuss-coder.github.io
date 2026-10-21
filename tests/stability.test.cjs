@@ -72,3 +72,26 @@ test('legacy tracking panel preserves unsaved controls and presentation decorati
   f.w.config='2026-11-01';f.w.buildTracking322();assert.equal(f.w.document.getElementById('p322Start').value,'2026-11-01');obs.disconnect();
  }finally{f.dom.window.close()}
 });
+
+test('external legacy menus reuse equivalent lock and swap actions instead of recreating removed duplicates',()=>{
+ const f=fixture('<div id="cellContextMenu"><button id="lock">🔒 Seçili Hücreleri Kilitle / Aç</button><button id="swap">↔ Seçili 2 çalışmayı Değiştir</button></div>');try{
+  const w=f.w;w.db={assign:{protected:1}};const before=JSON.stringify(w.db);let clicks=0;w.document.getElementById('lock').onclick=()=>clicks++;
+  const source="const $=s=>document.querySelector(s);function menu(){for(const [id,lab] of [['r319sl','🔒 Seçili hücreleri Kilitle / Aç'],['r319ss','↔ Seçili 2 çalışmayı Değiştir']]){let m=$('#cellContextMenu');if(!m||$('#'+id))continue;let b=document.createElement('button');b.id=id;b.textContent=lab;m.append(b)}}";
+  w.eval(f.api.repairPatch(source,'rpys-patch319fixed'));const obs=new w.MutationObserver(()=>{});obs.observe(w.document.body,{subtree:true,childList:true});
+  for(let i=0;i<30;i++)w.menu();assert.equal(obs.takeRecords().length,0);assert.equal(w.document.querySelectorAll('button').length,2);w.document.getElementById('lock').click();assert.equal(clicks,1);
+  w.document.getElementById('lock').remove();w.menu();assert.equal(w.document.querySelectorAll('button').length,2);assert.ok(w.document.getElementById('r319sl'),'a missing action is still installed');assert.equal(JSON.stringify(w.db),before);obs.disconnect();
+ }finally{f.dom.window.close()}
+});
+
+test('window-assigned encoded tracking summary stops its observer loop and preserves table controls until data changes',()=>{
+ const f=fixture('<div id="rpysF20PolTrackSummary"></div>');try{
+  const source='var count=1;function summary(){let h=document.getElementById("rpysF20PolTrackSummary");if(!h)return;h.innerHTML=`<div class="tablewrap"><table><tbody><tr><td>${count}</td></tr></tbody></table></div>`}';
+  const encoded=Buffer.from(source).toString('base64'),html='window.__F20_SOURCE="'+encoded+'";',repaired=f.api.repair(html);assert.notEqual(repaired,html,'window property payload must be patched too');f.w.eval(repaired);f.w.eval(f.w.atob(f.w.__F20_SOURCE));f.w.summary();const table=f.w.document.querySelector('table');const button=f.w.document.createElement('button');button.textContent='Zoom';table.parentElement.prepend(button);
+  const obs=new f.w.MutationObserver(()=>{});obs.observe(f.w.document.body,{subtree:true,childList:true});for(let n=0;n<40;n++)f.w.summary();assert.equal(obs.takeRecords().length,0);assert.equal(f.w.document.querySelector('table'),table);assert.ok(button.isConnected);
+  f.w.count=2;f.w.summary();assert.equal(f.w.document.querySelector('td').textContent,'2');assert.notEqual(f.w.document.querySelector('table'),table);obs.disconnect();
+ }finally{f.dom.window.close()}
+});
+
+test('unrelated encoded data and executable payloads remain byte-for-byte unchanged',()=>{
+ const f=fixture();try{const data=Buffer.from('unrelated data '.repeat(80)).toString('base64'),code=Buffer.from('window.unrelated=42;/*'+'x'.repeat(300)+'*/').toString('base64'),html=`<img src="data:image/png;base64,${data}"><script>window.bin="${data}";window.code="${code}";</script>`;assert.equal(f.api.repair(html),html)}finally{f.dom.window.close()}
+});
