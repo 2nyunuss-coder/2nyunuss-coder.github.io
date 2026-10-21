@@ -246,3 +246,18 @@ test('Berk and Ulaş keep eligible duties even when a mandatory return and low-t
  const f=fixture();enableEdgeGaps(f);f.c.db.staff[1].name='Ulaş';const cfg=f.c.rpysTargets399.config(unit);cfg.people[2]={day:1,night:2};cfg.people[6]={day:4,night:6};datedLeave(f,1,'2026-10-05','2026-10-06');const base=f.c.canTakeShiftV2414;f.c.canTakeShiftV2414=(id,d,...args)=>!(id===1&&d===7)&&base(id,d,...args);
  const before=JSON.stringify(cfg.people),r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.equal(r.partial,true);assert.ok(r.plan.some(x=>x.id===1),'Berk must retain eligible duties');assert.ok(r.plan.some(x=>x.id===2),'Ulaş must retain eligible duties');assert.equal(r.plan.length,51);assert.equal(JSON.stringify(cfg.people),before);assert.equal(f.saved.length,1);assert.equal(f.c.rpysRest16V397.allViolations().size,0);assert.match(f.controls.distResult.textContent,/Berk Yaşar.*7.*izin dönüşü/);assert.match(f.controls.distResult.textContent,/Ulaş.*boş gün/);assert.ok(!f.c.assignmentsMonth().some(a=>a.person.id===1&&[2,3,4,5,6,7].includes(a.day)));
 });
+
+function enableSharedRules(f,cfg={}){
+ f.c.RPYSRules=require('../rpys-rules-v421.js');f.c.db.distributionRulesV421={[unit]:f.c.RPYSRules.config({maxGapEnabled:false,spouseSameDay:false,preLeaveThursday:false,returnMonday:false,minGapEnabled:false,...cfg})};
+ vm.runInContext(fs.readFileSync(path.join(root,'rpys-rules-runtime-v421.js'),'utf8'),f.c);
+}
+test('shared custom duty cap is applied per unit and switching it off restores all manual targets',async()=>{
+ const f=fixture();enableSharedRules(f,{custom:[{id:'limit',name:'Berk en fazla iki',type:'maxDuties',personId:'1',value:2,enabled:true}]});const targets=JSON.stringify(f.c.rpysTargets399.config(unit).people);let r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.equal(r.partial,true);assert.equal(f.c.rpysTargets399.model(unit).actual[1].day+f.c.rpysTargets399.model(unit).actual[1].night,2);assert.equal(r.plan.length,41);
+ f.c.db.distributionRulesV421[unit].custom[0].enabled=false;r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.equal(r.plan.length,51);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),targets);assert.equal(f.saved.length,2);
+});
+test('post-duty rule switch changes Worker conflicts and the transaction guard consistently',async()=>{
+ for(const on of [true,false]){const f=fixture();f.c.daysInMonth=()=>2;f.c.isDutyCellApplicable=(type,col)=>col.key==='night';f.controls.autoPeople.selectedOptions=[{value:1}];f.c.rpysTargets399.config(unit).people[1]={day:0,night:2};enableSharedRules(f,{noPostDuty:on});const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.equal(r.plan.length,on?1:2);assert.equal(r.partial,on);assert.equal(f.saved.length,1);assert.equal(f.c.rpysRest16V397.allViolations().size,on?0:1)}
+});
+test('shared rule settings and custom date blocks are isolated between units',()=>{
+ const f=fixture();enableSharedRules(f,{spouseSameDay:false,custom:[{id:'day',name:'Berk tarih yasağı',type:'blockedDates',personId:'1',dates:['2026-10-02'],enabled:true}]});assert.equal(f.c.rpysRules421.enabled(unit,'spouseSameDay'),false);assert.equal(f.c.rpysRules421.enabled('OTHER','spouseSameDay'),true);assert.match(f.c.rpysRules421.customReason(1,2,f.cols.day,unit),/tarih yasağı/);assert.equal(f.c.rpysRules421.customReason(1,2,f.cols.other,'OTHER'),'');
+});

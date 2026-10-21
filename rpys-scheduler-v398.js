@@ -100,7 +100,9 @@
   }
   function spouseDayViolations(month){
     if(typeof spouseOf!=='function')return [];
-    const staff=db.staff||[],pairs=new Set(),rows=allAssignmentsAllMonths().filter(a=>a.monthKey===month);
+    if(window.rpysRules421&&!window.rpysRules421.enabled(run?.unit||document.getElementById('autoUnit')?.value||'','spouseSameDay'))return [];
+    const staff=db.staff||[],pairs=new Set(),rows=Object.entries(db.assign||{}).filter(([k,id])=>k.startsWith(month+'|')&&Number(id)).map(([k,id])=>({person:{id:Number(id)},day:Number(k.split('|')[2])}));
+    for(const r of db.importedRecords||[])if(r.monthKey===month&&!(typeof isImportedShiftBlocked==='function'&&isImportedShiftBlocked(r)))rows.push({person:{id:Number(r.personId)},day:Number(r.day)});
     const byId=new Map(),out=[];
     for(const a of rows){const id=Number(a.person?.id||0),day=Number(a.day);if(!id||!day)continue;if(!byId.has(id))byId.set(id,new Set());byId.get(id).add(day)}
     for(const p of staff){
@@ -110,7 +112,9 @@
       for(const d of new Set([...a,...b])){
         if(a.has(d)===b.has(d))continue;
         const missing=a.has(d)?other:id;
-        let leave=false;try{leave=typeof isOnLeave==='function'&&!!isOnLeave(missing,d)}catch(_){}
+        const date=month+'-'+String(d).padStart(2,'0'),person=staff.find(p=>Number(p.id)===missing);
+        let leave=(db.leaves||[]).some(l=>Number(l.personId??l.idPerson??l.person?.id)===missing&&l.start<=date&&l.end>=date);
+        try{if(month===ym()&&typeof isOnLeave==='function')leave=leave||!!isOnLeave(missing,d);if(month===ym()&&person&&typeof getCellStatus==='function')leave=leave||['izin','rapor','gecici','ketem','yillik','yıllık'].includes(String(getCellStatus(person.name,d)||'').toLocaleLowerCase('tr-TR'));if(person&&typeof personStatusAt==='function')leave=leave||personStatusAt(person,date)!=='Aktif'}catch(_){}
         if(leave)continue;
         out.push({key:pk+'|'+d,day:d,first:id,second:other,missing});
       }
@@ -183,7 +187,7 @@
         const beforeSpouses=new Set(spouseDayViolations(month).map(x=>x.key));
         value=window.rpysRest16V397.runIndexed(()=>window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
         if(value&&typeof value.then==='function')throw Error('Beklenmeyen asenkron motor; liste korunarak işlem durduruldu.');
-        for(const key of restCheck().keys())if(!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
+        for(const key of restCheck().keys())if(window.rpysRules421?.enabled(unit,'noPostDuty')!==false&&!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
         if(newSpouseIssues.length){const x=newSpouseIssues[0];throw Error('Eşlerin aynı gün çalışma kuralı: '+(getPersonById(x.first)?.name||x.first)+' / '+(getPersonById(x.second)?.name||x.second)+', '+x.day+'. gün. İzinli olmayan eş tek başına görevlendirilemez.');}
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
@@ -209,7 +213,7 @@
     if(!targetRunner)throw Error('Güvenli hedef dağıtım motoru henüz yüklenemedi. Sayfayı yenileyin.');
     return targetRunner();
   }
-  window.rpysScheduler398={runTargets,repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,spouseDayViolations,running:()=>!!run};
+  window.rpysScheduler398={runTargets,repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);

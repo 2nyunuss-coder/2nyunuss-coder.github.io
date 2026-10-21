@@ -5,3 +5,24 @@ test('infeasible staffing leaves gaps rather than overriding rules',()=>{const s
 test('adjacent month duties enforce rest and are preserved',()=>{const s=fixture();s.assign['2026-09|30|d|0']='0';assert.equal(E.reason(s,s.people[0],1,s.shifts[0]),'Dinlenme süresi yetersiz');const out=E.generate(s);assert.equal(out.assign['2026-09|30|d|0'],'0');assert.notEqual(out.assign['2026-10|1|d|0'],'0');});
 test('hours summary isolates month and calculates target difference',()=>{const s=fixture();s.assign={'2026-10|1|d|0':'0','2026-10|3|d|0':'0','2026-09|1|d|0':'0'};s.people[0].target=40;const p=E.totals(s)[0];assert.equal(p.hours,48);assert.equal(p.extra,8);assert.equal(p.missing,0);assert.equal(p.count,2);});
 test('same-day second shift and future adjacent duty are rejected',()=>{const s=fixture();s.shifts.push({id:'n',start:20,hours:8});s.assign['2026-10|1|d|0']='0';assert.equal(E.reason(s,s.people[0],1,s.shifts[1]),'Aynı gün ikinci görev');s.assign={'2026-11|1|d|0':'0'};assert.equal(E.reason(s,s.people[0],31,s.shifts[0]),'Dinlenme süresi yetersiz');});
+
+test('unit-specific rules, cross-unit overlap and next-day rest share the same assigned records',()=>{
+ const s=fixture();s.unit='A';s.shifts[0].unit='A';s.shifts.push({id:'b',unit:'B',name:'B gündüz',start:8,hours:8,weekday:1,weekend:0});s.unitRules={A:{...s.rules},B:{...s.rules,avoidSameDay:true,noPostDuty:true}};s.assign={'2026-10|1|d|0':'0'};
+ assert.equal(E.reason({...s,unit:'B'},s.people[0],1,s.shifts[1]),'Aynı gün ikinci görev');assert.equal(E.reason({...s,unit:'B'},s.people[0],2,s.shifts[1]),'Dinlenme süresi yetersiz');s.unitRules.B.noPostDuty=false;s.unitRules.B.minGapEnabled=false;assert.equal(E.reason({...s,unit:'B'},s.people[0],2,s.shifts[1]),'');assert.equal(E.rules(s,'A').noPostDuty,true);
+});
+test('multi-unit bulk generation preserves manual, locked, unselected and previous-month duties',()=>{
+ const s=fixture();s.unit='A';s.shifts[0].unit='A';s.shifts.push({id:'b',unit:'B',name:'B',start:8,hours:8,weekday:1,weekend:0},{id:'c',unit:'C',name:'C',start:8,hours:8,weekday:1,weekend:0});s.assign={'2026-09|30|d|0':'0','2026-10|1|d|0':'1','2026-10|2|b|0':'2','2026-10|3|c|0':'3'};s.assignmentMeta={'2026-10|1|d|0':{manual:true}};s.locks={'2026-10|2|b|0':true,'2026-10|4|b|0':true};const before=JSON.stringify(s),r=E.generate(s,{units:['A','B'],rebuild:true});assert.equal(JSON.stringify(s),before);for(const [k,id] of Object.entries(s.assign))assert.equal(r.assign[k],id);assert.equal(r.assign['2026-10|4|b|0'],undefined);assert.ok(Object.keys(r.assign).filter(k=>k.includes('|b|')).length>5);
+});
+test('FHZ only uses eligible actual shift snapshots and editing shift definitions never rewrites history',()=>{
+ const s=fixture();s.unit='A';s.shifts[0].unit='A';s.shifts[0].fhzEligible=true;s.fhz={dailyHours:7,addDaysPer360:90};s.assign={'2026-10|1|d|0':'0'};E.snapshot(s,'2026-10|1|d|0',s.shifts[0],true);s.shifts[0].hours=8;s.shifts[0].fhzEligible=false;const r=E.totals(s)[0];assert.equal(r.hours,24);assert.equal(r.fhzHours,24);assert.equal(r.workDays,24/7);assert.equal(r.fhzDays,24/7*90/360);
+});
+test('alternate-duty warnings, custom dates and custom caps can each be switched independently',()=>{
+ const s=fixture();s.assign={'2026-10|1|d|0':'0'};assert.ok(E.issues(s,s.people[0],3,s.shifts[0]).some(x=>/Gün aşırı/.test(x.message)&&x.severity==='warning'));s.rules.avoidAlternate=false;assert.ok(!E.issues(s,s.people[0],3,s.shifts[0]).some(x=>/Gün aşırı/.test(x.message)));
+ s.rules.custom=[{id:'x',name:'Ayın üçü boş',type:'blockedDates',personId:'0',dates:['2026-10-03'],enabled:true}];assert.equal(E.reason(s,s.people[0],3,s.shifts[0]),'Ayın üçü boş');s.rules.custom[0].enabled=false;assert.equal(E.reason(s,s.people[0],3,s.shifts[0]),'');
+});
+test('a spouse on leave is exempt from the matching-day warning',()=>{
+ const s=fixture();s.people[0].spouseId='1';s.people[1].spouseId='0';s.people[1].unavailable=['2026-10-01'];s.assign={'2026-10|1|d|0':'0'};assert.ok(!E.audit(s).some(x=>x.key.startsWith('spouse')));s.people[1].unavailable=[];assert.ok(E.audit(s).some(x=>x.key.startsWith('spouse')));
+});
+test('an overnight shift shorter than 16 hours also protects the next calendar day',()=>{
+ const s=fixture();s.shifts=[{id:'n',name:'Gece',start:20,hours:8,weekday:1,weekend:1}];s.assign={'2026-10|1|n|0':'0'};assert.equal(E.reason(s,s.people[0],2,s.shifts[0]),'Dinlenme süresi yetersiz');s.rules.noPostDuty=false;assert.equal(E.reason(s,s.people[0],2,s.shifts[0]),'');
+});

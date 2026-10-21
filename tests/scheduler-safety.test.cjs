@@ -119,3 +119,14 @@ test('non-rebuild transactions can fill cleared null cells while protecting expl
  f.controls.rebuildSelectedUnitV246.checked=false;f.c.db.assign[key]=null;f.c.autoDistribute();assert.equal(f.c.db.assign[key],1);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
  const locked=fixture(c=>{assert.equal(c.rpysScheduler398.protectedCell(key),true);c.db.assign[key]=1;c.saveNowV245()});locked.controls.rebuildSelectedUnitV246.checked=false;locked.c.db.assign[key]=null;locked.c.db.rpysCellLocks[key]={exists:false};const before=JSON.stringify(locked.c.db);locked.c.autoDistribute();assert.equal(JSON.stringify(locked.c.db),before);assert.equal(locked.saved.length,0);
 });
+
+test('a spouse marked on leave in Saymanlık may stay home while the other spouse works',()=>{
+ const f=fixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.saveNowV245()});f.c.allAssignmentsAllMonths=()=>Object.entries(f.c.db.assign).map(([k,id])=>{const [month,type,day,col]=k.split('|');return {monthKey:month,type,day:Number(day),col:f.cols[col],person:f.c.getPersonById(id)}});f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.isOnLeave=()=>false;f.c.getCellStatus=(name,d)=>name==='Person B'&&d===2?'izin':'';
+ f.c.autoDistribute();assert.equal(f.c.db.assign['2026-10|pol|2|day'],1);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
+});
+test('spouse leave is checked against the requested month and supports existing leave aliases',()=>{
+ const f=fixture();f.c.allAssignmentsAllMonths=()=>Object.entries(f.c.db.assign).map(([k,id])=>{const [month,type,day,col]=k.split('|');return {monthKey:month,type,day:Number(day),col:f.cols[col],person:f.c.getPersonById(id)}});f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.db.assign['2026-09|pol|2|day']=1;f.c.db.leaves=[{idPerson:2,start:'2026-09-01',end:'2026-09-05'}];f.c.isOnLeave=()=>false;assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-09').length,0);f.c.db.leaves=[];assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-09').length,1);
+});
+test('an available spouse still requires the shared day while the spouse rule is enabled',()=>{
+ const f=fixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.saveNowV245()});f.c.allAssignmentsAllMonths=()=>Object.entries(f.c.db.assign).map(([k,id])=>{const [month,type,day,col]=k.split('|');return {monthKey:month,type,day:Number(day),col:f.cols[col],person:f.c.getPersonById(id)}});f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.isOnLeave=()=>false;const before=JSON.stringify(f.c.db);f.c.autoDistribute();assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts.at(-1),/Eşlerin aynı gün/);
+});

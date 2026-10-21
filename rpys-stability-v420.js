@@ -41,6 +41,7 @@
   return js;
  }
  function repairEmbedded(js){
+  js=js.replace(/^const spouseBad=\(ids\)=>[^\n]*$/m,"const spouseBad=(ids)=>(window.rpysScheduler398?.spouseDayViolations?.(ym())||[]).filter(x=>ids.map(Number).includes(x.first)||ids.map(Number).includes(x.second)).length;").replace(/^const spouseBad10=ids=>[^\n]*$/m,"const spouseBad10=ids=>(window.rpysScheduler398?.spouseDayViolations?.(ym())||[]).filter(x=>ids.map(Number).includes(x.first)||ids.map(Number).includes(x.second)).length;");
   if(js.includes('rpysF20PolTrackSummary'))js=js.replace(/(function summary\(\)\{[^\n]*?)h\.innerHTML=(`[^\n]*`)/g,"$1window.rpysStability420.updateHtml(h,$2,'.tablewrap')");
   if(!js.includes('__RPYS_FIXPACK_319__'))return js;
   js=js.replace(/  function addSayGrandTotals\(\)\{[^\n]*\}/,'  function addSayGrandTotals(){window.rpysStability420.renderGrandTotals()}');
