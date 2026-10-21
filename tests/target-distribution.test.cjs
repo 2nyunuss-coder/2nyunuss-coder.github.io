@@ -85,3 +85,24 @@ test('exact weekend/weekday night subsets agree with exhaustive enumeration on 2
   const expected=brute(0,structuredClone(remaining),new Set()),r=solveTargets({ids,remaining,slots,limits});assert.equal(r.timedOut,false);assert.equal(r.ok,expected,'weekend trial '+trial);
  }
 });
+
+test('payroll is a soft tie-breaker: exact targets survive overtime and heavier work favours the lower balance',()=>{
+ const data={ids:[1,2],remaining:{1:{day:0,night:1},2:{day:0,night:1}},slots:[{index:0,day:1,kind:'night',hours:24,category:'ac',allowed:[1,2]},{index:1,day:3,kind:'night',hours:16,category:'ac',allowed:[1,2]}],payroll:{1:{worked:180,obligation:160,cap:0},2:{worked:120,obligation:160,cap:30}},conflicts:[]};
+ const before=JSON.stringify(data),r=solveTargets(data);validate(data,r);assert.equal(r.plan.find(x=>x.slot===0).id,2);assert.equal(r.plan.find(x=>x.slot===1).id,1);assert.equal(JSON.stringify(data),before);
+});
+
+test('partial mandatory days and gap edges match the largest safe plan on 120 enumerated calendars',()=>{
+ let seed=870;const rnd=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n};
+ for(let trial=0;trial<120;trial++){
+  const ids=[1,2,3],remaining=Object.fromEntries(ids.map(id=>[id,{day:rnd(5),night:0}])),slots=Array.from({length:6},(_,index)=>({index,day:index+1,kind:'day',allowed:ids.filter(()=>rnd(4)!==0)})),conflicts=[];
+  for(let a=0;a<6;a++)for(let b=a+1;b<6;b++)for(const id of ids)if(rnd(9)===0)conflicts.push([`${a}:${id}`,`${b}:${id}`]);
+  const requirements=[{id:2,values:['0:2','1:2']}],limits=[{values:['2:3','3:3','4:3','5:3'],max:trial%3}],gapRules=[{id:1,maxBlank:1,segments:[[1,6]],fixedDays:[],includeEdges:true}],data={ids,remaining,slots,conflicts,requirements,limits,gapRules,allowPartial:true};let optimum=0;
+  function valid(picked){
+   const active=new Set([...picked].map(v=>Number(v.split(':')[1])));
+   if(requirements.some(r=>active.has(r.id)&&!r.values.some(v=>picked.has(v))))return false;
+   for(const r of gapRules)if(active.has(r.id)){const days=[0,...[...picked].filter(v=>Number(v.split(':')[1])===r.id).map(v=>slots[Number(v.split(':')[0])].day).sort((a,b)=>a-b),7];if(days.slice(1).some((d,i)=>d-days[i]-1>r.maxBlank))return false}return true;
+  }
+  function brute(i,left,picked){if(limits.some(g=>g.values.filter(v=>picked.has(v)).length>g.max))return;if(i===6){if(valid(picked))optimum=Math.max(optimum,picked.size);return}brute(i+1,left,picked);for(const id of slots[i].allowed){const v=`${i}:${id}`;if(!left[id].day||conflicts.some(([a,b])=>(a===v&&picked.has(b))||(b===v&&picked.has(a))))continue;left[id].day--;picked.add(v);brute(i+1,left,picked);picked.delete(v);left[id].day++}}
+  brute(0,structuredClone(remaining),new Set());const result=solveTargets(data);assert.equal(result.timedOut,false);assert.equal(result.plan.length,optimum,'conditional calendar trial '+trial);assert.ok(valid(new Set(result.plan.map(x=>`${x.slot}:${x.id}`))),'unsafe partial trial '+trial);
+ }
+});

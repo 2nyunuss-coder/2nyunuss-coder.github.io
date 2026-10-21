@@ -16,7 +16,7 @@ function fixtureHTML(){
  assert.ok(start>0&&end>start,'fixture extraction');
  fixture=fixture.slice(0,start)+`
  for(const [key,value] of Object.entries(c))if(!['document','window','setTimeout','clearTimeout','Date','URL','Worker','addEventListener'].includes(key))window[key]=value;
- Object.defineProperty(c,'db',{get:()=>window.db,set:v=>window.db=v});window.fixtureResult={saved,alerts,controls};
+ Object.defineProperty(c,'db',{get:()=>window.db,set:v=>window.db=v});Object.defineProperty(c,'isOnLeave',{get:()=>window.isOnLeave,set:v=>window.isOnLeave=v});window.fixtureResult={saved,alerts,controls};
  `+fixture.slice(end);
  return `<!doctype html><html><head><meta charset="utf-8"></head><body>
  <div class="autoBox"><select id="autoUnit"><option>PORTABL + SKOPİ</option></select>
@@ -98,5 +98,20 @@ test('weekend target inputs persist and the real button applies exact weekend co
   assert.match(await page.locator('.rpysTargetSummary399').textContent(),/Hafta sonu nöbet: 8 gereken \/ 8 hedef/);const before=await page.evaluate(()=>fixtureResult.saved.length);await page.locator('[data-target-action=run]').click();await page.waitForFunction(n=>fixtureResult.saved.length>n,before);
   const state=await page.evaluate(()=>({actual:rpysTargets399.model(autoUnit.value).actual,targets:rpysTargets399.config(autoUnit.value).people,text:document.querySelector('[data-target-feedback]').textContent,count:Object.keys(db.assign).length}));assert.equal(state.count,51);assert.deepEqual(Object.values(state.actual).map(x=>x.weekendNight),[2,2,1,1,1,1]);for(const id of [1,2,3,4,5,6])assert.equal(state.actual[id].night,state.targets[id].night);assert.match(state.text,/tam karşılandı/);
   await page.locator('[data-target-id="1"][data-target-kind=weekendNight]').fill('');assert.equal(await page.evaluate(()=>rpysTargets399.config(autoUnit.value).people[1].weekendNight),null);assert.match(await page.locator('.rpysTargetSummary399').textContent(),/1 kişi serbest/);assert.deepEqual(errors,[]);
+ }finally{await browser.close()}
+});
+
+test('real button respects dated leave, Thursday preparation, first working day, prior-month rest and payroll overrides',async()=>{
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const context=await browser.newContext();await context.route('**/*',route=>{const u=new URL(route.request().url()),name=u.pathname.slice(1);if(u.hostname==='rpys.test'&&!name)return route.fulfill({contentType:'text/html; charset=utf-8',body:fixtureHTML()});if(u.hostname==='rpys.test'&&['rpys-runtime-v397.js','rpys-scheduler-v398.js','rpys-targets-v399.js','rpys-target-worker.js'].includes(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,name),'utf8')});return route.fulfill({status:404,body:''})});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://rpys.test/');await page.waitForSelector('[data-target-action=run]');
+  await page.evaluate(()=>{
+   db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-06',type:'Yıllık İzin'}];window.isOnLeave=(id,d)=>db.leaves.some(l=>l.personId===id&&l.start<=dateStr(d)&&l.end>=dateStr(d));window.rpysHolidayInfo=date=>date==='2026-10-07'?{type:'full'}:null;
+   db.assign['2026-09|acil|30|night']=2;db.puantajOverride={'2026-10|1|total':220,'2026-10|1|muk':140};db.staff[0].mesaiBand='0-30';window.totals=()=>db.staff.map(p=>({p,total:assignmentsMonth().filter(a=>a.person.id===p.id).reduce((n,a)=>n+a.col.hours,0),muk:160}));window.puantajValue=(row,field)=>db.puantajOverride[`${ym()}|${row.p.id}|${field}`]??row[field];window.targetsBefore=JSON.stringify(rpysTargets399.config(autoUnit.value).people);
+  });
+  await page.locator('[data-target-action=run]').click();await page.waitForFunction(()=>fixtureResult.saved.length===1);
+  const result=await page.evaluate(()=>({actual:rpysTargets399.model(autoUnit.value).actual,berk:assignmentsMonth().filter(a=>a.person.id===1).map(a=>a.day),previous:db.assign['2026-09|acil|30|night'],rest:rpysRest16V397.allViolations().size,erdFirst:assignmentsMonth().filter(a=>a.person.id===2&&a.day===1).length,payroll:db.puantajOverride,report:document.querySelector('.rpysTargetLastResult399')?.textContent,html:document.querySelector('.rpysTargets399')?.textContent||document.body.textContent,targetsUnchanged:JSON.stringify(rpysTargets399.config(autoUnit.value).people)===targetsBefore}));
+  assert.deepEqual(Object.values(result.actual).map(x=>[x.day,x.night]),[[5,7],[4,6],[4,5],[4,6],[3,4],[1,2]]);assert.ok(result.berk.includes(1));assert.ok(result.berk.includes(8));for(const d of [2,3,4,5,6,7])assert.ok(!result.berk.includes(d),'blocked day '+d);assert.equal(result.previous,2);assert.equal(result.erdFirst,0);assert.equal(result.rest,0);assert.equal(result.payroll['2026-10|1|total'],220);assert.equal(result.payroll['2026-10|1|muk'],140);assert.equal(result.targetsUnchanged,true);assert.match(result.html,/Dağıtım sonrası Saymanlık kontrolü/);assert.match(result.html,/mükellef 140 saat \/ görünen toplam 220 saat/);assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });
