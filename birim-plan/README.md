@@ -15,4 +15,4 @@ Kayıt yalnız bu tarayıcıdadır. Sunucuya gönderilmez. Yedek yükleme mevcut
 
 Doğrulama: `node tests/unit-planner.test.cjs` ve Chromium/Playwright bulunan ortamda `node tests/unit-planner.browser.test.cjs`.
 
-Sürüm `20261021-rules-10`: RPYS otomatik dağıtım alanında **Birim kural listesi**, hedef ekranında **Kurallar** düğmesini kullanın. Bağımsız planlayıcıda birimi seçip **Kurallar** ekranını açın; ayarlar yalnız **Kaydet** ile uygulanır. Kapatılan kural diğer birimlerin ayarını değiştirmez. Eş izinli veya raporluysa eşlerin aynı gün çalışma şartı diğer eşin görev almasını engellemez.
+Sürüm `20261021-rules-11`: RPYS otomatik dağıtım alanında **Birim kural listesi**, hedef ekranında **Kurallar** düğmesini kullanın. Bağımsız planlayıcıda birimi seçip **Kurallar** ekranını açın; ayarlar yalnız **Kaydet** ile uygulanır. Kapatılan kural diğer birimlerin ayarını değiştirmez. Eş izinli veya raporluysa eşlerin aynı gün çalışma şartı diğer eşin görev almasını engellemez.
