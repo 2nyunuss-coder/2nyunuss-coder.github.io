@@ -261,3 +261,11 @@ test('post-duty rule switch changes Worker conflicts and the transaction guard c
 test('shared rule settings and custom date blocks are isolated between units',()=>{
  const f=fixture();enableSharedRules(f,{spouseSameDay:false,custom:[{id:'day',name:'Berk tarih yasağı',type:'blockedDates',personId:'1',dates:['2026-10-02'],enabled:true}]});assert.equal(f.c.rpysRules421.enabled(unit,'spouseSameDay'),false);assert.equal(f.c.rpysRules421.enabled('OTHER','spouseSameDay'),true);assert.match(f.c.rpysRules421.customReason(1,2,f.cols.day,unit),/tarih yasağı/);assert.equal(f.c.rpysRules421.customReason(1,2,f.cols.other,'OTHER'),'');
 });
+
+test('custom weekday restrictions follow the selected person and unit in RPYS eligibility',()=>{
+ const f=fixture();enableSharedRules(f,{custom:[{id:'fri',name:'Berk Cuma boş',type:'blockedWeekdays',personId:'1',weekdays:[5],enabled:true}]});assert.equal(f.c.rpysRules421.customReason(1,2,f.cols.day,unit),'Berk Cuma boş');assert.equal(f.c.rpysRules421.customReason(2,2,f.cols.day,unit),'');assert.equal(f.c.rpysRules421.customReason(1,2,f.cols.other,'OTHER'),'');f.c.db.distributionRulesV421[unit].custom[0].enabled=false;assert.equal(f.c.rpysRules421.customReason(1,2,f.cols.day,unit),'');
+});
+
+test('a person-specific consecutive-day custom rule constrains the Worker without constraining other staff',async()=>{
+ const f=fixture();enableSharedRules(f,{custom:[{id:'one',name:'Berk ardışık çalışmasın',type:'maxConsecutive',personId:'1',value:1,enabled:true}]});const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.equal(r.partial,false,f.controls.distResult.textContent);const rows=f.c.assignmentsMonth();const ds=new Set(rows.filter(a=>a.person.id===1).map(a=>a.day));for(const d of ds)assert.ok(!ds.has(d+1));assert.equal(rows.length,51);assert.ok([2,3,4,5,6].some(id=>{const days=new Set(rows.filter(a=>a.person.id===id).map(a=>a.day));return [...days].some(d=>days.has(d+1))}));
+});

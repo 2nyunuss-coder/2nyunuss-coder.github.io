@@ -26,3 +26,20 @@ test('a spouse on leave is exempt from the matching-day warning',()=>{
 test('an overnight shift shorter than 16 hours also protects the next calendar day',()=>{
  const s=fixture();s.shifts=[{id:'n',name:'Gece',start:20,hours:8,weekday:1,weekend:1}];s.assign={'2026-10|1|n|0':'0'};assert.equal(E.reason(s,s.people[0],2,s.shifts[0]),'Dinlenme süresi yetersiz');s.rules.noPostDuty=false;assert.equal(E.reason(s,s.people[0],2,s.shifts[0]),'');
 });
+
+test('calendar leave, report and reserve block assignments across units and toggles remain per-unit',()=>{
+ const s=fixture(),p=s.people[0];s.unit='A';s.shifts[0].unit='A';s.calendar={'0|2026-10-05':'rezerve','0|2026-10-06':'rapor'};assert.equal(E.reason(s,p,5,s.shifts[0]),'Rezerve gün');assert.equal(E.reason(s,p,6,s.shifts[0]),'Raporlu');s.unitRules={A:{...s.rules,blockReserve:false}};assert.equal(E.reason(s,p,5,s.shifts[0]),'');s.shifts.push({...s.shifts[0],id:'b',unit:'B'});assert.equal(E.reason(s,p,5,s.shifts[1]),'Rezerve gün');
+ const original=JSON.stringify(s);const out=E.generate(s);assert.equal(JSON.stringify(s),original);assert.notEqual(out.assign['2026-10|6|d|0'],'0');
+});
+test('operating room teams require matching role and all skills; each check can be disabled',()=>{
+ const s=fixture(),p=s.people[0],t=s.shifts[0];t.role='Sirküle';t.requiredSkills=['Ortopedi','Genel cerrahi'];p.roles=['sirküle'];p.skills=['Ortopedi'];assert.match(E.reason(s,p,5,t),/Yetkinlik eksik.*Genel cerrahi/);p.skills.push('genel cerrahi');assert.equal(E.reason(s,p,5,t),'');p.roles=[];assert.match(E.reason(s,p,5,t),/Görev grubu/);s.rules.requireRole=false;assert.equal(E.reason(s,p,5,t),'');p.skills=[];s.rules.requireSkills=false;assert.equal(E.reason(s,p,5,t),'');
+});
+test('room weekday templates and archival preserve recorded shift hours and room snapshot',()=>{
+ const s=fixture();s.unit='A';s.shifts[0]={...s.shifts[0],unit:'A',room:'Salon 1',weekdays:[1,2,3,4,5],hours:8,weekend:0};assert.equal(E.cells(s).length,22);assert.ok(!E.cells(s).some(c=>E.weekend(s.month,c.d)));s.assign['2026-10|1|d|0']='0';E.snapshot(s,'2026-10|1|d|0',s.shifts[0],true);s.rooms=[{unit:'A',name:'Salon 1',active:false}];s.shifts[0].hours=12;s.shifts[0].room='Salon 2';assert.equal(E.records(s)[0].shift.room,'Salon 1');assert.equal(E.totals(s)[0].hours,8);s.shifts[0].room='Salon 1';const out=E.generate(s);assert.deepEqual(out.assign,s.assign);assert.equal(E.cells(s).length,1);
+});
+test('reserve entered after manual assignment is reported without removing the assignment',()=>{
+ const s=fixture();s.assign={'2026-10|5|d|0':'0'};E.snapshot(s,'2026-10|5|d|0',s.shifts[0],true);s.calendar={'0|2026-10-05':'rezerve'};const before=JSON.stringify(s);assert.ok(E.audit(s).some(w=>/Rezerve/.test(w.message)));const out=E.generate(s,{rebuild:true});assert.equal(out.assign['2026-10|5|d|0'],'0');assert.equal(JSON.stringify(s),before);
+});
+test('weekday custom rules affect only the selected person and explain unfilled room needs',()=>{
+ const s=fixture();s.shifts[0].role='Scrub';s.people[0].roles=['Scrub'];s.rules.custom=[{id:'fri',type:'blockedWeekdays',name:'Cuma çalışmaz',weekdays:[5],personId:'0',enabled:true}];assert.equal(E.reason(s,s.people[0],2,s.shifts[0]),'Cuma çalışmaz');const out=E.generate(s);const gap=out.gaps.find(g=>g.day===2);assert.match(gap.reason,/Cuma çalışmaz/);assert.match(gap.reason,/Görev grubu/);assert.equal(E.coverage({...s,assign:out.assign}).filled,Object.keys(out.assign).length);
+});

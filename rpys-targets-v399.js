@@ -170,7 +170,7 @@
           if([...chosen.values()].some(x=>x.id===other&&x.s.day===s.day))return false;
         }
         if(rule.kind==='unitNextDayBlock'&&rule.fromUnit===m.u&&rule.toUnit===m.u&&mine.some(x=>Math.abs(x.s.day-s.day)===1))return false;
-        if(rule.kind==='unitConsecutive'&&rule.unit===m.u){
+        if(rule.kind==='unitConsecutive'&&rule.unit===m.u&&(!rule.personId||Number(rule.personId)===id)){
           const days=new Set(baseRows.filter(a=>Number(a.person.id)===id&&a.col.unit===m.u).map(a=>Number(a.day)));for(const x of mine)days.add(x.s.day);days.add(s.day);
           const max=Number(rule.maxConsecutive||1);for(let from=s.day-max;from<=s.day;from++)if(Array.from({length:max+1},(_,i)=>from+i).every(d=>days.has(d)))return false;
         }
@@ -196,7 +196,7 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261021-rules-10',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261021-or-12',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null,bestEffortRequested=false;
   let feedback={text:'',tone:'',busy:false};
   function report(text,tone='progress',busy=preparing){
@@ -350,7 +350,7 @@
       };
       for(const id of m.ids){
         if(cfg.avoidAlternate&&(window.rpysRules421||db.settings.avoidAlternate))for(let d=1;d+4<=daysInMonth();d++)addLimit(id,[d,d+2,d+4],2,true);
-        for(const rule of [...textFor(m.u),...customFor(m.u)].filter(r=>r.active!==false&&r.kind==='unitConsecutive'&&r.unit===u)){
+        for(const rule of [...textFor(m.u),...customFor(m.u)].filter(r=>r.active!==false&&r.kind==='unitConsecutive'&&r.unit===u&&(!r.personId||Number(r.personId)===id))){
           const max=Number(rule.maxConsecutive||1);
           for(let d=1;d+max<=daysInMonth();d++)addLimit(id,Array.from({length:max+1},(_,i)=>d+i),max);
         }
@@ -672,7 +672,7 @@
     persist();const m=model(u),host=document.getElementById('rpysTargetPanel399');host.querySelector('.rpysTargetSummary399').textContent=totals(m);
     for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=metrics.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
   }
-  window.rpysTargets399={version:'20261021-rules-10',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
+  window.rpysTargets399={version:'20261021-or-12',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{
