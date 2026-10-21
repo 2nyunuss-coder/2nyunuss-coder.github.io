@@ -64,3 +64,14 @@ test('real November calendar with leave, cross-month duties and two protected ce
  // eligibility rules: 21 day + 30 night, including 2 protected assignments.
  const data=require('./fixtures/target-51-cross-month.json');const result=solveTargets(data);validate(data,result);assert.equal(result.plan.length,49);assert.ok(result.nodes<1000,`excessive branching: ${result.nodes}`);console.log('51-duty constrained calendar:',result.nodes,'nodes,',result.elapsed,'ms');
 });
+
+test('partial search maximizes safe coverage against exhaustive enumeration on 150 calendars',()=>{
+ let seed=329;const rnd=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n};
+ for(let trial=0;trial<150;trial++){
+  const ids=[1,2,3],remaining=Object.fromEntries(ids.map(id=>[id,{day:rnd(3),night:rnd(3)}])),slots=Array.from({length:6},(_,index)=>({index,day:index+1,kind:index%2?'night':'day',allowed:ids.filter(()=>rnd(4)!==0)})),conflicts=[];
+  for(let a=0;a<6;a++)for(let b=a+1;b<6;b++)for(const id of ids)if(rnd(5)===0)conflicts.push([`${a}:${id}`,`${b}:${id}`]);
+  const limits=[{values:['0:1','2:1','4:1'],max:trial%3}],data={ids,remaining,slots,conflicts,limits,allowPartial:true};let optimum=0;
+  function brute(i,left,picked){if(limits.some(g=>g.values.filter(v=>picked.has(v)).length>g.max))return;if(i===6){optimum=Math.max(optimum,picked.size);return}brute(i+1,left,picked);for(const id of slots[i].allowed){const kind=slots[i].kind,v=`${i}:${id}`;if(!left[id][kind]||conflicts.some(([a,b])=>(a===v&&picked.has(b))||(b===v&&picked.has(a))))continue;left[id][kind]--;picked.add(v);brute(i+1,left,picked);picked.delete(v);left[id][kind]++}}
+  brute(0,structuredClone(remaining),new Set());const result=solveTargets(data);assert.equal(result.ok,true);assert.equal(result.timedOut,false);assert.equal(result.plan.length,optimum,'partial trial '+trial);const picked=new Set(result.plan.map(x=>`${x.slot}:${x.id}`));for(const [a,b] of conflicts)assert.ok(!picked.has(a)||!picked.has(b));for(const group of limits)assert.ok(group.values.filter(v=>picked.has(v)).length<=group.max);for(const id of ids)for(const kind of ['day','night'])assert.ok(result.plan.filter(x=>x.id===id&&x.kind===kind).length<=remaining[id][kind]);
+ }
+});

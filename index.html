@@ -18,7 +18,7 @@
 <div id="err" class="err"></div>
 <div class="small">Program GitHub Pages üzerinden açılır; uygulama ve ana veri güvenli Supabase katmanından gelir.</div>
 </div>
-<script src="/rpys-scheduler-v398.js?v=20261020-gap-4"></script>
+<script src="/rpys-scheduler-v398.js?v=20261021-partial-5"></script>
 <script src="/rpys-stability-v420.js?v=20261019-3"></script>
 <script>
 (async()=>{
@@ -81,9 +81,9 @@
  const FIILI_PRINT_JS='<script id="rpys-fiili-print-isolation-v1">(()=>{const selector="#fiilihizmet";function repairFiiliPrintButtons(){let section=document.querySelector(selector);if(!section)return;section.querySelectorAll("[data-rpys383print=\\"say\\"]").forEach(b=>b.removeAttribute("data-rpys383print"));section.querySelectorAll(".rpys332Print").forEach(b=>{b.dataset.rpysFiiliPrint="1";b.title="Fiilî Hizmet belgesini yazdır"})}document.addEventListener("click",e=>{let b=e.target.closest?.(selector+" .rpys332Print");if(!b)return;e.preventDefault();e.stopImmediatePropagation();if(typeof printFiiliDocument==="function")printFiiliDocument()},true);new MutationObserver(repairFiiliPrintButtons).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-rpys383print"]});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",repairFiiliPrintButtons);else repairFiiliPrintButtons();setTimeout(repairFiiliPrintButtons,2500)})();<'+ '/script>';
  const DATA_SAFETY_ARCHIVE_JS='<script id="rpys-data-safety-archive-loader-v395" src="/rpys-runtime-v395.js?v=20261019-3"><'+ '/script>';
  const DATA_INTEGRITY_PERSONNEL_JS='<script id="rpys-data-integrity-personnel-loader-v396" src="/rpys-runtime-v396.js?v=20260928-2"><'+ '/script>';
- const REST_16_HOURS_JS='<script id="rpys-rest-16-hours-loader-v397" src="/rpys-runtime-v397.js?v=20261020-gap-4"><'+ '/script>';
- const SCHEDULER_SAFETY_JS='<script id="rpys-scheduler-safety-loader-v398" src="/rpys-scheduler-v398.js?v=20261020-gap-4"><'+ '/script>';
- const MANUAL_TARGETS_JS='<script id="rpys-manual-targets-loader-v399" src="/rpys-targets-v399.js?v=20261020-gap-4"><'+ '/script>';
+ const REST_16_HOURS_JS='<script id="rpys-rest-16-hours-loader-v397" src="/rpys-runtime-v397.js?v=20261021-partial-5"><'+ '/script>';
+ const SCHEDULER_SAFETY_JS='<script id="rpys-scheduler-safety-loader-v398" src="/rpys-scheduler-v398.js?v=20261021-partial-5"><'+ '/script>';
+ const MANUAL_TARGETS_JS='<script id="rpys-manual-targets-loader-v399" src="/rpys-targets-v399.js?v=20261021-partial-5"><'+ '/script>';
  const INTERACTION_GUARD_JS='<script id="rpys-interaction-guard-loader-v400" src="/rpys-runtime-v400.js?v=20261019-2"><'+ '/script>';
  const CUSTOM_SHIFT_JS='<script id="rpys-custom-shift-loader-v405" src="/rpys-runtime-v405.js?v=20260929-2"><'+ '/script>';
  const MONTHLY_LIST_VARIANTS_JS='<script id="rpys-monthly-list-variants-loader-v406" src="/rpys-runtime-v406.js?v=20260929-1"><'+ '/script>';
@@ -269,7 +269,7 @@
    app=app.replace(/\/rpys-runtime-v395\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v395.js?v=20261019-3')
      .replace(/\/rpys-page-fit-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-page-fit-v1.js?v=20261019-3')
      .replace(/\/rpys-page-notes-v2\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-page-notes-v2.js?v=20261019-3');
-   app=app.replace(/\/rpys-runtime-v397\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v397.js?v=20261020-gap-4')
+   app=app.replace(/\/rpys-runtime-v397\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v397.js?v=20261021-partial-5')
      .replace(/\/rpys-runtime-v400\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-runtime-v400.js?v=20261019-2')
      .replace(/\/rpys-saymanlik-hakedis-fix-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-saymanlik-hakedis-fix-v1.js?v=20261019-2');
    const uiLoader=`async function stableUiPatch420(slug,ver){const r=await fetch(base+'/functions/v1/'+slug+'?v='+encodeURIComponent(ver)+'&cb=420',{cache:'no-store'});if(!r.ok)throw new Error(slug+' HTTP '+r.status);(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug))}`;
@@ -277,8 +277,8 @@
    app=app.replace("else await tag(slug,ver);", "else if(['rpys-patch322','rpys-patch336','rpys-patch337','rpys-patch338','rpys-patch339','rpys-patch340','rpys-patch352','rpys-patch353','rpys-patch383','rpys-patch388'].includes(slug))await stableUiPatch420(slug,ver);else await tag(slug,ver);");
    app=app.replace("(0,eval)(await r.text());if(test())", "(0,eval)(window.rpysStability420.repairPatch(await r.text(),slug));if(test())");
    app=app.replace("(0,eval)(js)}async function ensureCritical", "(0,eval)(window.rpysStability420.repairPatch(js,'rpys-patch332'))}async function ensureCritical");
-   app=app.replace(/\/rpys-scheduler-v398\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-scheduler-v398.js?v=20261020-gap-4');
-   app=app.replace(/\/rpys-targets-v399\.js(?:\?v=[^\"'<> ]*)?/g,'/rpys-targets-v399.js?v=20261020-gap-4');
+   app=app.replace(/\/rpys-scheduler-v398\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-scheduler-v398.js?v=20261021-partial-5');
+   app=app.replace(/\/rpys-targets-v399\.js(?:\?v=[^\"'<> ]*)?/g,'/rpys-targets-v399.js?v=20261021-partial-5');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;

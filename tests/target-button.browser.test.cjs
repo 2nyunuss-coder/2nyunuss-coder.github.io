@@ -56,11 +56,11 @@ test('actual target button: queued render, legacy replacement, real Worker and v
   const result=await page.evaluate(()=>({filled:Object.keys(db.assign).length,saves:fixtureResult.saved.length,legacy:legacyCalls,actual:rpysTargets399.model(autoUnit.value).actual,feedback:document.querySelector('[data-target-feedback]').textContent,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
   assert.equal(result.filled,51);assert.equal(result.saves,1);assert.equal(result.legacy,0);assert.equal(result.busy,'false');assert.match(result.feedback,/tam karşılandı/);
   assert.deepEqual(Object.values(result.actual).map(v=>[v.day,v.night]),[[5,7],[4,6],[4,5],[4,6],[3,4],[1,2]]);
-  await page.evaluate(()=>{window.successAssignments=JSON.stringify(db.assign);rpysTargets399.config(autoUnit.value).people[1].day=100});
+  await page.evaluate(()=>{window.successAssignments=JSON.stringify(db.assign);rpysTargets399.config(autoUnit.value).people[1].day=-1});
   await button.click();
   await page.waitForFunction(()=>document.querySelector('[data-target-feedback]').dataset.tone==='error');
   const failed=await page.evaluate(()=>({text:document.querySelector('[data-target-feedback]').textContent,unchanged:JSON.stringify(db.assign)===successAssignments,saves:fixtureResult.saved.length,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
-  assert.match(failed.text,/hedef toplamı/);assert.equal(failed.unchanged,true);assert.equal(failed.saves,1);assert.equal(failed.busy,'false');
+  assert.match(failed.text,/0 veya pozitif tam sayı/);assert.equal(failed.unchanged,true);assert.equal(failed.saves,1);assert.equal(failed.busy,'false');
   await page.evaluate(()=>{window.savedTargetRunner=rpysScheduler398.runTargets;rpysScheduler398.runTargets=()=>{throw Error('startup probe')}});
   await button.click();
   await page.waitForFunction(()=>document.querySelector('[data-target-feedback]').textContent.includes('startup probe'));
@@ -73,5 +73,18 @@ test('actual target button: queued render, legacy replacement, real Worker and v
   const cancelled=await page.evaluate(()=>({unchanged:JSON.stringify(db.assign)===successAssignments,saves:fixtureResult.saved.length,terminated:window.stallTerminated,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy'),hidden:document.querySelector('[data-target-action=cancel]').hidden}));
   assert.equal(cancelled.unchanged,true);assert.equal(cancelled.saves,1);assert.equal(cancelled.terminated,true);assert.equal(cancelled.busy,'false');assert.equal(cancelled.hidden,true);
   assert.deepEqual(errors,[]);
+ }finally{await browser.close()}
+});
+
+test('actual partial button applies feasible duties, displays saved shortages and leaves a second run unchanged',async()=>{
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ try{
+  const context=await browser.newContext();await context.route('**/*',route=>{const u=new URL(route.request().url()),name=u.pathname.slice(1);if(u.hostname==='rpys.test'&&!name)return route.fulfill({contentType:'text/html; charset=utf-8',body:fixtureHTML()});if(u.hostname==='rpys.test'&&['rpys-runtime-v397.js','rpys-scheduler-v398.js','rpys-targets-v399.js','rpys-target-worker.js'].includes(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,name),'utf8')});return route.fulfill({status:404,body:''})});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://rpys.test/');await page.waitForSelector('[data-target-action=run]');
+  await page.evaluate(()=>{db.leaves=Array.from({length:30},(_,i)=>({id:1,day:i+1}));window.originalTargets=JSON.stringify(rpysTargets399.config(autoUnit.value).people)});await page.locator('[data-target-action=run]').click();await page.waitForFunction(()=>fixtureResult.saved.length===1);await page.waitForSelector('.rpysTargetLastResult399');
+  const state=await page.evaluate(()=>({count:Object.keys(db.assign).length,text:document.querySelector('[data-target-feedback]').textContent,tone:document.querySelector('[data-target-feedback]').dataset.tone,report:document.querySelector('.rpysTargetLastResult399').textContent,unchangedTargets:JSON.stringify(rpysTargets399.config(autoUnit.value).people)===originalTargets,record:db.manualDistributionResultsV399[ym()+'|'+autoUnit.value],busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
+  assert.equal(state.count,39);assert.equal(state.unchangedTargets,true);assert.equal(state.tone,'warning');assert.equal(state.busy,'false');assert.match(state.text,/Kısmi dağıtım uygulandı/);assert.match(state.text,/Berk Yaşar: 0 \/ 5 gündüz; 5 eksik/);assert.match(state.report,/Son kısmi dağıtım raporu/);assert.match(state.report,/gün .*boş:/);assert.equal(state.record.status,'partial');assert.equal(state.record.shortfalls.reduce((n,x)=>n+x.missing,0),12);
+  await page.evaluate(()=>{window.originalAssignments=JSON.stringify(db.assign)});await page.locator('[data-target-action=run]').click();await page.waitForFunction(()=>document.querySelector('[data-target-feedback]').textContent.includes('Yerleştirilebilen yeni görev yok'));
+  assert.equal(await page.evaluate(()=>JSON.stringify(db.assign)===originalAssignments&&fixtureResult.saved.length===1),true);assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });

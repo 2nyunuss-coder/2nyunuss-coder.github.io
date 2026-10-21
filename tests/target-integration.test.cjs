@@ -136,7 +136,7 @@ test('cross-month anchors are solved up front: exact 51 duties and no rejected f
 });
 test('infeasible target between previous and next month explains person and preserves all data',async()=>{
  const f=fixture();enableCrossMonthGaps(f);for(const k of ['2026-09|acil|30|day','2026-11|acil|1|day'])f.c.db.assign[k]=6;
- const before=JSON.stringify(f.c.db),started=Date.now();assert.equal(await f.c.rpysTargets399.run(),false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Recep Duman/);assert.match(f.alerts[0],/görev aralığı|boş gün kuralı/);assert.doesNotMatch(f.alerts[0],/Verilen sürede/);assert.ok(Date.now()-started<2000);
+ const before=JSON.stringify(f.c.db),started=Date.now();assert.equal(await f.c.autoDistribute(),false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Recep Duman/);assert.match(f.alerts[0],/görev aralığı|boş gün kuralı/);assert.doesNotMatch(f.alerts[0],/Verilen sürede/);assert.ok(Date.now()-started<2000);
 });
 
 function enableEdgeGaps(f){
@@ -147,9 +147,42 @@ function enableEdgeGaps(f){
  })));
 }
 test('effective rulepatch8: low monthly target fails before Worker with the exact missing count',async()=>{
- const f=fixture();enableEdgeGaps(f);let workers=0;f.c.Worker=class{constructor(){workers++}};const before=JSON.stringify(f.c.db);assert.equal(await f.c.rpysTargets399.run(),false);assert.equal(workers,0);assert.equal(f.saved.length,0);assert.equal(JSON.stringify(f.c.db),before);assert.match(f.alerts[0],/Recep Duman.*1 gündüz.*2 nöbet/);assert.match(f.alerts[0],/ay başını, ay sonunu/);assert.match(f.alerts[0],/en az 5 görev/);assert.match(f.alerts[0],/En az 2 görev eksik/);
+ const f=fixture();enableEdgeGaps(f);let workers=0;f.c.Worker=class{constructor(){workers++}};const before=JSON.stringify(f.c.db);assert.equal(await f.c.autoDistribute(),false);assert.equal(workers,0);assert.equal(f.saved.length,0);assert.equal(JSON.stringify(f.c.db),before);assert.match(f.alerts[0],/Recep Duman.*1 gündüz.*2 nöbet/);assert.match(f.alerts[0],/ay başını, ay sonunu/);assert.match(f.alerts[0],/en az 5 görev/);assert.match(f.alerts[0],/En az 2 görev eksik/);
 });
 test('effective edge and cross-month rules: 51 exact duties with feasible manually edited targets',async()=>{
  const f=fixture();enableEdgeGaps(f);const cfg=f.c.rpysTargets399.config(unit);cfg.people[1].night=5;cfg.people[6].night=4;f.c.db.assign['2026-09|acil|30|day']=1;f.c.db.assign['2026-11|acil|1|day']=2;
  const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.plan.length,51);assert.equal(f.c.v251GapViolations([1,2,3,4,5,6]).length,0);assert.equal(f.saved.length,1);const m=f.c.rpysTargets399.model(unit);for(const id of m.ids)for(const kind of ['day','night'])assert.equal(m.actual[id][kind],cfg.people[id][kind]);
+});
+
+test('button applies 39 feasible duties and reports the unavailable persons exact 12-duty shortfall',async()=>{
+ const f=fixture();f.c.db.leaves=Array.from({length:30},(_,i)=>({id:1,day:i+1}));const targets=JSON.stringify(f.c.rpysTargets399.config(unit).people),before=JSON.stringify(f.c.db.assign);let draftExposed=false;const poll=setInterval(()=>{if(!f.saved.length&&JSON.stringify(f.c.db.assign)!==before)draftExposed=true},1);
+ const result=await f.c.rpysTargets399.run();clearInterval(poll);assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);assert.equal(result.plan.length,39);assert.equal(result.unfilled.length,12);assert.equal(result.shortfalls.length,2);assert.deepEqual(JSON.parse(JSON.stringify(result.shortfalls.map(x=>[x.id,x.kind,x.missing]))),[[1,'day',5],[1,'night',7]]);assert.equal(f.saved.length,1);assert.equal(draftExposed,false);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),targets);assert.equal(f.c.rpysRest16V397.allViolations().size,0);assert.match(f.controls.distResult.textContent,/Kısmi dağıtım uygulandı/);assert.match(f.controls.distResult.textContent,/Berk Yaşar: 0 \/ 5 gündüz; 5 eksik/);assert.equal(f.alerts.length,0);
+});
+test('button applies target counts even when gap obligations cannot finish, with explicit unresolved warnings',async()=>{
+ const f=fixture();enableEdgeGaps(f);const before=JSON.stringify(f.c.rpysTargets399.config(unit).people);const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);assert.equal(result.plan.length,51);assert.equal(result.shortfalls.length,0);assert.equal(f.saved.length,1);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),before);assert.ok(result.notes.some(x=>/Recep Duman/.test(x)));assert.match(f.controls.distResult.textContent,/koşullar hâlâ düzeltilmeli/);assert.equal(f.c.db.manualDistributionResultsV399['2026-10|'+unit].status,'partial');assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});
+test('partial fallback preserves existing unlocked, manual, locked, historical and other-unit assignments',async()=>{
+ const f=fixture();Object.assign(f.c.db.assign,{'2026-10|acil|1|day':1,'2026-10|acil|10|night':2,'2026-10|acil|3|day':4,'2026-10|acil|2|other':3,'2026-09|acil|30|night':5});f.c.db.assignmentMeta['2026-10|acil|1|day']={manual:true};f.c.db.rpysCellLocks['2026-10|acil|10|night']={exists:true,value:2};f.c.db.leaves=Array.from({length:29},(_,i)=>({id:1,day:i+2}));const original=JSON.stringify([f.c.db.assignmentMeta,f.c.db.rpysCellLocks,f.c.db.staff]),assign={...f.c.db.assign},targets=JSON.stringify(f.c.rpysTargets399.config(unit).people);const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);assert.ok(result.plan.length>20);for(const [key,id] of Object.entries(assign))assert.equal(f.c.db.assign[key],id);assert.equal(JSON.stringify([f.c.db.assignmentMeta,f.c.db.rpysCellLocks,f.c.db.staff]),original);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),targets);assert.equal(f.saved.length,1);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});
+
+test('partial validation removes only unsafe new duties when an authoritative dynamic rule rejects a full draft',async()=>{
+ const f=fixture(),base=f.c.canTakeShiftV2414;f.c.canTakeShiftV2414=(id,d,col,u)=>base(id,d,col,u)&&(id!==1||f.c.assignmentsMonth().filter(a=>a.person.id===1&&a.col.unit===unit).length<3);
+ const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(r.partial,true);assert.equal(f.c.assignmentsMonth().filter(a=>a.person.id===1).length,3);assert.equal(r.plan.length,42);assert.equal(f.saved.length,1);assert.ok(r.notes.some(x=>/uygunluk kuralı/.test(x)));assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});
+test('partial fallback preserves spouse-day guard and still applies unaffected peoples duties',async()=>{
+ const f=fixture();f.c.db.staff.push({id:7,name:'Unselected spouse',status:'Aktif'});f.c.spouseOf=id=>Number(id)===1?7:Number(id)===7?1:null;
+ const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(r.partial,true);assert.equal(r.plan.length,39);assert.equal(f.saved.length,1);assert.equal(f.c.assignmentsMonth().filter(a=>a.person.id===1).length,0);assert.equal(f.c.rpysScheduler398.spouseDayViolations(f.c.ym()).length,0);assert.match(f.controls.distResult.textContent,/eşlerin aynı gün/);
+});
+test('when no new duty can be placed, partial mode keeps the complete database and does not save',async()=>{
+ const f=fixture();for(const id of [1,2,3,4,5,6])for(let day=1;day<=30;day++)f.c.db.leaves.push({id,day});const before=JSON.stringify(f.c.db);const r=await f.c.rpysTargets399.run();assert.equal(r.ok,false);assert.equal(r.partial,true);assert.equal(r.plan.length,0);assert.equal(f.saved.length,0);assert.equal(JSON.stringify(f.c.db),before);assert.match(f.controls.distResult.textContent,/Yerleştirilebilen yeni görev yok/);
+});
+
+test('partial search retains monthly special upper limits and exact per-kind target ceilings',async()=>{
+ const f=fixture();f.c.db.customTextRules=[{active:true,kind:'personUnitMonthlyMax',personId:1,unit,max:2}];const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(r.partial,true);assert.equal(f.c.assignmentsMonth().filter(x=>x.person.id===1).length,2);assert.equal(r.plan.length,41);assert.equal(f.saved.length,1);for(const id of [1,2,3,4,5,6])for(const kind of ['day','night'])assert.ok(f.c.rpysTargets399.model(unit).actual[id][kind]<=f.c.rpysTargets399.config(unit).people[id][kind]);
+});
+test('cancel and live edits during partial fallback never save a draft or overwrite the edit',async()=>{
+ for(const action of ['cancel','edit']){
+  const f=fixture();f.c.db.leaves=Array.from({length:30},(_,i)=>({id:1,day:i+1}));let signal;const started=new Promise(r=>{signal=r}),Native=f.c.Worker;f.c.Worker=class extends Native{postMessage(data){assert.equal(data.allowPartial,true);signal();super.postMessage(data)}};
+  const pending=f.c.rpysTargets399.run();await started;if(action==='cancel')f.c.rpysTargets399.cancel();else f.c.db.assign['2026-10|acil|1|other']=3;const before=JSON.stringify(f.c.db);assert.equal(await pending,false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);
+ }
 });

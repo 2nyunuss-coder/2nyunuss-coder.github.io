@@ -2,6 +2,7 @@
 (function(scope){
 'use strict';
 function solveTargets(input){
+ if(input.allowPartial)return solvePartial(input);
  const {slots,ids,remaining,conflicts=[],requirements:required=[],forbidden=[],limits=[],gapRules=[],excluded=[]}=input;
  const start=Date.now(),limit=input.timeLimit??3200,maxNodes=input.maxNodes??7000;
  const requirements=required.slice();
@@ -104,6 +105,33 @@ function solveTargets(input){
  }
  const plan=visit(options,remaining,[]);
  return {ok:!!plan,plan:(plan||[]).map(v=>values.get(v)),nodes,timedOut,lastFailure,bottleneck,best:best.map(v=>values.get(v)),elapsed:Date.now()-start};
+}
+// A separate maximum-coverage search uses quotas as upper bounds. Missing
+// targets and global coverage/gap obligations are reported by the caller;
+// eligibility, pair conflicts and special upper bounds remain hard constraints.
+function solvePartial(input){
+ const {slots,ids,remaining,conflicts=[],limits=[]}=input,start=Date.now(),budget=input.timeLimit??1200,maxNodes=input.maxNodes??7000;
+ const values=new Map(),clashes=new Map();for(const s of slots)for(const id of s.allowed){const v=`${s.index}:${id}`;values.set(v,{slot:s.index,id,kind:s.kind});clashes.set(v,new Set())}
+ for(const [a,b] of conflicts){clashes.get(a)?.add(b);clashes.get(b)?.add(a)}
+ const initial=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`));let best=[],nodes=0,timedOut=false;
+ function upper(domains,left){let n=0;for(const kind of ['day','night']){const owners=new Map();function add(i,seen){for(const v of domains[i]||[]){const id=values.get(v).id;if(seen.has(id))continue;seen.add(id);const mine=owners.get(id)||[];if(mine.length<left[id][kind]){mine.push(i);owners.set(id,mine);return true}for(let k=0;k<mine.length;k++)if(add(mine[k],seen)){mine[k]=i;return true}}return false}for(const s of slots)if(s.kind===kind&&domains[s.index]?.length&&add(s.index,new Set()))n++}return n}
+ const personCeilings=Object.fromEntries(ids.map(id=>[id,remaining[id].day+remaining[id].night]));
+ for(const group of limits){const set=new Set(group.values),first=values.get(group.values[0]);if(first&&group.values.every(v=>values.get(v)?.id===first.id)&&[...values].filter(([,x])=>x.id===first.id).every(([v])=>set.has(v)))personCeilings[first.id]=Math.min(personCeilings[first.id],Math.max(0,group.max))}
+ const goal=Math.min(upper(initial,remaining),ids.reduce((n,id)=>n+personCeilings[id],0));
+ function visit(domains,left,chosen){
+  if(best.length===goal)return;
+  if(++nodes>maxNodes||Date.now()-start>budget){timedOut=true;return}
+  domains=domains.map(d=>d===null?null:d.filter(v=>left[values.get(v).id][values.get(v).kind]>0));
+  const picked=new Set(chosen);for(const group of limits){const used=group.values.filter(v=>picked.has(v)).length;if(used>group.max)return;if(used===group.max){const ban=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!ban.has(v)))}}
+  if(chosen.length>best.length)best=chosen.slice();if(best.length===goal)return;
+  const cells=slots.filter(s=>domains[s.index]?.length);if(!cells.length||chosen.length+Math.min(cells.length,ids.reduce((n,id)=>n+left[id].day+left[id].night,0))<=best.length)return;
+  let s=cells[0];for(const x of cells)if(domains[x.index].length<domains[s.index].length||(domains[x.index].length===domains[s.index].length&&x.day<s.day))s=x;
+  const cost=v=>domains.reduce((n,d)=>n+(d?.length?d.filter(w=>clashes.get(v).has(w)).length/d.length:0),0),costs=new Map(domains[s.index].map(v=>[v,cost(v)]));
+  const candidates=domains[s.index].slice().sort((a,b)=>{const x=values.get(a),y=values.get(b);return costs.get(a)-costs.get(b)||left[y.id][y.kind]/Math.max(1,remaining[y.id][y.kind])-left[x.id][x.kind]/Math.max(1,remaining[x.id][x.kind])||x.id-y.id});
+  for(const v of candidates){const x=values.get(v),next=domains.map(d=>d===null?null:d.filter(w=>!clashes.get(v).has(w)));next[s.index]=null;const rest=Object.fromEntries(ids.map(id=>[id,{...left[id]}]));rest[x.id][x.kind]--;visit(next,rest,[...chosen,v]);if(best.length===goal||timedOut)return}
+  const skipped=domains.slice();skipped[s.index]=null;visit(skipped,left,chosen);
+ }
+ visit(initial,remaining,[]);return {ok:true,partial:true,plan:best.map(v=>values.get(v)),nodes,timedOut,optimal:!timedOut||best.length===goal,elapsed:Date.now()-start};
 }
 if(typeof module!=='undefined')module.exports={solveTargets};
 else scope.onmessage=e=>{try{scope.postMessage(solveTargets(e.data))}catch(error){scope.postMessage({ok:false,error:String(error.message||error)})}};
