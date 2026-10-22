@@ -98,11 +98,38 @@
       return base.apply(this,arguments);
     };fn.__rpys398=true;window[name]=fn;
   }
+  const personNameKey=value=>String(value||'').trim().toLocaleUpperCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+  function calendarValue(store,person,month,day){
+    const exact=month+'|'+person.name+'|'+Number(day);if(own(store,exact))return store[exact];
+    const name=personNameKey(person.name);for(const [key,value] of Object.entries(store||{})){const p=key.split('|');if(p[0]===month&&Number(p.at(-1))===Number(day)&&personNameKey(p.slice(1,-1).join('|'))===name)return value}return null;
+  }
+  function absentStatus(value){
+    let code=String(value||'').trim().toLocaleLowerCase('tr-TR');
+    if(typeof sayStatusFromText==='function')code=sayStatusFromText(value)||code;
+    if(['izin','sua','yillik','yıllık','idari','mazeret','rapor','gecici','ketem','ketemgecici','ayrilis','atamaoncesi','tayinoncesi'].includes(code))return true;
+    const text=personNameKey(value);return /^(ŞUA|SUA|SAĞLIK|SAGLIK|YILLIK|İDARİ|IDARI|MAZERET) (İZNİ|IZNI|IZIN)$/.test(text)||text==='RAPOR';
+  }
+  function spouseUnavailable(id,day,month=ym()){
+    const person=getPersonById(id);if(!person)return false;const date=month+'-'+String(day).padStart(2,'0');
+    if((db.leaves||[]).some(l=>Number(l.personId??l.idPerson??l.person?.id)===Number(id)&&l.start<=date&&l.end>=date))return true;
+    try{if(typeof personStatusAt==='function'&&personStatusAt(person,date)!=='Aktif')return true}catch(_){}
+    if(calendarValue(db.sayStatusCleared,person,month,day))return false;
+    let effective='';try{if(month===ym()&&typeof getCellStatus==='function')effective=getCellStatus(person.name,Number(day))||''}catch(_){}
+    if(!effective){const manual=calendarValue(db.cellStatus,person,month,day),imported=calendarValue(db.importedSaymanlik,person,month,day);effective=manual==='izin'&&imported?imported:manual||imported||''}
+    return absentStatus(effective);
+  }
+  function spouseWorkingOnDay(id,day,month=ym()){
+    const person=getPersonById(id);if(!person)return false;
+    for(const [key,pid] of Object.entries(db.assign||{})){const p=key.split('|');if(p[0]===month&&Number(p[2])===Number(day)&&Number(pid)===Number(id))return true}
+    if((db.importedRecords||[]).some(r=>r.monthKey===month&&Number(r.day)===Number(day)&&Number(r.personId)===Number(id)&&!(typeof isImportedShiftBlocked==='function'&&isImportedShiftBlocked(r))))return true;
+    const work=calendarValue(db.sayManualWork,person,month,day),hours=Number(work?.total??(Number(work?.pol||0)+Number(work?.ac||0)));return Number.isFinite(hours)&&hours>0;
+  }
   function spouseDayViolations(month){
     if(typeof spouseOf!=='function')return [];
     if(window.rpysRules421&&!window.rpysRules421.enabled(run?.unit||document.getElementById('autoUnit')?.value||'','spouseSameDay'))return [];
     const staff=db.staff||[],pairs=new Set(),rows=Object.entries(db.assign||{}).filter(([k,id])=>k.startsWith(month+'|')&&Number(id)).map(([k,id])=>({person:{id:Number(id)},day:Number(k.split('|')[2])}));
     for(const r of db.importedRecords||[])if(r.monthKey===month&&!(typeof isImportedShiftBlocked==='function'&&isImportedShiftBlocked(r)))rows.push({person:{id:Number(r.personId)},day:Number(r.day)});
+    for(const p of staff)for(const [key,work] of Object.entries(db.sayManualWork||{})){const a=key.split('|');if(a[0]!==month||personNameKey(a.slice(1,-1).join('|'))!==personNameKey(p.name))continue;const total=Number(work?.total??(Number(work?.pol||0)+Number(work?.ac||0)));if(Number.isFinite(total)&&total>0)rows.push({person:{id:Number(p.id)},day:Number(a.at(-1))})}
     const byId=new Map(),out=[];
     for(const a of rows){const id=Number(a.person?.id||0),day=Number(a.day);if(!id||!day)continue;if(!byId.has(id))byId.set(id,new Set());byId.get(id).add(day)}
     for(const p of staff){
@@ -113,8 +140,8 @@
         if(a.has(d)===b.has(d))continue;
         const missing=a.has(d)?other:id;
         const date=month+'-'+String(d).padStart(2,'0'),person=staff.find(p=>Number(p.id)===missing);
-        let leave=(db.leaves||[]).some(l=>Number(l.personId??l.idPerson??l.person?.id)===missing&&l.start<=date&&l.end>=date);
-        try{if(month===ym()&&typeof isOnLeave==='function')leave=leave||!!isOnLeave(missing,d);if(month===ym()&&person&&typeof getCellStatus==='function')leave=leave||['izin','rapor','gecici','ketem','yillik','yıllık'].includes(String(getCellStatus(person.name,d)||'').toLocaleLowerCase('tr-TR'));if(person&&typeof personStatusAt==='function')leave=leave||personStatusAt(person,date)!=='Aktif'}catch(_){}
+        let leave=spouseUnavailable(missing,d,month);
+        try{if(month===ym()&&typeof isOnLeave==='function')leave=leave||!!isOnLeave(missing,d)}catch(_){}
         if(leave)continue;
         out.push({key:pk+'|'+d,day:d,first:id,second:other,missing});
       }
@@ -213,7 +240,7 @@
     if(!targetRunner)throw Error('Güvenli hedef dağıtım motoru henüz yüklenemedi. Sayfayı yenileyin.');
     return targetRunner();
   }
-  window.rpysScheduler398={runTargets,repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
+  window.rpysScheduler398={runTargets,repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);

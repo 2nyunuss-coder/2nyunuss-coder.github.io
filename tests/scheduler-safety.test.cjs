@@ -130,3 +130,15 @@ test('spouse leave is checked against the requested month and supports existing 
 test('an available spouse still requires the shared day while the spouse rule is enabled',()=>{
  const f=fixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.saveNowV245()});f.c.allAssignmentsAllMonths=()=>Object.entries(f.c.db.assign).map(([k,id])=>{const [month,type,day,col]=k.split('|');return {monthKey:month,type,day:Number(day),col:f.cols[col],person:f.c.getPersonById(id)}});f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.isOnLeave=()=>false;const before=JSON.stringify(f.c.db);f.c.autoDistribute();assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts.at(-1),/Eşlerin aynı gün/);
 });
+
+test('all RPYS Saymanlık absence codes exempt the absent spouse, including ŞUA, idari and mazeret',()=>{
+ for(const code of ['sua','yillik','idari','mazeret','rapor','gecici','ketem','ketemgecici','ayrilis','atamaoncesi','tayinoncesi']){
+  const f=fixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.saveNowV245()});f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.isOnLeave=()=>false;f.c.getCellStatus=(name,d)=>name==='Person B'&&d===2?code:'';f.c.autoDistribute();assert.equal(f.saved.length,1,code+': '+f.alerts.join(' '));assert.equal(f.c.db.assign['2026-10|pol|2|day'],1);assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
+ }
+});
+test('manual Saymanlık actual working hours satisfy the spouse same-day rule without creating roster duties',()=>{
+ const f=fixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.saveNowV245()});f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.isOnLeave=()=>false;f.c.db.sayManualWork={'2026-10|Person B|2':{pol:7,ac:0,total:7}};const before=JSON.stringify(f.c.db.sayManualWork);f.c.autoDistribute();assert.equal(f.saved.length,1,f.alerts.join(' '));assert.equal(Object.keys(f.c.db.assign).length,1);assert.equal(JSON.stringify(f.c.db.sayManualWork),before);f.c.db.sayManualWork['2026-10|Person B|2'].total=0;assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-10').length,1);
+});
+test('past-month imported leave is honored and explicitly cleared status is not resurrected',()=>{
+ const f=fixture();f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.db.assign['2026-09|pol|2|day']=1;f.c.db.importedSaymanlik={'2026-09|Person B|2':'ŞUA İZNİ'};assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-09').length,0);f.c.db.sayStatusCleared={'2026-09|Person B|2':true};assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-09').length,1);
+});

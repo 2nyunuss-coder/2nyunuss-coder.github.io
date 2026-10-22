@@ -38,15 +38,13 @@ function fixture(){
 }
 function parse(w,html){return new w.DOMParser().parseFromString(html,'text/html')}
 function pack(doc,period='this'){return {name:'Test',rows:[{doc,period,copies:1}]}}
-test('both pages show unit totals with manual values; labels and numbers share one spanning cell',()=>{
+test('both print pages omit appended unit totals and preserve all personal summary rows',()=>{
  const {dom,w}=fixture();try{
   const before=JSON.stringify(w.db);
   for(const pg of [1,2]){
    const d=parse(w,w.stableSayDoc(w.sayNamesForPage(pg),'SAYFA '+pg+'/2'));
-   const rows=d.querySelectorAll('.rpysSay414Grand');assert.equal(rows.length,2);
-   assert.match(rows[0].textContent,/TOPLAM MÜKELLEF — 4975,5 SAAT/);
-   assert.match(rows[1].textContent,/TOPLAM FAZLA MESAİ — 227 SAAT/);
-   assert.equal(rows[0].cells.length,1);assert.equal(rows[0].cells[0].colSpan,17);
+   assert.equal(d.querySelectorAll('.rpysSay414Grand,.rpys393grand,.rpys393grand2').length,0);
+   assert.equal(d.querySelectorAll('.sum').length,5);
    assert.equal(d.querySelectorAll('.rpysSay414Name').length,16);
    assert.equal(d.querySelectorAll('.sum').length,5);
   }
@@ -61,7 +59,7 @@ test('note is captured immediately, escaped, before signatures; monthly notes ne
   assert.equal(d.querySelectorAll('.rpysSay414Note').length,1);assert.equal(d.querySelector('.rpysSay414Note div').textContent,ta.value);assert.equal(d.querySelectorAll('img').length,0);
   assert.equal(d.querySelector('table').nextElementSibling.className,'rpysSay414Note');assert.equal(d.querySelector('.rpysSay414Note').nextElementSibling.className,'sigs');
   const result=w.rpysBulkPrint413.build(pack('say2','prev')),prev=parse(w,result.parts[0].body);
-  assert.equal(prev.querySelectorAll('.rpysSay414Note,.printNote').length,0);assert.match(prev.querySelector('.rpysSay414Grand').textContent,/4928 SAAT/);
+  assert.equal(prev.querySelector('.rpysSay414NoteContent')?.textContent.trim()||'','');assert.doesNotMatch(prev.body.textContent,/Birinci satır/);assert.equal(prev.querySelectorAll('.rpysSay414Grand').length,0);
   assert.equal(w.document.getElementById('month').value,'2026-10');assert.equal(w.document.querySelector('#saymanlik textarea').value,ta.value);
  }finally{dom.window.close()}
 });
@@ -72,7 +70,7 @@ test('single print and mixed bulk package retain routing, notes, caches, databas
   const duty=w.stableDutyDoc('pol');assert.equal(w.stablePrintDocument('Nöbet',duty,'portrait').body,duty);
   const result=w.rpysBulkPrint413.build({rows:[{doc:'say1',period:'this',copies:2},{doc:'nobet',period:'prev',copies:1},{doc:'puantaj',period:'this',copies:1},{doc:'birim',period:'this',copies:1}]});
   assert.equal(result.parts.length,7);assert.match(result.parts[2].body,/pol 2026-09/);assert.match(result.parts[3].body,/acil 2026-09/);
-  for(const p of result.parts.filter(p=>p.doc==='say1'||p.doc==='puantaj')){const d=parse(w,p.body);assert.equal(d.querySelectorAll('.rpysSay414Grand').length,2);assert.equal(d.querySelectorAll('.rpysSay414Note,.printNote').length,1)}
+  for(const p of result.parts.filter(p=>p.doc==='say1'||p.doc==='puantaj')){const d=parse(w,p.body);assert.equal(d.querySelectorAll('.rpysSay414Grand').length,0);assert.equal(d.querySelectorAll('.rpysSay414Note,.printNote').length,1)}
   assert.equal(w.db,w.original);assert.equal(JSON.stringify(w.db),before);assert.equal(w._calcCache,w.cacheRefs[3]);assert.equal(w._assignCache,w.cacheRefs[2]);assert.equal(w.document.querySelectorAll('option').length,1);
  }finally{dom.window.close()}
 });
@@ -82,11 +80,11 @@ test('renderer failure restores month, database and cache references',()=>{
   assert.equal(w.db,w.original);assert.equal(w.document.getElementById('month').value,'2026-10');assert.equal(w._calcCache,w.cacheRefs[3]);
  }finally{dom.window.close()}
 });
-test('later renderer replacement is wrapped once; serialized print body can repair legacy total removal',()=>{
+test('later renderer replacement is wrapped once; serialized print body keeps added totals removed',()=>{
  const {dom,w,api}=fixture();try{
   const old=w.stableSayDoc;w.stableSayDoc=function(){return old.apply(this,arguments)};api.install();const wrapper=w.stableSayDoc;api.install();assert.equal(w.stableSayDoc,wrapper);
   const d=parse(w,w.stableSayDoc(w.sayNamesForPage(1),'SAYFA 1/2'));d.querySelectorAll('.rpysSay414Grand').forEach(x=>x.remove());
-  const repaired=parse(w,api.prepare(d.body.innerHTML,{snapshot:true}));assert.equal(repaired.querySelectorAll('.rpysSay414Grand').length,2);assert.match(repaired.querySelector('.rpysSay414Grand').textContent,/4975,5 SAAT/);
+  const repaired=parse(w,api.prepare(d.body.innerHTML,{snapshot:true}));assert.equal(repaired.querySelectorAll('.rpysSay414Grand').length,0);assert.equal(repaired.querySelectorAll('.sum').length,5);
  }finally{dom.window.close()}
 });
 test('leading print styles and colors survive repeated document preparation',()=>{

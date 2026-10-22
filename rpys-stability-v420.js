@@ -41,6 +41,7 @@
   return js;
  }
  function repairEmbedded(js){
+  if(js.includes('rpysF20UnitTotal'))js=js.replace(/^function totalsRows\(\)\{[^\n]*$/m,'function totalsRows(){window.rpysStability420.renderGrandTotals()}');
   js=js.replace(/^const spouseBad=\(ids\)=>[^\n]*$/m,"const spouseBad=(ids)=>(window.rpysScheduler398?.spouseDayViolations?.(ym())||[]).filter(x=>ids.map(Number).includes(x.first)||ids.map(Number).includes(x.second)).length;").replace(/^const spouseBad10=ids=>[^\n]*$/m,"const spouseBad10=ids=>(window.rpysScheduler398?.spouseDayViolations?.(ym())||[]).filter(x=>ids.map(Number).includes(x.first)||ids.map(Number).includes(x.second)).length;");
   if(js.includes('rpysF20PolTrackSummary'))js=js.replace(/(function summary\(\)\{[^\n]*?)h\.innerHTML=(`[^\n]*`)/g,"$1window.rpysStability420.updateHtml(h,$2,'.tablewrap')");
   if(!js.includes('__RPYS_FIXPACK_319__'))return js;
@@ -59,20 +60,20 @@
  }
  function action(text){text=String(text).toLocaleUpperCase('tr-TR');if(text.includes('KİLİTLE')||text.includes('KİLİDİ AÇ'))return 'lock';if(text.includes('SEÇİLİ')&&/ÇALIŞMAYI DEĞİŞTİR|HÜCREYİ DEĞİŞTİR/.test(text))return 'swap';return ''}
  function hasEquivalent(menu,label){const key=action(label);return !!key&&[...menu.querySelectorAll('button')].some(b=>action(b.textContent)===key)}
- function renderGrandTotals(){
-  if(typeof totals!=='function'||typeof puantajValue!=='function')return;
-  let values;try{const all=totals();values=[all.reduce((n,r)=>n+Number(puantajValue(r,'muk')||0),0),all.reduce((n,r)=>n+Math.max(0,Number(puantajValue(r,'diff')||0)),0)]}catch{return}
-  const labels=['TÜM BİRİM TOPLAM MÜKELLEF','TÜM BİRİM TOPLAM FAZLA MESAİ'];
-  for(const table of document.querySelectorAll('table.say')){
-   const body=table.tBodies[0];if(!body)continue;
-   const existing=[...table.querySelectorAll('.rpys319GrandRow')];existing.slice(2).forEach(r=>r.remove());
-   for(let i=0;i<2;i++){
-    let row=existing[i];if(!row){row=body.insertRow();row.className='puantajRow rpys319GrandRow';row.insertCell();row.insertCell();}
-    if(row.cells[0].textContent!==labels[i])row.cells[0].textContent=labels[i];
-    const colspan=Math.max(1,(table.rows[1]?.cells.length||2)-1);if(row.cells[1].colSpan!==colspan)row.cells[1].colSpan=colspan;
-    const value=values[i].toLocaleString('tr-TR',{maximumFractionDigits:2})+' SAAT';if(row.cells[1].textContent!==value)row.cells[1].textContent=value;
-   }
+ function removeSayGrandTotals(){
+  for(const table of document.querySelectorAll('table.say,table.stableSay,table.rpys393saytable'))for(const row of [...table.rows]){
+   const label=String(row.cells[0]?.textContent||'').trim().toLocaleUpperCase('tr-TR').replace(/\s+/g,' ');
+   if(row.matches('.rpys319GrandRow,.rpysF20UnitTotal,.rpys393grand,.rpys393grand2,.rpysSay414Grand')||/^(?:TÜM )?BİRİM TOPLAM/.test(label)||/^TOPLAM (MÜKELLEF|FAZLA MESAİ)/.test(label))row.remove();
   }
  }
- window.rpysStability420={updateHtml,repair,repairPatch,repairEmbedded,renderGrandTotals,hasEquivalent};
+ function installPuantajAction(){
+  const page=document.getElementById('saymanlik');if(!page)return;
+  if(!document.getElementById('rpysPuantajActionStyle422')){const style=document.createElement('style');style.id='rpysPuantajActionStyle422';style.textContent='@media print{#rpysPuantajReset422{display:none!important}}';document.head.append(style)}
+  page.querySelectorAll('button[onclick*="resetAllPuantajOverrides"]').forEach(b=>b.remove());
+  const host=page.querySelector('.toolbar');if(!host||document.getElementById('rpysPuantajReset422'))return;
+  const button=document.createElement('button');button.id='rpysPuantajReset422';button.type='button';button.className='btn alt';button.textContent='Elle girilen toplamları kaldır';button.title='Seçili ayın puantaj özetindeki elle girilen değerleri kaldırır; görevlerden hesaplanan değerleri gösterir.';button.onclick=()=>window.resetAllPuantajOverrides?.();host.append(button);
+ }
+ function renderGrandTotals(){removeSayGrandTotals();installPuantajAction()}
+ window.rpysStability420={updateHtml,repair,repairPatch,repairEmbedded,renderGrandTotals,removeSayGrandTotals,installPuantajAction,hasEquivalent};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderGrandTotals);else renderGrandTotals();
 })();

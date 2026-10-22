@@ -24,7 +24,7 @@ table.rpysSay414Table .rpysSay414GrandLabel,table.rpysSay414Table .rpysSay414Gra
 function note(m){
  const sec=document.getElementById('saymanlik');
  const ta=sec?.querySelector('.rpysPageNote textarea,textarea[placeholder*="not" i],textarea[aria-label*="not" i],textarea[title*="not" i],textarea[name*="not" i],textarea[id*="not" i]');
- const live=String(ta?.value||'').trim();if(live)return live;
+ const owner=ta?.closest('.rpysPageNote')?.dataset?.rpysNoteMonth;const live=String(ta?.value||'').trim();if(live&&(!owner||owner===m))return live;
  try{const all=JSON.parse(localStorage.getItem('rpys_page_notes_v1')||'{}');return String(all['saymanlik|'+m]||'').trim()}catch(_){return ''}
 }
 function unitTotals(){
@@ -57,23 +57,16 @@ function prepare(html,opts={}){
  // DOMParser can move leading legacy print styles into <head>. Keep them so
  // the existing colors, row heights, header and signature sizing survive.
  d.body.prepend(...d.head.querySelectorAll('style'));
- const sum=opts.snapshot?null:unitTotals(),m=opts.month||month();
+ const m=opts.month||month();
  for(const t of tables){
-  const value=sum||{muk:number(t.dataset.rpysUnitMuk),extra:number(t.dataset.rpysUnitExtra)};
-  t.classList.add('rpysSay414Table');t.dataset.rpysUnitMuk=String(value.muk);t.dataset.rpysUnitExtra=String(value.extra);
+  t.classList.add('rpysSay414Table');delete t.dataset.rpysUnitMuk;delete t.dataset.rpysUnitExtra;
   // Keep the existing date/person column widths; only format their contents.
   t.querySelectorAll('thead th.nameHead,thead tr:last-child th:not(:first-child)').forEach(th=>{
    if(th.colSpan>1)return;
    const name=th.textContent.trim(),span=d.createElement('span');span.className='rpysSay414Name'+(name.length>22?' rpysSay414Long':'');span.textContent=name;
    th.classList.add('rpysSay414Head');th.replaceChildren(span);
   });
-  for(const r of [...t.rows])if(r.classList.contains('rpys393grand')||r.classList.contains('rpys393grand2')||r.classList.contains('rpysSay414Grand')||/^TOPLAM (MUKELLEF|FAZLA)/.test(label(r.cells[0]?.textContent)))r.remove();
-  const columns=Math.max(...[...t.rows].map(r=>[...r.cells].reduce((n,c)=>n+c.colSpan,0))),tb=t.tBodies[t.tBodies.length-1]||t.createTBody();
-  for(const [text,val,cls] of [['TOPLAM MÜKELLEF',value.muk,'rpys393grand'],['TOPLAM FAZLA MESAİ',value.extra,'rpys393grand2']]){
-   const r=tb.insertRow();r.className='rpysSay414Grand '+cls;
-   const td=r.insertCell();td.colSpan=columns;
-   const a=d.createElement('span'),b=d.createElement('span');a.className='rpysSay414GrandLabel';b.className='rpysSay414GrandValue';a.textContent=text;b.textContent=hours(val);td.append(a,' — ',b);
-  }
+  for(const r of [...t.rows])if(r.matches('.rpys393grand,.rpys393grand2,.rpysSay414Grand,.rpys319GrandRow,.rpysF20UnitTotal')||/^(?:TUM )?BIRIM TOPLAM/.test(label(r.cells[0]?.textContent))||/^TOPLAM (MUKELLEF|FAZLA)/.test(label(r.cells[0]?.textContent)))r.remove();
   // Embed each page's note before its signatures, inside the document body.
   const page=t.closest('.stableSayPage,.rpys393saywrap')||t.parentElement;
   page.querySelectorAll('.rpysSay414Note,.rpys383Note,.printNote').forEach(x=>x.remove());

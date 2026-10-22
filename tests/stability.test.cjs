@@ -1,12 +1,10 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
 const js=fs.readFileSync(path.join(__dirname,'../rpys-stability-v420.js'),'utf8');
 function fixture(html=''){const dom=new JSDOM(html,{url:'https://test.invalid',runScripts:'outside-only'}),w=dom.window;w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;w.eval(js);return {dom,w,api:w.rpysStability420}}
-test('grand total rows keep their identity and stop mutating once values settle',()=>{
- const f=fixture('<table class="say"><thead><tr><th>DATE</th><th>A</th><th>B</th></tr></thead><tbody><tr><td>FARK</td><td>1</td><td>2</td></tr></tbody></table>');try{
-  let value=100;f.w.totals=()=>[{muk:value,diff:20},{muk:100,diff:-10}];f.w.puantajValue=(r,k)=>r[k];f.api.renderGrandTotals();
-  const first=f.w.document.querySelector('.rpys319GrandRow'),obs=new f.w.MutationObserver(()=>{});obs.observe(f.w.document.body,{childList:true,subtree:true});
-  for(let n=0;n<30;n++)f.api.renderGrandTotals();assert.equal(obs.takeRecords().length,0);assert.equal(f.w.document.querySelector('.rpys319GrandRow'),first);
-  value=120;f.api.renderGrandTotals();assert.equal(first.cells[1].textContent,'220 SAAT');assert.equal(first.cells[1].colSpan,2);assert.equal(f.w.document.querySelectorAll('.rpys319GrandRow').length,2);obs.disconnect();
+test('Saymanlık extra unit totals are removed while personal totals stay and repeated cleanup does not mutate',()=>{
+ const f=fixture('<section id="saymanlik"><div class="toolbar"></div><table class="say"><tbody><tr><td>TOPLAM</td><td>157</td></tr><tr><td>MÜKELLEF</td><td>112</td></tr><tr><td>FARK</td><td>45</td></tr><tr class="rpysF20UnitTotal"><td>BİRİM TOPLAM ÇALIŞILAN</td><td>3948</td></tr><tr class="rpys319GrandRow"><td>TÜM BİRİM TOPLAM MÜKELLEF</td><td>3232</td></tr></tbody></table></section>');try{
+  f.w.db={assign:{manual:1},puantajOverride:{a:45}};const before=JSON.stringify(f.w.db);f.api.renderGrandTotals();assert.equal(f.w.document.querySelectorAll('table.say tr').length,3);assert.equal(f.w.document.querySelectorAll('.rpysF20UnitTotal,.rpys319GrandRow').length,0);
+  const obs=new f.w.MutationObserver(()=>{});obs.observe(f.w.document.body,{childList:true,subtree:true});for(let n=0;n<30;n++)f.api.renderGrandTotals();assert.equal(obs.takeRecords().length,0);assert.equal(JSON.stringify(f.w.db),before);assert.equal(f.w.document.querySelectorAll('#rpysPuantajReset422').length,1);assert.match(f.w.document.querySelector('#rpysPuantajReset422').textContent,/Elle girilen toplamları kaldır/);obs.disconnect();
  }finally{f.dom.window.close()}
 });
 test('embedded legacy functions delegate totals and avoid rebuilding unchanged menu buttons',()=>{
@@ -94,4 +92,8 @@ test('window-assigned encoded tracking summary stops its observer loop and prese
 
 test('unrelated encoded data and executable payloads remain byte-for-byte unchanged',()=>{
  const f=fixture();try{const data=Buffer.from('unrelated data '.repeat(80)).toString('base64'),code=Buffer.from('window.unrelated=42;/*'+'x'.repeat(300)+'*/').toString('base64'),html=`<img src="data:image/png;base64,${data}"><script>window.bin="${data}";window.code="${code}";</script>`;assert.equal(f.api.repair(html),html)}finally{f.dom.window.close()}
+});
+
+test('the second embedded F20 unit-total writer delegates cleanup instead of recreating summary rows',()=>{
+ const f=fixture('<table class="say"><tbody><tr><td>FARK</td><td>45</td></tr></tbody></table>');try{const source='// rpysF20UnitTotal\nfunction totalsRows(){throw Error("old writer")}';f.w.eval(f.api.repairEmbedded(source));f.w.totalsRows();assert.equal(f.w.document.querySelectorAll('table tr').length,1)}finally{f.dom.window.close()}
 });
