@@ -98,13 +98,19 @@ function shiftTimes(p,dateCell){
   const value=String(meta.shift||base?.shift||'');const t=value.match(/\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}/)?.[0];if(t&&!shifts.includes(t))shifts.push(t);
  }}catch(e){}return shifts.join(' / ');
 }
-function source(){const host=document.querySelector(state.tab===1?'#say1Grid':'#say2Grid');return host?.querySelector('table')||null}
+function source(){
+ const host=document.querySelector(state.tab===1?'#say1Grid':'#say2Grid'),table=host?.querySelector('table');if(!table)return null;
+ const rows=[...table.rows];
+ const header=rows.find(r=>r.cells.length>4&&/TARİH|TARIH/i.test(r.cells[0]?.textContent||''))||rows.find(r=>r.cells.length>4);
+ const hasDates=rows.some(r=>/^\s*\d{1,2}\s*[/.]\s*\d{1,2}/.test(r.cells[0]?.textContent||''));
+ return header&&hasDates?table:null;
+}
 let warming=false,warmAttempts=0;
-function warmSource(){if(warming||source()||warmAttempts>=3)return;warmAttempts++;warming=true;const page=document.getElementById('saymanlikV2');const side=document.querySelector('.sidebar');const original=[...side?.querySelectorAll('.nav,button')||[]].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));try{if(original)original.click();else document.getElementById('saymanlik')?.classList.add('active')}catch(e){}setTimeout(()=>{const v=document.getElementById('saymanlikV2');document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));v?.classList.add('active');document.getElementById('rpysSayV2Nav')?.classList.add('active');warming=false;build()},550)}
+function warmSource(){if(warming||source()||warmAttempts>=8)return;warmAttempts++;warming=true;const side=document.querySelector('.sidebar');const original=[...side?.querySelectorAll('.nav,button')||[]].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));try{if(original)original.click();else document.getElementById('saymanlik')?.classList.add('active')}catch(e){}setTimeout(()=>{const v=document.getElementById('saymanlikV2');document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));v?.classList.add('active');document.getElementById('rpysSayV2Nav')?.classList.add('active');warming=false;build()},900)}
 function build(){
 const page=document.getElementById('saymanlikV2');if(!page)return;
 const holder=page.querySelector('.sv2wrap');if(!holder)return;
-const src=source();holder.replaceChildren();if(!src){holder.textContent=warmAttempts>=3?'Kaynak Saymanlık tablosu oluşturulamadı. Ana Saymanlık ekranındaki SAY1/SAY2 yüklemesi kontrol edilmeli.':'Saymanlık kayıtları hazırlanıyor…';warmSource();return}
+const src=source();holder.replaceChildren();if(!src){holder.textContent=warmAttempts>=8?'Ana Saymanlık henüz hazır değil. Önce Saymanlık SAY1/SAY2 sekmesini açıp ardından V2 içindeki Verileri Yenile düğmesine bas.':'Saymanlık kayıtları yükleniyor… ('+(warmAttempts+1)+'/8)';warmSource();return}
 
 const rows=[...src.rows],header=rows.find(r=>r.cells.length>4&&/TARİH|TARIH/i.test(r.cells[0]?.textContent||''))||rows.find(r=>r.cells.length>4);
 if(!header){holder.textContent='Personel başlıkları bulunamadı.';return}
@@ -182,7 +188,7 @@ const hide=el('button','İzin/Rapor sütunları: '+(state.hide?'Gizli':'Açık')
 const grouping=el('button',state.group?'✓ Birimlere göre ayrıldı':'Birimlere göre ayır');grouping.onclick=()=>{state.group=!state.group;grouping.textContent=state.group?'✓ Birimlere göre ayrıldı':'Birimlere göre ayır';save();build()};
 const fullscreen=el('button','⛶ Tam ekran');fullscreen.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await page.requestFullscreen()}catch(e){console.warn('Tam ekran kullanılamıyor',e)}};
 const search=el('input');search.type='search';search.placeholder='Personel ara';search.setAttribute('aria-label','Personel ara');search.value=state.search||'';search.addEventListener('input',()=>{state.search=search.value;save();build()});
-const refresh=el('button','↻ Verileri Yenile');refresh.onclick=()=>{refreshUnits();build()};
+const refresh=el('button','↻ Verileri Yenile');refresh.onclick=()=>{warmAttempts=0;refreshUnits();build()};
 const resetSize=el('button','↺ Hücre boyutlarını sıfırla');resetSize.onclick=()=>{state.width=58;state.height=39;state.widths={};state.heights={};save();bar.querySelectorAll('input[type="range"]').forEach((input,i)=>{input.value=i===0?58:39});build()};
 const back=el('button','Orijinal Saymanlıkta Düzenle');back.onclick=()=>{const original=[...side.querySelectorAll('button,.nav')].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));if(original)original.click();else{page.classList.remove('active');document.getElementById('saymanlik')?.classList.add('active')}};
 for(const [label,key,min,max] of [['Gün hücresi genişliği','width',42,110],['Tüm satırların yüksekliği','height',28,75]]){const wrap=el('label',label+' '),input=el('input');input.type='range';input.min=min;input.max=max;input.value=state[key];input.oninput=()=>{state[key]=Number(input.value);state[key==='width'?'widths':'heights']={};save();build()};wrap.append(input);bar.append(wrap)}
