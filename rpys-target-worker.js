@@ -191,7 +191,9 @@ function solvePartial(input){
   domains=domains.map(d=>d===null?null:d.filter(v=>left[values.get(v).id][values.get(v).kind]>0));
   const picked=new Set(chosen);for(const group of limits){const used=group.values.filter(v=>picked.has(v)).length;if(used>group.max)return;if(used===group.max){const ban=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!ban.has(v)))}}
   if(!propagateDependencies(dependencies,values,domains,picked))return;
-  const calendar=strict||input.hardGaps||input.strictAllCalendars?partialCalendar(input,values,domains,left,chosen):null;
+  // In the second pass, gap/soft calendar preferences may be reported as
+  // unmet, but they must not erase otherwise safe duties for a whole person.
+  const calendar=strict||input.strictAllCalendars?partialCalendar(input,values,domains,left,chosen):null;
   const eligible=calendar?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen;
   const valid=input.strictAllCalendars&&calendar.complete.size!==ids.length?[]:dependencyComplete(dependencies,eligible);
   if(valid.length>best.length)best=valid.slice();if(best.length===goal)return;

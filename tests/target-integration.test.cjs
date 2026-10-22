@@ -170,7 +170,8 @@ test('partial mode honors low targets and reports the unavoidable five-day gap',
  const f=fixture();enableEdgeGaps(f);const before=JSON.stringify(f.c.rpysTargets399.config(unit).people);const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);assert.equal(result.plan.length,51);assert.equal(result.shortfalls.length,0);assert.equal(result.plan.filter(x=>x.id===6).length,3);assert.equal(result.unfilled.length,0);assert.equal(f.c.v251GapViolations([1,2,3,4,5]).length,0);assert.equal(f.saved.length,1);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),before);assert.ok(result.notes.some(x=>/Recep Duman/.test(x)));assert.match(f.controls.distResult.textContent,/Recep Duman.*boş gün/);assert.equal(f.c.db.manualDistributionResultsV399['2026-10|'+unit].status,'partial');assert.equal(f.c.rpysRest16V397.allViolations().size,0);
 });
 test('partial fallback preserves existing unlocked, manual, locked, historical and other-unit assignments',async()=>{
- const f=fixture();Object.assign(f.c.db.assign,{'2026-10|acil|1|day':1,'2026-10|acil|10|night':2,'2026-10|acil|3|day':4,'2026-10|acil|2|other':3,'2026-09|acil|30|night':5});f.c.db.assignmentMeta['2026-10|acil|1|day']={manual:true};f.c.db.rpysCellLocks['2026-10|acil|10|night']={exists:true,value:2};f.c.db.leaves=Array.from({length:29},(_,i)=>({id:1,day:i+2}));const original=JSON.stringify([f.c.db.assignmentMeta,f.c.db.rpysCellLocks,f.c.db.staff]),assign={...f.c.db.assign},targets=JSON.stringify(f.c.rpysTargets399.config(unit).people);const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);assert.ok(result.plan.length>20);for(const [key,id] of Object.entries(assign))assert.equal(f.c.db.assign[key],id);assert.equal(JSON.stringify([f.c.db.assignmentMeta,f.c.db.rpysCellLocks,f.c.db.staff]),original);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),targets);assert.equal(f.saved.length,1);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+ // With rebuild off, previously entered unlocked duties are retained.
+ const f=fixture();f.controls.rebuildSelectedUnitV246.checked=false;Object.assign(f.c.db.assign,{'2026-10|acil|1|day':1,'2026-10|acil|10|night':2,'2026-10|acil|3|day':4,'2026-10|acil|2|other':3,'2026-09|acil|30|night':5});f.c.db.assignmentMeta['2026-10|acil|1|day']={manual:true};f.c.db.rpysCellLocks['2026-10|acil|10|night']={exists:true,value:2};f.c.db.leaves=Array.from({length:29},(_,i)=>({id:1,day:i+2}));const original=JSON.stringify([f.c.db.assignmentMeta,f.c.db.rpysCellLocks,f.c.db.staff]),assign={...f.c.db.assign},targets=JSON.stringify(f.c.rpysTargets399.config(unit).people);const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);assert.ok(result.plan.length>20);for(const [key,id] of Object.entries(assign))assert.equal(f.c.db.assign[key],id);assert.equal(JSON.stringify([f.c.db.assignmentMeta,f.c.db.rpysCellLocks,f.c.db.staff]),original);assert.equal(JSON.stringify(f.c.rpysTargets399.config(unit).people),targets);assert.equal(f.saved.length,1);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
 });
 
 test('partial validation removes only unsafe new duties when an authoritative dynamic rule rejects a full draft',async()=>{
@@ -343,4 +344,44 @@ test('low Skopi targets still place feasible shifts for people whose five-day ga
  assert.equal(f.saved.length,1);assert.equal(JSON.stringify(cfg.people),targets);
  assert.equal(f.c.rpysRest16V397.allViolations().size,0);
  assert.match(f.controls.distResult.textContent,/boş gün sınırı karşılanamayabilir|Girilen hedef bu sınırı karşılamıyor/);
+});
+test('rebuilding a partial seven-person Skopi roster assigns the previously omitted person',async()=>{
+ const f=fixture();enableEdgeGaps(f);f.c.db.staff.push({id:7,name:'ULAŞ BEYDE',status:'Aktif'});f.controls.autoPeople.selectedOptions.push({value:7});
+ const cfg=f.c.rpysTargets399.config(unit),values={1:[3,0],2:[5,7],3:[4,6],4:[0,3],5:[3,4],6:[1,3],7:[5,7]};
+ const weekend={1:0,2:3,3:2,4:0,5:1,6:1,7:2};
+ for(const [id,[day,night]] of Object.entries(values))cfg.people[id]={day,night,weekendNight:weekend[id]};
+ Object.assign(f.c.db.assign,{'2026-10|acil|1|day':2,'2026-10|acil|2|day':3,'2026-10|acil|3|night':6});
+ f.c.db.assignmentMeta['2026-10|acil|1|day']={manual:true};
+ f.c.db.rpysCellLocks['2026-10|acil|3|night']={locked:true};
+ const before=JSON.stringify(cfg.people),result=await f.c.rpysTargets399.run();
+ assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);
+ const actual=f.c.rpysTargets399.model(unit).actual;
+ assert.deepEqual([actual[7].day,actual[7].night,actual[7].weekendNight],[5,7,2],`Ulaş was omitted: ${JSON.stringify(actual[7])}`);
+ assert.ok(Object.entries(values).every(([id,[day,night]])=>actual[id].day<=day&&actual[id].night<=night));
+ assert.ok(result.unfilled.length<=2,`too many cells remained empty: ${result.unfilled.length}`);
+ assert.equal(f.c.db.assign['2026-10|acil|1|day'],2);assert.equal(f.c.db.assign['2026-10|acil|3|night'],6);
+ assert.ok(result.plan.length>3);assert.equal(JSON.stringify(cfg.people),before);assert.equal(f.saved.length,1);
+ assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});
+test('an unmet pre-leave Thursday warns but does not erase the other feasible Ulaş duties',async()=>{
+ const f=fixture();enableEdgeGaps(f);f.c.db.staff.push({id:7,name:'ULAŞ BEYDE',status:'Aktif'});f.controls.autoPeople.selectedOptions.push({value:7});
+ const cfg=f.c.rpysTargets399.config(unit),values={1:[3,0],2:[5,7],3:[4,6],4:[0,3],5:[3,4],6:[1,3],7:[5,7]};
+ for(const [id,[day,night]] of Object.entries(values))cfg.people[id]={day,night,weekendNight:null};
+ datedLeave(f,7,'2026-10-26','2026-10-30');const base=f.c.canTakeShiftV2414;
+ f.c.canTakeShiftV2414=(id,day,...args)=>!(id===7&&day===22)&&base(id,day,...args);
+ const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));
+ const actual=f.c.rpysTargets399.model(unit).actual[7];assert.ok(actual.day>0&&actual.night>0,`Ulaş was omitted: ${JSON.stringify(actual)}`);
+ assert.match(f.controls.distResult.textContent,/ULAŞ BEYDE.*Perşembe/);assert.equal(f.saved.length,1);
+ assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});
+test('rerunning a saved partial Skopi roster rebalances old automatic duties for Ulaş',async()=>{
+ const f=fixture();enableEdgeGaps(f);const cfg=f.c.rpysTargets399.config(unit);
+ const values={1:[3,0],2:[5,7],3:[4,6],4:[0,3],5:[3,4],6:[1,3]};
+ for(const [id,[day,night]] of Object.entries(values))cfg.people[id]={day,night,weekendNight:null};
+ const first=await f.c.rpysTargets399.run();assert.equal(first.ok,true,f.alerts.join('\n'));assert.ok(first.plan.length>=37);
+ f.c.db.staff.push({id:7,name:'ULAŞ BEYDE',status:'Aktif'});f.controls.autoPeople.selectedOptions.push({value:7});cfg.people[7]={day:5,night:7,weekendNight:2};
+ const second=await f.c.rpysTargets399.run();assert.equal(second.ok,true,f.alerts.join('\n'));
+ const actual=f.c.rpysTargets399.model(unit).actual[7];assert.deepEqual([actual.day,actual.night,actual.weekendNight],[5,7,2]);
+ assert.ok(second.unfilled.length<=2,`too many cells remained empty: ${second.unfilled.length}`);
+ assert.equal(f.saved.length,2);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
 });
