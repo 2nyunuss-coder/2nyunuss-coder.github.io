@@ -9,11 +9,13 @@
   const kind=col=>Number(col.hours||0)>=16?'night':'day';
   const weekendOn=(day,month=ym())=>[0,6].includes(new Date(month+'-'+String(day).padStart(2,'0')+'T12:00:00Z').getUTCDay());
   const key=u=>ym()+'|'+u;
+  const gapLimit=u=>Number(window.rpysRules421?.settings(u).maxGapDays??(typeof unitMaxGapDaysV251==='function'?unitMaxGapDaysV251(u):5))||5;
   const ruleOn=(u,k)=>['returnMonday','blockReserve'].includes(k)?true:window.rpysRules421?window.rpysRules421.enabled(u,k):unitRulesV251(u)[k]!==false;
   const textFor=u=>window.rpysRules421?.textRules(u)||db.customTextRules||[];
   const customFor=u=>window.rpysRules421?.customRules(u)||[];
   const config=u=>db.manualDistributionTargetsV399?.[key(u)]||{enabled:false,people:{}};
-  const enabledFor=u=>config(u).enabled===true;
+  let automaticUnit=null;
+  const enabledFor=u=>automaticUnit===u||config(u).enabled===true;
   const selected=u=>[...new Set((document.getElementById('autoUnit')?.value===u
     ?Array.from(document.getElementById('autoPeople')?.selectedOptions||[]).map(o=>Number(o.value))
     :(db.unitPools?.[key(u)]||[]).map(Number)).filter(id=>getPersonById(id)))];
@@ -57,6 +59,7 @@
     return {u,ids,rebuild,actual,fixed,required,slots,mutable,lockedEmpty};
   }
   function readTargets(m,{partial=false}={}){
+    if(automaticUnit===m.u)return Object.fromEntries(m.ids.map(id=>[id,{day:m.fixed[id].day+m.slots.filter(s=>s.kind==='day').length,night:m.fixed[id].night+m.slots.filter(s=>s.kind==='night').length,weekendNight:null}]));
     const cfg=config(m.u),targets={},problems=[];
     for(const id of m.ids){targets[id]={};for(const t of kinds){
       const v=cfg.people?.[id]?.[t];
@@ -132,7 +135,7 @@
     const assignments=assignmentsMonth(),result={};
     for(const id of m.ids){
       const p=getPersonById(id),row=rows.find(r=>Number(r.p?.id)===id);
-      const display=field=>row&&typeof puantajValue==='function'?Number(puantajValue(row,field)):row?Number(row[field]):NaN;
+      const display=field=>{if(!row)return NaN;try{return typeof puantajValue==='function'?Number(puantajValue(row,field)):Number(row[field])}catch(_){return Number(row[field])}};
       let worked=display('total'),obligation=display('muk');
       if(!Number.isFinite(worked))worked=assignments.filter(a=>Number(a.person.id)===id).reduce((n,a)=>n+Number(a.col.hours||0),0);
       if(!Number.isFinite(obligation)&&typeof finalObligation==='function')obligation=Number(finalObligation(p));
@@ -148,7 +151,7 @@
   }
   function finalRules(m){
     const r=unitRulesV251(m.u),rows=assignmentsMonth();
-    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u);if(gaps.length)return gaps.map(g=>`${getPersonById(g.id)?.name||('#'+g.id)}: ${g.leftDate??g.left??g.from??'?'} – ${g.rightDate??g.right??g.to??'?'} arasında görev aralığı ${g.blank??g.gap??'?'} boş gün; izin verilen en fazla ${unitMaxGapDaysV251(m.u)||5}.`).join('\n')}
+    if(r.maxGapEnabled){const gaps=window.rpysScheduler398.gapViolations?window.rpysScheduler398.gapViolations(m.ids,m.u,ym()):v251GapViolations(m.ids,m.u);if(gaps.length)return gaps.map(g=>`${getPersonById(g.id)?.name||('#'+g.id)}: ${g.leftDate??g.left??g.from??'?'} – ${g.rightDate??g.right??g.to??'?'} arasında görev aralığı ${g.blank??g.gap??'?'} boş gün; izin verilen en fazla ${gapLimit(m.u)}.`).join('\n')}
     if(r.spouseSameDay){const issues=window.rpysScheduler398?.spouseDayViolations?.(ym())||[];if(issues.length)return issues.map(x=>`${getPersonById(x.first).name} / ${getPersonById(x.second).name}: ${x.day}. gün eş kuralı.`).join('\n')}
     const missing=requirementsFor(m);if(missing.length)return missing.map(x=>`${getPersonById(x.id).name}: ${[...x.days].join(', ')}. gün ${x.reason} eksik.`).join('\n');
     return true;
@@ -159,8 +162,9 @@
     for(const id of m.ids)longFixed.set(id,new Set(allAssignmentsAllMonths().filter(a=>Number(a.person.id)===id&&Number(a.col.hours)>=Number(r.longHours||23)).map(a=>Math.round((new Date(a.date+'T12:00:00').getTime()-start)/86400000)+1).filter(d=>d>=-Math.max(4,Number(r.minGap??2))&&d<=daysInMonth()+Math.max(4,Number(r.minGap??2)))));
     const textRules=[...textFor(m.u),...customFor(m.u)].filter(x=>x.active!==false&&x.kind!=='config');
     for(const s of m.slots){s.long=Number(s.col.hours)>=Number(r.longHours||23);s.blocksNext=ruleOn(m.u,'noPostDuty')&&(isOvernightOrDutyShift(s.col)||Number(s.col.hours)>=16);}
+    const calendarChecks=new Map();
     function canPlace(id,s){
-      if(calendarReason(calendar,id,s.day,s.col))return false;
+      const checkKey=id+'|'+s.key;if(!calendarChecks.has(checkKey))calendarChecks.set(checkKey,calendarReason(calendar,id,s.day,s.col));if(calendarChecks.get(checkKey))return false;
       const mine=[...chosen.values()].filter(x=>x.id===id),longs=new Set(longFixed.get(id));
       for(const x of mine){const t=x.s;if(ruleOn(m.u,'overlap')&&typeof shiftInterval==='function'){const a=shiftInterval(s.day,s.col),b=shiftInterval(t.day,t.col);if(a&&b&&a.st<b.en&&b.st<a.en)return false}if(ruleOn(m.u,'avoidSameDay')&&t.day===s.day)return false;if(ruleOn(m.u,'noPostDuty')&&((t.blocksNext&&s.day===t.day+1)||(s.blocksNext&&t.day===s.day+1)))return false;if(t.long)longs.add(t.day);}
       if(s.long){
@@ -200,7 +204,7 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261022-return-16',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261022-gap-17',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null,bestEffortRequested=false;
   let feedback={text:'',tone:'',busy:false};
   function report(text,tone='progress',busy=preparing){
@@ -277,6 +281,7 @@
   }
   function gapRulesFor(m,rows){
     if(!unitRulesV251(m.u).maxGapEnabled)return [];
+    if(window.rpysScheduler398.gapCalendar)return window.rpysScheduler398.gapCalendar(m.ids,m.u,ym()).map(({date,...rule})=>rule);
     const origin=Date.parse(ym()+'-01T00:00:00Z'),last=daysInMonth();
     const offset=s=>Math.round((Date.parse(s+'T00:00:00Z')-origin)/86400000)+1;
     const anchors=new Map(m.ids.map(id=>[id,{before:null,after:null,fixedDays:[]}]));
@@ -297,11 +302,11 @@
       const {before,after,fixedDays}=anchors.get(id),from=before===null?1:before+1,to=after===null?last:after-1;
       const leaves=(db.leaves||[]).filter(l=>Number(l.personId??l.idPerson??l.person?.id)===id&&l.start&&l.end).map(l=>[Math.max(from,offset(l.start)),Math.min(to,offset(l.end))]).filter(([a,b])=>a<=b).sort((a,b)=>a[0]-b[0]);
       const runs=[];let next=from;for(const [a,b] of leaves){if(a>next)runs.push([next,a-1]);next=Math.max(next,b+1)}if(next<=to)runs.push([next,to]);
-      return {id,maxBlank:Number(unitMaxGapDaysV251(m.u)||5),includeEdges:!!window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__,segments:nonLeaveSegmentsV2414(id),fixedDays:rows.filter(a=>Number(a.person.id)===id&&a.col.unit===m.u).map(a=>Number(a.day)),crossMonth:{before,after,fixedDays,last,runs,month:ym()}};
+      return {id,maxBlank:Number(gapLimit(m.u)),includeEdges:!!window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__,segments:nonLeaveSegmentsV2414(id),fixedDays:rows.filter(a=>Number(a.person.id)===id&&a.col.unit===m.u).map(a=>Number(a.day)),crossMonth:{before,after,fixedDays,last,runs,month:ym()}};
     });
   }
   async function planningData(u,{check=()=>{},progress=()=>{},partial=false}={}){
-    const m=model(u,selected(u),{preserveExisting:partial}),targets=readTargets(m,{partial});
+    const m=model(u,selected(u),{preserveExisting:partial&&automaticUnit!==u}),targets=readTargets(m,{partial});
     if(!partial)validateMonthlyLimits(m,targets);
     if(!m.ids.length)throw Error('Önce bu birimde çalışacak personelleri seç.');
     // Work exclusively on a detached database. No save is called during planning.
@@ -330,7 +335,7 @@
       const problems=[];
       for(const id of m.ids)for(const t of kinds){
         const capacity=new Set(m.slots.filter(s=>s.kind===t&&s.allowed.includes(id)).map(s=>s.day)).size;
-        if(remaining[id][t]>capacity)problems.push(`${getPersonById(id).name}: ${targets[id][t]} ${labels[t]} hedefi; korunan ${m.fixed[id][t]}, uygun gün en fazla ${capacity}. İzin, dinlenme, mevcut görev veya özel kurallar nedeniyle en az ${remaining[id][t]-capacity} görev karşılanamıyor. Önerilen üst sınır: ${m.fixed[id][t]+capacity} (ortak kapasite ayrıca doğrulanır).`);
+        if(automaticUnit!==u&&remaining[id][t]>capacity)problems.push(`${getPersonById(id).name}: ${targets[id][t]} ${labels[t]} hedefi; korunan ${m.fixed[id][t]}, uygun gün en fazla ${capacity}. İzin, dinlenme, mevcut görev veya özel kurallar nedeniyle en az ${remaining[id][t]-capacity} görev karşılanamıyor. Önerilen üst sınır: ${m.fixed[id][t]+capacity} (ortak kapasite ayrıca doğrulanır).`);
       }
       for(const id of m.ids){
         let free=0,rest=-Infinity;
@@ -341,11 +346,11 @@
           free=nextFree;rest=nextRest;
         }
         const capacity=Math.max(free,rest),need=remaining[id].day+remaining[id].night;
-        if(ruleOn(u,'avoidSameDay')&&need>capacity)problems.push(`${getPersonById(id).name}: kalan ${remaining[id].day} gündüz + ${remaining[id].night} nöbet toplamı ${need}; aynı gün ve nöbet ertesi dinlenmeyle en fazla ${capacity} görev mümkün. En az ${need-capacity} görev azaltılmalı veya uygun günler gözden geçirilmeli.`);
+        if(automaticUnit!==u&&ruleOn(u,'avoidSameDay')&&need>capacity)problems.push(`${getPersonById(id).name}: kalan ${remaining[id].day} gündüz + ${remaining[id].night} nöbet toplamı ${need}; aynı gün ve nöbet ertesi dinlenmeyle en fazla ${capacity} görev mümkün. En az ${need-capacity} görev azaltılmalı veya uygun günler gözden geçirilmeli.`);
       }
       for(const s of m.slots)if(!s.allowed.length)problems.push(`${s.day}. gün ${s.col.shift||s.col.key}: seçili personellerden hedefi kalan uygun kişi yok (izin, dinlenme, mevcut görev veya özel kural).`);
       if(problems.length&&!partial)throw Error(problems.join('\n'));
-      const adapter=searchAdapter(m),conflicts=[],limits=[],cfg=ruleCfg();
+      const adapter=searchAdapter(m),conflicts=[],limits=[],cfg=ruleCfg(),crossPairs=new Set();for(const rule of [...textFor(m.u),...customFor(m.u)].filter(r=>r.active!==false&&r.kind==='pairAvoidSameDay')){crossPairs.add(Number(rule.personA)+'|'+Number(rule.personB));crossPairs.add(Number(rule.personB)+'|'+Number(rule.personA));}
       const addLimit=(id,days,max,longOnly=false)=>{
         const fixedDays=new Set(rows.filter(a=>Number(a.person.id)===id&&(longOnly?Number(a.col.hours)>=Number(cfg.longHours||23):a.col.unit===u)).map(a=>Number(a.day)));
         const fixed=days.filter(d=>fixedDays.has(d)).length;
@@ -363,6 +368,7 @@
         check();progress('Görev çakışmaları',i+1,m.slots.length);
         const a=m.slots[i];adapter.place(id,a);
         try{for(let j=i+1;j<m.slots.length;j++)for(const other of m.slots[j].allowed){
+          if(other!==id&&!crossPairs.has(id+'|'+other))continue;
           const b=m.slots[j];
           if(!adapter.canPlace(other,b))conflicts.push([`${i}:${id}`,`${j}:${other}`]);
         }}
@@ -388,13 +394,13 @@
         const blocked=dependencies.filter(r=>Number(r.when.split(':')[1])===id&&!r.anyOf.length).map(r=>m.slots[Number(r.when.split(':')[0])].day);
         if(blocked.length)problems.push(`${getPersonById(id).name}: eşlerin aynı gün çalışma kuralı için ${[...new Set(blocked)].join(', ')}. günlerde eşine uygun ikinci görev yok. Eşi başka birimde çalışmıyor ve izinli değil; personel seçimini ve uygun hücreleri kontrol edin. İzinli eşin çalışması gerekmez.`);
       }
-      const obligations=requirementsFor(m,calendar),softRequirements=new Set(),softGaps=new Set();
+      const obligations=requirementsFor(m,calendar),softRequirements=new Set();
       for(const id of m.ids){
         const chosenDays=[],availableDays=new Set(m.slots.filter(s=>s.allowed.includes(id)).map(s=>s.day));
         for(const r of obligations.filter(r=>r.id===id).sort((a,b)=>Math.max(...a.days)-Math.max(...b.days))){
           if(chosenDays.some(d=>r.days.has(d)))continue;
           const options=[...r.days].filter(d=>availableDays.has(d));
-          if(!options.length){const reason=`${getPersonById(id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun görev yok.`;if(partial){if(!r.hard)softRequirements.add(r);problems.push(reason);continue}throw Error(reason)};
+          if(!options.length){const reason=`${getPersonById(id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun görev yok.`;if(automaticUnit===u&&r.hard)throw Error(reason+' İzin/rezerve dönüşü kesin kuraldır; personel seçimi, uygun vardiya, dinlenme ve kilitli hücreleri kontrol edin.');if(partial){if(!r.hard)softRequirements.add(r);problems.push(reason);continue}throw Error(reason)};
           chosenDays.push(Math.max(...options));
         }
         const need=remaining[id].day+remaining[id].night;
@@ -409,10 +415,25 @@
         let minimum=0;
         for(const [a,b] of rule.segments){const days=[a-1,...new Set(rule.fixedDays.filter(d=>d>=a&&d<=b)),b+1].sort((x,y)=>x-y);for(let i=1;i<days.length;i++)minimum+=Math.floor((days[i]-days[i-1]-1)/(rule.maxBlank+1));}
         const need=remaining[rule.id].day+remaining[rule.id].night;
-        if(minimum>need){const reason=`${getPersonById(rule.id).name}: hedef ${targets[rule.id].day} gündüz + ${targets[rule.id].night} nöbet = ${targets[rule.id].day+targets[rule.id].night} görev. Etkin ${rule.maxBlank} boş gün kuralı ay başını, ay sonunu ve izin dışı dönemleri de kapsıyor; korunan görevlerle birlikte en az ${m.fixed[rule.id].day+m.fixed[rule.id].night+minimum} görev gerekiyor. En az ${minimum-need} görev eksik. Öneri: bu kişinin toplam hedefini artırıp diğer kişilerin hedeflerini dengeleyin veya görev aralığı ayarını gözden geçirin. Hedefler ve liste değiştirilmedi.`;if(partial){softGaps.add(rule.id);problems.push(reason)}else throw Error(reason)}
+        if(minimum>need){const reason=`${getPersonById(rule.id).name}: hedef ${targets[rule.id].day} gündüz + ${targets[rule.id].night} nöbet = ${targets[rule.id].day+targets[rule.id].night} görev. Etkin ${rule.maxBlank} boş gün kuralı ay başını, ay sonunu ve izin dışı dönemleri de kapsıyor; korunan görevlerle birlikte en az ${m.fixed[rule.id].day+m.fixed[rule.id].night+minimum} görev gerekiyor. En az ${minimum-need} görev eksik. Öneri: bu kişinin toplam hedefini artırıp diğer kişilerin hedeflerini dengeleyin veya görev aralığı ayarını gözden geçirin. Hedefler ve liste değiştirilmedi.`;if(partial){problems.push(reason)}else throw Error(reason)}
       }
-      if(partial)for(const rule of gapRules)rule.soft=softGaps.has(rule.id);
-      return {m,targets,problems,input:{payroll,allowPartial:partial,ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,hours:Number(s.col.hours||0),category:s.col.cat==='Poliklinik'?'pol':s.col.cat==='Acil'?'ac':s.type==='acil'?'ac':'pol',allowed:s.allowed})),conflicts,requirements,limits,gapRules,dependencies}};
+      if(automaticUnit===u){
+        const requiredDays=new Map();for(const r of requirements.filter(r=>r.hard))for(const value of r.values){const day=m.slots[Number(value.split(':')[0])].day;if(!requiredDays.has(day))requiredDays.set(day,new Set());requiredDays.get(day).add(r.id)}
+        for(const [day,required] of requiredDays){
+          for(const id of [...required]){const other=ruleOn(u,'spouseSameDay')&&typeof spouseOf==='function'?Number(spouseOf(id)||0):0;if(other&&!window.rpysScheduler398.spouseUnavailable(other,day)&&!window.rpysScheduler398.reservedOn(other,day)&&!window.rpysScheduler398.spouseWorkingOnDay(other,day))required.add(other)}
+          const owner=new Map(),slots=m.slots.filter(s=>s.day===day);const augment=(id,seen)=>{for(const s of slots){if(!s.allowed.includes(id)||seen.has(s.index))continue;seen.add(s.index);if(!owner.has(s.index)||augment(owner.get(s.index),seen)){owner.set(s.index,id);return true}}return false};
+          for(const id of required)if(!augment(id,new Set()))throw Error(`${day}. gün izin/rezerve dönüşü ve eş kuralı nedeniyle ${[...required].map(id=>getPersonById(id)?.name||id).join(', ')} için ${required.size} ayrı görev gerekiyor; uygun vardiya hücreleri yetmiyor. İzin, rezerve ve kilitli kayıtları veya birim vardiyalarını kontrol edin. Liste ve hedefler korundu.`);
+        }
+      }
+      if(automaticUnit===u)for(const rule of gapRules){
+        const edge=rule.crossMonth,days=[...rule.fixedDays,...m.slots.filter(s=>s.allowed.includes(rule.id)).map(s=>s.day)];
+        for(const side of ['before','after']){if(edge?.[side]==null)continue;const blank=d=>Math.max(0,...edge.runs.map(([lo,hi])=>Math.max(0,Math.min(hi,(side==='before'?d:edge.after)-1)-Math.max(lo,(side==='before'?edge.before:d)+1)+1)));if(!days.some(d=>blank(d)<=rule.maxBlank)){const date=plusDate(ym()+'-01',edge[side]-1);throw Error(`${getPersonById(rule.id).name}: ${side==='before'?'önceki':'sonraki'} ayın ${date} göreviyle ${rule.maxBlank} boş gün sınırını sağlayacak uygun gün yok. Ay geçişi listesini, izin/rezerve kayıtlarını veya kilitli hücreleri düzeltin. Mevcut liste korundu.`)}}
+      }
+      if(automaticUnit===u){
+        const needs=gapRules.map(rule=>({id:rule.id,n:rule.segments.reduce((n,[a,b])=>{const days=[a-1,...rule.fixedDays.filter(d=>d>=a&&d<=b),b+1].sort((x,y)=>x-y);return n+days.slice(1).reduce((m,d,i)=>m+Math.floor((d-days[i]-1)/(rule.maxBlank+1)),0)},0)})),minimum=needs.reduce((n,x)=>n+x.n,0),available=m.slots.filter(s=>s.allowed.length).length;
+        if(minimum>available)throw Error(`${u}: ${needs.filter(x=>x.n).map(x=>(getPersonById(x.id)?.name||x.id)+': en az '+x.n+' ek görev').join('; ')}. ${gapRules[0]?.maxBlank||5} boş gün kuralı için toplam ${minimum} ek görev gerekiyor; yalnız ${available} uygun hücre var.${!m.rebuild?' Mevcut görevleri koru modu açık. Otomatik görevleri yeniden yerleştirmek için “Seçili birimi baştan dağıt” seçeneğini açın; manuel ve kilitli kayıtlar korunur.':' Personel seçimini, izin/rezerve takvimini veya vardiya sayısını düzenleyin.'} Liste korunuyor.`);
+      }
+      return {m,targets,problems,input:{payroll,allowPartial:partial,hardGaps:gapRules.length>0,strictAllCalendars:automaticUnit===u,ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,hours:Number(s.col.hours||0),category:s.col.cat==='Poliklinik'?'pol':s.col.cat==='Acil'?'ac':s.type==='acil'?'ac':'pol',allowed:s.allowed})),conflicts,requirements,limits,gapRules,dependencies}};
     }finally{db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache()}
   }
   function validatePartial(m,plan){
@@ -443,6 +464,11 @@
         for(let i=retained.length-1;i>=0;i--)if(Number(retained[i].id)===requirement.id){const x=retained[i];delete db.assign[m.slots[x.slot].key];retained.splice(i,1);changed=true;notes.push(`${getPersonById(x.id).name}: zorunlu izin/rezerve dönüşü ilk iş günü yerleşmediği için yeni görevleri uygulanmadı. Korunan kayıtlar ve hedefleri değiştirilmedi.`)}
         clearCache();
       }
+      if(ruleOn(m.u,'maxGapEnabled')){
+        const active=[...new Set(retained.map(x=>Number(x.id)))],gaps=window.rpysScheduler398.gapViolations(active,m.u,ym()),bad=new Set(gaps.map(x=>x.id));
+        for(const gap of gaps)notes.push(`${getPersonById(gap.id).name}: ${gap.leftDate} – ${gap.rightDate} arasında ${gap.blank} boş gün; sınır ${gap.maxBlank}. Bu kişinin yeni görevleri uygulanmadı.`);
+        for(let i=retained.length-1;i>=0;i--)if(bad.has(Number(retained[i].id))){delete db.assign[m.slots[retained[i].slot].key];retained.splice(i,1);changed=true;}clearCache();
+      }
       for(const issue of spouseIssues().filter(x=>!beforeSpouses.has(x.key))){
         let removed=false;
         for(let i=retained.length-1;i>=0;i--){const x=retained[i],s=m.slots[x.slot];if(s.day===issue.day&&[issue.first,issue.second].includes(Number(x.id))){delete db.assign[s.key];retained.splice(i,1);removed=changed=true;notes.push(`${getPersonById(x.id).name}: ${s.day}. gün eşlerin aynı gün çalışma kuralı nedeniyle boş bırakıldı.`)}}
@@ -454,7 +480,7 @@
     return {plan:retained,notes:[...new Set(notes)]};
   }
   function planningFingerprint(){
-    const ignored=new Set(['_meta','ui','auditLog','poliklinikTakipConfig','polTrackConfig']);
+    const ignored=new Set(['_meta','ui','auditLog','poliklinikTakipConfig','polTrackConfig','polTracking322','quickPrint383','sayRoster']);
     const exact=new Set(['assign','assignmentMeta','manualDutyOverrides','rpysCellLocks','unitPools','staff','leaves','importedRecords']);
     function canonical(value,preserve=false){
       if(value===null||typeof value!=='object')return value;
@@ -462,8 +488,12 @@
       const result={};for(const k of Object.keys(value).sort()){const v=canonical(value[k],preserve);if(v!==undefined)result[k]=v}
       return Object.keys(result).length||preserve?result:undefined;
     }
-    const state={};for(const k of Object.keys(db).sort())if(!ignored.has(k)){const v=canonical(db[k],exact.has(k));if(v!==undefined&&!(v&&typeof v==='object'&&Object.keys(v).length===0))state[k]=v}
+    const state={};for(const k of Object.keys(db).sort())if(!ignored.has(k)){const value=k==='staff'?(db.staff||[]).map(({color,...person})=>person):db[k],v=canonical(value,exact.has(k));if(v!==undefined&&!(v&&typeof v==='object'&&Object.keys(v).length===0))state[k]=v}
     return JSON.stringify(state);
+  }
+  async function prepareAutomatic(u,resume){
+    if(preparing||automaticUnit)return false;
+    automaticUnit=u;try{return await prepare(u,resume)}finally{automaticUnit=null}
   }
   async function prepare(u,resume){
     if(preparing){report('Dağıtım zaten hesaplanıyor.','progress',true);return false;}
@@ -476,13 +506,12 @@
     const progress=(phase,done,total)=>{if(Date.now()-lastProgress<200)return;lastProgress=Date.now();report(`${phase}: ${done} / ${total} · ${Math.floor((Date.now()-job.started)/1000)} sn`,'progress',true)};
     report('Hedefler ve uygun günler denetleniyor; geçici plan arka planda hazırlanıyor…','progress',true);
     try{
-      const fingerprint=planningFingerprint(),month=ym(),selectionRebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
-      // If Skopi targets cannot cover every editable cell, go straight to the
-      // partial planner instead of spending the preparation deadline on an
-      // impossible exact plan. Existing cells stay fixed in partial mode.
+      const sourceUnit=document.getElementById('autoUnit')?.value,fingerprint=planningFingerprint(),month=ym(),selectionRebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
+      // Short Skopi targets cannot cover every editable cell; start directly
+      // with partial planning while preserving existing assignments.
       const current=model(u,selected(u),{preserveExisting:true}),given=readTargets(current,{partial:true});
       const short=u==='PORTABL + SKOPİ'&&kinds.some(t=>current.ids.reduce((n,id)=>n+given[id][t],0)<current.required[t]);
-      const attempts=short?[true]:bestEffortRequested?[false,true]:[false];let data,result,reason='',notes=[];
+      const attempts=automaticUnit===u||short?[true]:bestEffortRequested?[false,true]:[false];let data,result,reason='',notes=[];
       for(const partial of attempts){
         preparationLimit=partial?20000:6000;
         try{data=await planningData(u,{check,progress,partial})}
@@ -491,7 +520,7 @@
         if(typeof Worker!=='function')throw Error('Bu tarayıcı arka plan hesaplamasını desteklemiyor. Liste değiştirilmedi.');
         report(partial?'Yerleştirilebilen görevler hesaplanıyor; eksikler ayrıca gösterilecek…':'Takvime tam hedeflerle yerleştirme hesaplanıyor…','progress',true);
         worker??=new Worker(workerURL);
-        const excluded=[],started=Date.now(),searchBudget=bestEffortRequested?(partial?1200:1800):3200;
+        const excluded=[],started=Date.now(),searchBudget=automaticUnit===u?1200:bestEffortRequested?(partial?1200:1800):3200;
         let accepted=false;
         for(;;){
           if(job.cancelled)throw Error('İşlem iptal edildi. Önceki liste korundu.');
@@ -508,35 +537,37 @@
             const message=(result.timedOut?'Verilen sürede geçerli tam plan bulunamadı; bu sonuç hedeflerin imkânsız olduğunu kanıtlamaz.':'Hedefler ortak uygun günler ve görev çakışmalarıyla birlikte karşılanamıyor.')+'\n'+(result.lastFailure||'İzin, nöbet ertesi dinlenme ve özel kurallar.');
             if(bestEffortRequested&&!partial){reason=message;break}throw Error(message);
           }
-          if(ym()!==month||planningFingerprint()!==fingerprint||document.getElementById('autoUnit')?.value!==u||JSON.stringify(selected(u))!==JSON.stringify(data.m.ids)||!!document.getElementById('rebuildSelectedUnitV246')?.checked!==selectionRebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Yeni bilgilerle dağıtımı tekrar başlatın; plan kaydedilmedi.');
+          const currentFingerprint=planningFingerprint();if(currentFingerprint!==fingerprint){const a=JSON.parse(fingerprint),b=JSON.parse(currentFingerprint);console.warn('RPYS plan değişiklik denetimi',Object.keys({...a,...b}).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).join(', '))}
+          if(ym()!==month||currentFingerprint!==fingerprint||document.getElementById('autoUnit')?.value!==sourceUnit||JSON.stringify(selected(u))!==JSON.stringify(data.m.ids)||!!document.getElementById('rebuildSelectedUnitV246')?.checked!==selectionRebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Yeni bilgilerle dağıtımı tekrar başlatın; plan kaydedilmedi.');
           report('Yerleştirilen görevlerin güvenlik ve hedef kontrolleri yapılıyor…','progress',true);
           const live=db,originalAll=window.allAssignmentsAllMonths;db=JSON.parse(JSON.stringify(live));draftActive=true;clearCache();let verdict;
           try{
             const beforeSpouses=new Set((window.rpysScheduler398.spouseDayViolations?.(ym())||[]).map(x=>x.key));
             for(const k of data.m.mutable){delete db.assign[k];if(db.assignmentMeta)delete db.assignmentMeta[k]}
             clearCache();activeRecordIndex=recordIndex(data.m);window.allAssignmentsAllMonths=historyIndex(data.m);
-            if(partial){const checked=validatePartial(data.m,result.plan);result.plan=checked.plan;notes=[...data.problems,...checked.notes];verdict=true}
+            if(partial){const checked=validatePartial(data.m,result.plan);result.plan=checked.plan;notes=[...data.problems,...checked.notes];verdict=automaticUnit===u?finalRules(data.m):true}
             else{const adapter=searchAdapter(data.m);for(const x of result.plan)adapter.place(x.id,data.m.slots[x.slot]);verdict=adapter.finalCheck();if(verdict===true){const issues=(window.rpysScheduler398.spouseDayViolations?.(ym())||[]).filter(x=>!beforeSpouses.has(x.key));if(issues.length){const x=issues[0];verdict=`${getPersonById(x.first)?.name||x.first} / ${getPersonById(x.second)?.name||x.second}: ${x.day}. gün eşlerin aynı gün çalışma kuralı.`}}}
           }finally{db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache()}
           if(verdict===true){accepted=true;break}
+          if(automaticUnit===u&&result.timedOut)throw Error('Verilen sürede bütün kuralları sağlayan plan bulunamadı; bu sonuç hedeflerin imkânsız olduğunu kanıtlamaz.\n'+String(verdict));
           if(bestEffortRequested){reason=String(verdict);break}
           excluded.push(result.plan.map(x=>`${x.slot}:${x.id}`));
           if(Date.now()-started>=searchBudget)throw Error(String(verdict)+'\nGeçerli alternatif plan süre içinde bulunamadı; liste ve hedefler korundu.');
         }
         if(accepted){
           if(partial&&!result.plan.length){report('Yerleştirilebilen yeni görev yok. Mevcut liste korundu.\n'+[reason,...data.problems,...notes].filter(Boolean).join('\n'),'warning',false);return {ok:false,partial:true,plan:[],notes}}
-          prepared={u,partial,reason:partial?reason:'',notes:partial&&result.timedOut?[...notes,'Bulunan kısmi plan uygulandı; daha fazla görevin yerleşemeyeceği kanıtlanmış değildir.']:notes,plan:result.plan.map(x=>({id:x.id,slot:data.m.slots[x.slot]})),nodes:result.nodes};break;
+          prepared={u,partial,timedOut:!!result.timedOut,reason:partial?reason:'',notes:partial&&result.timedOut?[...notes,'Bulunan kısmi plan uygulandı; daha fazla görevin yerleşemeyeceği kanıtlanmış değildir.']:notes,plan:result.plan.map(x=>({id:x.id,slot:data.m.slots[x.slot]})),nodes:result.nodes};break;
         }
       }
       if(!prepared)throw Error(reason||'Yerleştirilebilen plan bulunamadı; mevcut liste korundu.');
       report('Plan doğrulandı. Güvenli kayıt hazırlanıyor…','progress',true);
       return resume();
-    }catch(e){report(e.message||String(e),'error',false);alert('Dağıtım uygulanmadı; mevcut liste ve hedefler korundu.\n\n'+(e.message||e));return false}
+    }catch(e){console.error('RPYS dağıtım hazırlığı',e);report(e.message||String(e),'error',false);alert('Dağıtım uygulanmadı; mevcut liste ve hedefler korundu.\n\n'+(e.message||e));return false}
     finally{clearTimeout(timer);worker?.terminate();preparing=false;prepared=null;currentJob=null;activeRecordIndex=null;report(feedback.text,feedback.tone,false)}
   }
   function distribute(u){
     if(!window.rpysScheduler398?.running())throw Error('Güvenli dağıtım oturumu gerekli.');
-    const partial=!!prepared?.partial,m=model(u,selected(u),{preserveExisting:partial});if(!m.ids.length)throw Error('Önce bu birimde çalışacak personelleri seç.');
+    const partial=!!prepared?.partial,m=model(u,selected(u),{preserveExisting:partial&&automaticUnit!==u});if(!m.ids.length)throw Error('Önce bu birimde çalışacak personelleri seç.');
     const targets=readTargets(m,{partial});
     if(!partial)validateMonthlyLimits(m,targets);
     activeRecordIndex=recordIndex(m);
@@ -556,7 +587,7 @@
     for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun hücre yok.`);
     for(const s of m.slots)if(!partial&&!s.allowed.length)throw Error(`${s.day}. gün ${s.col.shift||s.col.key}: hedefi kalan uygun personel yok (izin, dinlenme, başka görev veya korunan kayıt).`);
     if(!hasPrepared(u))throw Error('Önce arka plan dağıtım planı hazırlanmalı.');
-    const result={ok:true,partial,plan:prepared.plan,nodes:prepared.nodes};
+    const result={ok:true,partial,timedOut:!!prepared.timedOut,plan:prepared.plan,nodes:prepared.nodes};
     let unresolved=[];
     if(partial){
       const checked=validatePartial(m,prepared.plan.map(x=>({id:x.id,slot:m.slots.findIndex(s=>s.key===x.slot.key),kind:x.slot.kind})));
@@ -568,8 +599,16 @@
       for(const x of result.plan){const s=m.slots.find(s=>s.key===x.slot.key);if(!s||!s.allowed.includes(x.id)||remaining[x.id][s.kind]<=0||!adapter.canPlace(x.id,s))throw Error('Geçici plan güncel uygunluk kurallarını karşılamıyor.');adapter.place(x.id,s);remaining[x.id][s.kind]--;}
       const verdict=adapter.finalCheck();if(verdict!==true)throw Error(String(verdict));
     }
-    clearCache();const actual=model(u,m.ids,{preserveExisting:partial}).actual;
+    clearCache();const actual=model(u,m.ids,{preserveExisting:partial&&automaticUnit!==u}).actual;
     for(const id of m.ids)for(const t of metrics.filter(t=>targets[id][t]!=null))if(partial?actual[id][t]>Math.max(targets[id][t],m.fixed[id][t]):actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
+    if(automaticUnit===u){
+      const verdict=finalRules(m);if(verdict!==true)throw Error(String(verdict));
+      const unfilled=m.slots.filter(s=>!db.assign[s.key]);result.partial=unfilled.length>0;result.unfilled=unfilled;result.shortfalls=[];
+      db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
+      db.v251PlanAudit??={};db.v251PlanAudit[key(u)]={at:new Date().toISOString(),engine:'csp-worker-gap-calendar',gaps:[],filled:result.plan.length,unfilled:unfilled.map(s=>({day:s.day,key:s.key})),notes:result.notes||[]};
+      window.rpysScheduler398.validateReturnsFor?.(m.ids);saveNowV245({allowAssignDrop:m.rebuild,label:u+' boş gün sınırıyla güvenli otomatik dağıtım'});renderAll();render();
+      report(`${u}: ${result.plan.length} görev yerleştirildi; ${unfilled.length} hücre boş. Etkin ${gapLimit(u)} boş gün sınırı, izin/rezerve dönüşü, dinlenme ve korunan kayıtlar doğrulandı.${unfilled.length?(result.timedOut?' Bulunan geçerli plan uygulandı; daha fazla görevin yerleşemeyeceği kanıtlanmış değildir.':' Boş hücrelere uygun personel kalmadı; diğer geçerli görevler uygulandı.'):''}` ,unfilled.length?'warning':'success',false);return result;
+    }
     result.shortfalls=m.ids.flatMap(id=>metrics.filter(t=>targets[id][t]!=null&&actual[id][t]<targets[id][t]).map(t=>({id,kind:t,target:targets[id][t],actual:actual[id][t],missing:targets[id][t]-actual[id][t]})));
     result.unfilled=m.slots.filter(s=>!db.assign[s.key]).map(s=>({day:s.day,kind:s.kind,key:s.key,reason:s.allowed.length&&s.allowed.every(id=>actual[id][s.kind]>=targets[id][s.kind])?'Uygun personellerin ilgili hedefleri doldu.':'İzin, dinlenme, mevcut görev veya özel kurallar kalan hedeflerle birlikte yerleşmedi; elle kontrol edilebilir.'}));
     if(partial&&!result.shortfalls.length&&!result.unfilled.length&&!unresolved.length&&m.ids.every(id=>metrics.every(t=>targets[id][t]==null||actual[id][t]===targets[id][t]))){result.partial=false;result.notes=[]}
@@ -590,7 +629,7 @@
     const cfg=config(m.u),sum=empty();let missing=0;
     for(const id of m.ids)for(const t of kinds){const n=cfg.people?.[id]?.[t];if(n==null||n==='')missing++;else sum[t]+=Number(n)||0;}
     const specified=m.ids.filter(id=>cfg.people?.[id]?.weekendNight!=null&&cfg.people[id].weekendNight!==''),weekend=specified.reduce((n,id)=>n+Number(cfg.people[id].weekendNight||0),0);
-    return `Gereken: ${m.required.day} gündüz / ${m.required.night} nöbet · Hedef: ${sum.day} / ${sum.night} · Hafta sonu nöbet: ${m.required.weekendNight} gereken / ${weekend} hedef${specified.length<m.ids.length?` (${m.ids.length-specified.length} kişi serbest)`:''}${missing?` · ${missing} boş alan`:''}${m.lockedEmpty?` · ${m.lockedEmpty} boş kilitli hücre dağıtım dışında`:''}`;
+    return `Gereken: ${m.required.day} gündüz / ${m.required.night} nöbet · Hedef: ${sum.day} / ${sum.night} · Hafta sonu nöbet: ${m.required.weekendNight} gereken / ${weekend} hedef${specified.length<m.ids.length?` (${m.ids.length-specified.length} kişi serbest)`:''}${missing?` · ${missing} boş alan`:''}${m.lockedEmpty?` · ${m.lockedEmpty} boş kilitli hücre dağıtım dışında`:''} · Boş gün sınırı: ${(window.rpysRules421?window.rpysRules421.enabled(m.u,'maxGapEnabled'):!!unitRulesV251(m.u).maxGapEnabled)?gapLimit(m.u)+' gün':'Kapalı'}`;
   }
   // Distribute by the selected employees' actual active days within this unit.
   function availableOn(id,day){
@@ -701,7 +740,7 @@
     persist();const m=model(u),host=document.getElementById('rpysTargetPanel399');host.querySelector('.rpysTargetSummary399').textContent=totals(m);
     for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=metrics.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
   }
-  window.rpysTargets399={version:'20261021-or-12',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
+  window.rpysTargets399={version:'20261022-gap-17',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,prepareAutomatic,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{

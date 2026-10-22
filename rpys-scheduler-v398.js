@@ -211,6 +211,43 @@
     return filled;
   }
 
+  // One definition of blank days for search and commit validation. A leave or
+  // reserve interval resets the run; five empty calendar days are permitted.
+  function gapCalendar(ids,unit,month=ym()){
+    const origin=Date.parse(month+'-01T00:00:00Z'),last=month===ym()&&typeof daysInMonth==='function'?daysInMonth():new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).getUTCDate();
+    const offset=date=>Math.round((Date.parse(date+'T00:00:00Z')-origin)/86400000)+1;
+    const date=d=>new Date(origin+(d-1)*86400000).toISOString().slice(0,10);
+    const people=new Map(ids.map(id=>[Number(id),getPersonById(id)])),work=new Map(ids.map(id=>[Number(id),new Set()]));
+    const rows=typeof allAssignmentsAllMonths==='function'?allAssignmentsAllMonths():Object.entries(db.assign||{}).map(([key,id])=>{const [mk,type,d,col]=key.split('|');return {person:{id:Number(id)},col:dutyColumnByKey(type,col),date:mk+'-'+String(d).padStart(2,'0')}});
+    for(const row of rows){const id=Number(row.person?.id),ds=String(row.date||row.monthKey+'-'+String(row.day).padStart(2,'0')).slice(0,10);if(work.has(id)&&row.col?.unit===unit&&/^\d{4}-\d{2}-\d{2}$/.test(ds))work.get(id).add(offset(ds))}
+    const maxBlank=Number(window.rpysRules421?.settings(unit).maxGapDays??(typeof unitMaxGapDaysV251==='function'?unitMaxGapDaysV251(unit):5))||5;
+    return ids.map(raw=>{
+      const id=Number(raw),person=people.get(id),days=[...work.get(id)].sort((a,b)=>a-b),before=days.filter(d=>d<1).at(-1)??null,after=days.find(d=>d>last)??null,from=before===null?1:before+1,to=after===null?last:after-1,blocked=[];
+      const add=(a,b=a)=>{a=Math.max(from,a);b=Math.min(to,b);if(a<=b)blocked.push([a,b])};
+      for(const l of db.leaves||[])if(Number(l.personId??l.idPerson??l.person?.id)===id&&l.start&&l.end)add(offset(l.start),offset(l.end));
+      for(const [key,ds] of Object.entries(db.reserves||{})){const [mk,pid]=key.split('|');if(Number(pid)===id&&Array.isArray(ds))for(const d of ds)add(offset(mk+'-'+String(d).padStart(2,'0')))}
+      for(const store of [db.cellStatus,db.importedSaymanlik])for(const key of Object.keys(store||{})){
+        const p=key.split('|'),d=Number(p.at(-1)),mk=p[0];if(!person||personNameKey(p.slice(1,-1).join('|'))!==personNameKey(person.name))continue;
+        if(reservedOn(id,d,mk)||absentStatus(effectiveStatus(person,d,mk)))add(offset(mk+'-'+String(d).padStart(2,'0')));
+      }
+      for(let d=1;d<=last;d++)if(reservedOn(id,d,month)||spouseUnavailable(id,d,month))add(d);
+      blocked.sort((a,b)=>a[0]-b[0]);const runs=[];let cursor=from;for(const [a,b] of blocked){if(a>cursor)runs.push([cursor,a-1]);cursor=Math.max(cursor,b+1)}if(cursor<=to)runs.push([cursor,to]);
+      const segments=runs.map(([a,b])=>[Math.max(1,a),Math.min(last,b)]).filter(([a,b])=>a<=b),fixedDays=days.filter(d=>d>=1&&d<=last);
+      return {id,maxBlank,includeEdges:!!window.rpysRules421||!!window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__,segments,fixedDays,crossMonth:{before,after,fixedDays,last,runs,month},date};
+    });
+  }
+  function gapViolations(ids,unit,month=ym()){
+    if(!ids.length||!window.rpysRules421&&typeof unitRulesV251!=='function')return [];
+    if(window.rpysRules421?.enabled(unit,'maxGapEnabled')===false||!window.rpysRules421&&typeof unitRulesV251==='function'&&!unitRulesV251(unit).maxGapEnabled)return [];
+    const out=[];
+    for(const rule of gapCalendar(ids,unit,month)){
+      const push=(a,b,blank,kind)=>out.push({id:rule.id,left:a,right:b,leftDate:rule.date(a),rightDate:rule.date(b),a:a+1,b:b-1,blank,kind,maxBlank:rule.maxBlank});
+      for(const [a,b] of rule.segments){const days=rule.fixedDays.filter(d=>d>=a&&d<=b);if(rule.includeEdges){days.unshift(a-1);days.push(b+1)}for(let n=1;n<days.length;n++){const blank=days[n]-days[n-1]-1;if(blank>rule.maxBlank)push(days[n-1],days[n],blank,'month')}}
+      const edge=rule.crossMonth,days=[...(edge.before===null?[]:[edge.before]),...rule.fixedDays,...(edge.after===null?[]:[edge.after])];
+      for(let n=1;n<days.length;n++){const a=days[n-1],b=days[n];if(a>=1&&b<=edge.last||!rule.fixedDays.length)continue;const blank=Math.max(0,...edge.runs.map(([lo,hi])=>Math.max(0,Math.min(hi,b-1)-Math.max(lo,a+1)+1)));if(blank>rule.maxBlank)push(a,b,blank,'cross-month')}
+    }
+    return out;
+  }
   function spouseWorkingOnDay(id,day,month=ym()){
     const person=getPersonById(id);if(!person)return false;
     for(const [key,pid] of Object.entries(db.assign||{})){const p=key.split('|');if(p[0]===month&&Number(p[2])===Number(day)&&Number(pid)===Number(id))return true}
@@ -306,6 +343,7 @@
     const fn=function(){
       if(run)return base.apply(this,arguments);
       const targetUnit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
+      if(targetUnit&&window.rpysTargets399?.prepareAutomatic&&!window.rpysTargets399.enabledFor(targetUnit)&&window.rpysRules421?.enabled(targetUnit,'maxGapEnabled'))return window.rpysTargets399.prepareAutomatic(targetUnit,()=>fn.apply(this,arguments));
       if(window.rpysTargets399?.enabledFor(targetUnit)&&!window.rpysTargets399.hasPrepared(targetUnit))return window.rpysTargets399.prepare(targetUnit,()=>fn.apply(this,arguments));
       if(isMonthLocked()){alert('Bu ay kilitli. Liste değiştirilmedi.');return false}
       const before=clone(db),month=ym(),rebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
@@ -370,6 +408,7 @@
         for(const key of restCheck().keys())if(window.rpysRules421?.enabled(unit,'noPostDuty')!==false&&!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
         if(newSpouseIssues.length){const x=newSpouseIssues[0];throw Error('Eşlerin aynı gün çalışma kuralı: '+(getPersonById(x.first)?.name||x.first)+' / '+(getPersonById(x.second)?.name||x.second)+', '+x.day+'. gün aynı gün için iki uygun görev hücresi bulunamadı. İzinli eşin çalışması gerekmez; izinli olmayan eş tek başına çalışabilir.');}
+        const gaps=gapViolations(run.returnIds||targetIds||[],unit,month);if(gaps.length)throw Error(gaps.map(x=>(getPersonById(x.id)?.name||x.id)+': '+x.leftDate+' – '+x.rightDate+' arasında '+x.blank+' boş gün; sınır '+x.maxBlank+'.').join('\n'));
         const missingReturns=returnWorkdayViolations(run.returnIds||targetIds||[]);if(missingReturns.length)throw Error(missingReturns.map(x=>x.reason).join('\n'));
         for(const [key,id] of Object.entries(db.assign||{})){if(!key.startsWith(month+'|')||Number(before.assign?.[key])===Number(id))continue;if(reservedOn(Number(id),Number(key.split('|')[2]),month))throw Error((getPersonById(id)?.name||id)+': '+key.split('|')[2]+'. gün rezerve; bu güne görev yazılamaz.');}
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
@@ -395,7 +434,7 @@
     if(!targetRunner)throw Error('Güvenli hedef dağıtım motoru henüz yüklenemedi. Sayfayı yenileyin.');
     return targetRunner();
   }
-  window.rpysScheduler398={runTargets,repair,repairCache,install,validateReturnsFor:ids=>{if(run)run.returnIds=ids},protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
+  window.rpysScheduler398={runTargets,repair,repairCache,install,validateReturnsFor:ids=>{if(run)run.returnIds=ids},protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);

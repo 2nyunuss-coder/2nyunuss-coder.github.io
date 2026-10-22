@@ -207,3 +207,14 @@ test('a motor cannot save a new reserve-day duty even if it bypassed candidate e
 test('a Sunday night cannot consume the next months mandatory Monday return',()=>{
  const f=fixture(c=>{assert.equal(c.canTakeShift(1,31,f.cols.long,'UNIT'),false);c.save()});f.c.ym=()=> '2026-05';f.c.dateStr=d=>'2026-05-'+String(d).padStart(2,'0');f.c.db.leaves=[{personId:1,start:'2026-05-25',end:'2026-05-29'}];assert.deepEqual(Array.from(f.c.rpysScheduler398.returnWorkdays(1,'2026-06')),[1]);f.c.autoDistribute();assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
 });
+
+function gapFixture(){const f=fixture();f.c.daysInMonth=()=>30;f.c.unitRulesV251=()=>({maxGapEnabled:true});return f;}
+test('gap definition permits five empty days but reports six, without an off-by-one',()=>{
+ const f=gapFixture(),c=f.c;c.db.assign={'2026-10|pol|1|day':1,'2026-10|pol|7|day':1};assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);delete c.db.assign['2026-10|pol|7|day'];c.db.assign['2026-10|pol|8|day']=1;const issues=c.rpysScheduler398.gapViolations([1],'UNIT');assert.equal(issues.length,1);assert.equal(issues[0].blank,6);
+});
+test('month boundaries are checked and reserve periods reset the blank run exactly like leave',()=>{
+ const f=gapFixture(),c=f.c;c.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__=1;c.db.assign={'2026-10|pol|1|day':1,'2026-10|pol|26|day':1};c.db.reserves={'2026-10|1':Array.from({length:19},(_,i)=>i+2)};assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);delete c.db.assign['2026-10|pol|26|day'];c.db.assign['2026-10|pol|27|day']=1;assert.ok(c.rpysScheduler398.gapViolations([1],'UNIT').some(x=>x.blank===6));c.db.reserves={};c.db.leaves=[{personId:1,start:'2026-10-02',end:'2026-10-20'}];assert.ok(c.rpysScheduler398.gapViolations([1],'UNIT').some(x=>x.blank===6));
+});
+test('previous-month real duties and imported reserve statuses share the same cross-month check',()=>{
+ const f=gapFixture(),c=f.c;c.db.assign={'2026-09|pol|25|day':1,'2026-10|pol|6|day':1};c.db.importedSaymanlik=Object.fromEntries([28,29,30].map(d=>['2026-09|Person A|'+d,'REZERVE']));assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);delete c.db.assign['2026-10|pol|6|day'];c.db.assign['2026-10|pol|7|day']=1;const issues=c.rpysScheduler398.gapViolations([1],'UNIT');assert.equal(issues.length,1);assert.equal(issues[0].blank,6);assert.equal(issues[0].leftDate,'2026-09-25');
+});

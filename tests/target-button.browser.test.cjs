@@ -116,7 +116,7 @@ test('real button respects dated leave, Thursday preparation, first working day,
  }finally{await browser.close()}
 });
 
-test('a blocked mandatory return preserves Berks fixed duty and retains Ulaş through the real button',async()=>{
+test('blocked return and five-day conditions preserve fixed duties and exclude unsafe new duties through the real button',async()=>{
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
  try{
   const context=await browser.newContext();await context.route('**/*',route=>{const u=new URL(route.request().url()),name=u.pathname.slice(1);if(u.hostname==='rpys.test'&&!name)return route.fulfill({contentType:'text/html; charset=utf-8',body:fixtureHTML()});if(u.hostname==='rpys.test'&&['rpys-runtime-v397.js','rpys-scheduler-v398.js','rpys-targets-v399.js','rpys-target-worker.js'].includes(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,name),'utf8')});return route.fulfill({status:404,body:''})});
@@ -133,6 +133,6 @@ test('a blocked mandatory return preserves Berks fixed duty and retains Ulaş th
   });
   await page.locator('[data-target-action=run]').click();await page.waitForFunction(()=>fixtureResult.saved.length===1);
   const result=await page.evaluate(()=>({actual:rpysTargets399.model(autoUnit.value).actual,text:document.querySelector('[data-target-feedback]').textContent,report:document.querySelector('.rpysTargetLastResult399').textContent,protected:[db.assign['2026-10|acil|1|day'],db.assign['2026-10|acil|3|night'],db.assign['2026-10|acil|9|other'],db.assign['2026-09|acil|30|night']],guards:JSON.stringify([db.assignmentMeta,db.rpysCellLocks])===guardSnapshot,targets:JSON.stringify(rpysTargets399.config(autoUnit.value).people)===targetSnapshot,rest:rpysRest16V397.allViolations().size,blocked:assignmentsMonth().filter(a=>a.person.id===1&&[2,3,4,5,6,7].includes(a.day)).length,busy:document.querySelector('[data-target-action=run]').getAttribute('aria-busy')}));
-  assert.deepEqual(Object.values(result.actual).map(x=>[x.day,x.night]),[[1,0],[1,2],[4,5],[4,6],[3,4],[4,6]]);assert.deepEqual(result.protected,[1,2,4,3]);assert.equal(result.guards,true);assert.equal(result.targets,true);assert.equal(result.blocked,0);assert.equal(result.rest,0);assert.equal(result.busy,'false');assert.match(result.text,/Kısmi dağıtım uygulandı/);assert.match(result.report,/Berk Yaşar.*7.*izin dönüşü/);assert.match(result.report,/Ulaş.*boş gün/);assert.deepEqual(errors,[]);
+  assert.deepEqual(Object.values(result.actual).map(x=>[x.day,x.night]),[[1,0],[0,1],[4,5],[4,6],[3,4],[4,6]]);assert.deepEqual(result.protected,[1,2,4,3]);assert.equal(result.guards,true);assert.equal(result.targets,true);assert.equal(result.blocked,0);assert.equal(result.rest,0);assert.equal(result.busy,'false');assert.match(result.text,/Kısmi dağıtım uygulandı/);assert.match(result.report,/Berk Yaşar.*7.*izin dönüşü/);assert.match(result.report,/Ulaş.*boş gün/);assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });

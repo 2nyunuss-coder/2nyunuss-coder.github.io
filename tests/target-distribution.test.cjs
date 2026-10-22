@@ -127,3 +127,11 @@ test('a competing singleton cell cannot cause an unmatched spouse to escape a de
  const input=spouseExample();input.slots[1].allowed=[3];input.dependencies[0].anyOf=[];const r=solveTargets(input);assert.equal(r.ok,false);assert.equal(r.timedOut,false);
  const partial=solveTargets({...input,allowPartial:true});const picked=new Set(partial.plan.map(x=>`${x.slot}:${x.id}`));for(const r of input.dependencies)assert.ok(!picked.has(r.when)||r.anyOf.some(v=>picked.has(v)));
 });
+
+test('hard gap partial search excludes an insufficient target instead of saving six blank days',()=>{
+ const ids=[1,2],slots=Array.from({length:30},(_,index)=>({index,kind:'day',day:index+1,allowed:ids.slice()})),input={allowPartial:true,hardGaps:true,ids,slots,remaining:{1:{day:3,night:0},2:{day:15,night:0}},gapRules:ids.map(id=>({id,maxBlank:5,segments:[[1,30]],includeEdges:true,fixedDays:[]}))};const r=solveTargets(input);assert.equal(r.ok,true);assert.ok(r.plan.length>0);assert.ok(r.plan.every(x=>x.id===2));const days=new Set(r.plan.map(x=>slots[x.slot].day));let blank=0;for(let d=1;d<=30;d++){blank=days.has(d)?0:blank+1;assert.ok(blank<=5,'a six-day blank run must never be accepted')}
+});
+test('normal flexible search places spouse groups atomically while satisfying every selected calendar',()=>{
+ const ids=[1,2],slots=[];for(const day of [1,4,8,11])for(const kind of ['day','night'])slots.push({index:slots.length,day,kind,allowed:ids.slice()});const conflicts=[],dependencies=[];for(const s of slots)for(const id of ids){dependencies.push({when:`${s.index}:${id}`,anyOf:slots.filter(t=>t.day===s.day&&t.index!==s.index).map(t=>`${t.index}:${3-id}`)});for(const t of slots)if(t.index>s.index&&t.day===s.day)conflicts.push([`${s.index}:${id}`,`${t.index}:${id}`]);}
+ const input={ids,slots,remaining:{1:{day:4,night:4},2:{day:4,night:4}},conflicts,dependencies,allowPartial:true,hardGaps:true,strictAllCalendars:true,gapRules:ids.map(id=>({id,maxBlank:3,segments:[[1,12]],includeEdges:true,fixedDays:[]}))};const r=solveTargets(input);assert.equal(r.plan.length,8,JSON.stringify(r));for(const id of ids)assert.deepEqual(r.plan.filter(x=>x.id===id).map(x=>slots[x.slot].day).sort((a,b)=>a-b),[1,4,8,11]);assert.equal(r.timedOut,false);
+});

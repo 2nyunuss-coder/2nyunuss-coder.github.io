@@ -140,7 +140,7 @@ function payrollScores(input,values,chosen){
 // First try calendar-complete people. Proven impossible calendar conditions are
 // reported by the caller; they must not remove a person's eligible duties.
 function partialCalendar(input,values,domains,left,chosen){
- const {slots}=input,picked=new Set(chosen),active=new Set(chosen.map(v=>values.get(v).id)),complete=new Set(active);let feasible=true;
+ const {slots}=input,picked=new Set(chosen),active=new Set(input.strictAllCalendars?input.ids:chosen.map(v=>values.get(v).id)),complete=new Set(active);let feasible=true;
  function requireValues(id,tokens){
   if(tokens.some(v=>picked.has(v)))return;
   complete.delete(id);const possible=tokens.filter(v=>domains[values.get(v)?.slot]?.includes(v));
@@ -178,7 +178,8 @@ function solvePartial(input){
  for(const [a,b] of conflicts){clashes.get(a)?.add(b);clashes.get(b)?.add(a)}
  const initial=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`));let best=[],nodes=0,timedOut=false,phaseStopped=false;
  propagateDependencies(dependencies,values,initial,new Set());
- const strictUntil=start+budget*.35,strictNodes=Math.max(1,Math.floor(maxNodes*.35));
+ const paired=new Map();for(const r of dependencies){const x=values.get(r.when);if(x&&r.anyOf.length&&r.anyOf.every(v=>values.get(v)?.id!==x.id&&slots[values.get(v)?.slot]?.day===slots[x.slot].day))paired.set(r.when,r.anyOf);}
+ const strictUntil=start+budget*(input.strictAllCalendars?1:.35),strictNodes=input.strictAllCalendars?maxNodes:Math.max(1,Math.floor(maxNodes*.35));
  function upper(domains,left){let n=0;for(const kind of ['day','night']){const owners=new Map();function add(i,seen){for(const v of domains[i]||[]){const id=values.get(v).id;if(seen.has(id))continue;seen.add(id);const mine=owners.get(id)||[];if(mine.length<left[id][kind]){mine.push(i);owners.set(id,mine);return true}for(let k=0;k<mine.length;k++)if(add(mine[k],seen)){mine[k]=i;return true}}return false}for(const s of slots)if(s.kind===kind&&domains[s.index]?.length&&add(s.index,new Set()))n++}return n}
  const personCeilings=Object.fromEntries(ids.map(id=>[id,remaining[id].day+remaining[id].night]));
  for(const group of limits){const set=new Set(group.values),first=values.get(group.values[0]);if(first&&group.values.every(v=>values.get(v)?.id===first.id)&&[...values].filter(([,x])=>x.id===first.id).every(([v])=>set.has(v)))personCeilings[first.id]=Math.min(personCeilings[first.id],Math.max(0,group.max))}
@@ -190,8 +191,9 @@ function solvePartial(input){
   domains=domains.map(d=>d===null?null:d.filter(v=>left[values.get(v).id][values.get(v).kind]>0));
   const picked=new Set(chosen);for(const group of limits){const used=group.values.filter(v=>picked.has(v)).length;if(used>group.max)return;if(used===group.max){const ban=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!ban.has(v)))}}
   if(!propagateDependencies(dependencies,values,domains,picked))return;
-  const calendar=strict?partialCalendar(input,values,domains,left,chosen):null;
-  const valid=dependencyComplete(dependencies,strict?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen);
+  const calendar=strict||input.hardGaps||input.strictAllCalendars?partialCalendar(input,values,domains,left,chosen):null;
+  const eligible=calendar?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen;
+  const valid=input.strictAllCalendars&&calendar.complete.size!==ids.length?[]:dependencyComplete(dependencies,eligible);
   if(valid.length>best.length)best=valid.slice();if(best.length===goal)return;
   if(calendar&&!calendar.feasible)return;
   const cells=slots.filter(s=>domains[s.index]?.length);if(!cells.length||chosen.length+Math.min(cells.length,ids.reduce((n,id)=>n+left[id].day+left[id].night,0))<=best.length)return;
@@ -199,11 +201,17 @@ function solvePartial(input){
   const cost=v=>domains.reduce((n,d)=>n+(d?.length?d.filter(w=>clashes.get(v).has(w)).length/d.length:0),0),costs=new Map(domains[s.index].map(v=>[v,cost(v)]));
   const payroll=payrollScores(input,values,chosen);
   const candidates=domains[s.index].slice().sort((a,b)=>{const x=values.get(a),y=values.get(b);return costs.get(a)-costs.get(b)||left[y.id][y.kind]/Math.max(1,remaining[y.id][y.kind])-left[x.id][x.kind]/Math.max(1,remaining[x.id][x.kind])||payroll(a)-payroll(b)||x.id-y.id});
-  for(const v of candidates){const x=values.get(v),next=domains.map(d=>d===null?null:d.filter(w=>!clashes.get(v).has(w)));next[s.index]=null;const rest=Object.fromEntries(ids.map(id=>[id,{...left[id]}]));rest[x.id][x.kind]--;visit(next,rest,[...chosen,v],strict);if(best.length===goal||timedOut||phaseStopped)return}
+  for(const v of candidates){
+   const partners=paired.get(v),groups=partners&&!partners.some(w=>picked.has(w))?partners.filter(w=>domains[values.get(w).slot]?.includes(w)).map(w=>[v,w]):[[v]];
+   for(const group of groups){let next=domains.map(d=>d===null?null:d.slice()),rest=Object.fromEntries(ids.map(id=>[id,{...left[id]}])),ok=true;
+    for(const token of group){const x=values.get(token);if(!next[x.slot]?.includes(token)||rest[x.id][x.kind]<=0){ok=false;break}next=next.map(d=>d===null?null:d.filter(w=>!clashes.get(token).has(w)));next[x.slot]=null;rest[x.id][x.kind]--;}
+    if(ok)visit(next,rest,[...chosen,...group],strict);if(best.length===goal||timedOut||phaseStopped)return;
+   }
+  }
   const skipped=domains.slice();skipped[s.index]=null;visit(skipped,left,chosen,strict);
  }
  if((input.requirements||[]).some(r=>!r.soft)||(input.gapRules||[]).some(r=>!r.soft))visit(initial,remaining,[],true);
- if(best.length<goal&&!timedOut){phaseStopped=false;visit(initial,remaining,[],false)}
+ if(best.length<goal&&!timedOut&&!input.strictAllCalendars){phaseStopped=false;visit(initial,remaining,[],false)}
  return {ok:true,partial:true,plan:best.map(v=>values.get(v)),nodes,timedOut,optimal:!timedOut||best.length===goal,elapsed:Date.now()-start};
 }
 if(typeof module!=='undefined')module.exports={solveTargets};
