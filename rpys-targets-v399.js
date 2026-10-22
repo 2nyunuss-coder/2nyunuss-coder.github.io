@@ -470,16 +470,23 @@
     if(isMonthLocked()){report('Bu ay kilitli. Liste değiştirilmedi.','error',false);return false;}
     preparing=true;let worker,timer;
     const job={started:Date.now(),workerMs:0,cancelled:false,reject:null};currentJob=job;
-    const check=()=>{if(job.cancelled)throw Error('İşlem iptal edildi. Önceki liste korundu.');if(Date.now()-job.started-job.workerMs>6000)throw Error('Uygun gün hazırlığı zamanında tamamlanamadı; mevcut liste korunuyor. Bu sonuç hedeflerin imkânsız olduğunu göstermez.');};
+    let preparationLimit=6000;
+    const check=()=>{if(job.cancelled)throw Error('İşlem iptal edildi. Önceki liste korundu.');if(Date.now()-job.started-job.workerMs>preparationLimit)throw Error('Uygun gün hazırlığı zamanında tamamlanamadı; mevcut liste korunuyor. Bu sonuç hedeflerin imkânsız olduğunu göstermez.');};
     let lastProgress=0;
     const progress=(phase,done,total)=>{if(Date.now()-lastProgress<200)return;lastProgress=Date.now();report(`${phase}: ${done} / ${total} · ${Math.floor((Date.now()-job.started)/1000)} sn`,'progress',true)};
     report('Hedefler ve uygun günler denetleniyor; geçici plan arka planda hazırlanıyor…','progress',true);
     try{
       const fingerprint=planningFingerprint(),month=ym(),selectionRebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
-      const attempts=bestEffortRequested?[false,true]:[false];let data,result,reason='',notes=[];
+      // If Skopi targets cannot cover every editable cell, go straight to the
+      // partial planner instead of spending the preparation deadline on an
+      // impossible exact plan. Existing cells stay fixed in partial mode.
+      const current=model(u,selected(u),{preserveExisting:true}),given=readTargets(current,{partial:true});
+      const short=u==='PORTABL + SKOPİ'&&kinds.some(t=>current.ids.reduce((n,id)=>n+given[id][t],0)<current.required[t]);
+      const attempts=short?[true]:bestEffortRequested?[false,true]:[false];let data,result,reason='',notes=[];
       for(const partial of attempts){
+        preparationLimit=partial?20000:6000;
         try{data=await planningData(u,{check,progress,partial})}
-        catch(e){if(!partial&&bestEffortRequested&&!job.cancelled&&Date.now()-job.started-job.workerMs<=6000){reason=e.message;continue}throw e}
+        catch(e){if(!partial&&bestEffortRequested&&!job.cancelled){reason=e.message;continue}throw e}
         check();
         if(typeof Worker!=='function')throw Error('Bu tarayıcı arka plan hesaplamasını desteklemiyor. Liste değiştirilmedi.');
         report(partial?'Yerleştirilebilen görevler hesaplanıyor; eksikler ayrıca gösterilecek…':'Takvime tam hedeflerle yerleştirme hesaplanıyor…','progress',true);

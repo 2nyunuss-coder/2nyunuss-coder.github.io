@@ -293,3 +293,14 @@ test('manual Saymanlık work on the return date fulfills the rule without writin
 test('the Worker leaves month-end Sunday free before the next months mandatory Monday return',async()=>{
  const f=fixture();f.setMonth('2026-05');f.c.daysInMonth=()=>31;f.c.db.manualDistributionTargetsV399['2026-05|'+unit]=JSON.parse(JSON.stringify(f.c.db.manualDistributionTargetsV399['2026-10|'+unit]));f.c.rpysTargets399.config(unit).people[6].night=3;datedLeave(f,1,'2026-05-25','2026-05-29');const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.ok(!r.plan.some(x=>x.id===1&&x.slot.day===31&&x.slot.kind==='night'));assert.equal(f.saved.length,1);assert.deepEqual(Array.from(f.c.rpysScheduler398.returnWorkdays(1,'2026-06')),[1]);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
 });
+test('Skopi target shortage starts partial planning directly and leaves only unmatched duties empty',async()=>{
+ const f=fixture(),cfg=f.c.rpysTargets399.config(unit);cfg.people[6].night=0;
+ const before=JSON.stringify(f.c.db.assign),originalTargets=JSON.stringify(cfg.people),Native=f.c.Worker,modes=[];
+ f.c.Worker=class extends Native{postMessage(data){modes.push(data.allowPartial);super.postMessage(data)}};
+ const result=await f.c.rpysTargets399.run();
+ assert.equal(result.ok,true,f.alerts.join('\n'));assert.equal(result.partial,true);
+ assert.deepEqual(modes,[true]);assert.equal(result.plan.length,49);assert.equal(result.unfilled.length,2);
+ assert.equal(f.saved.length,1);assert.equal(JSON.stringify(cfg.people),originalTargets);
+ assert.equal(before,'{}');assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+ assert.match(f.controls.distResult.textContent,/2 hücre boş kaldı/);
+});
