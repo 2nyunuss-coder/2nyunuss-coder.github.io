@@ -204,7 +204,7 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261022-gap-17',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261022-gap-19',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null,bestEffortRequested=false;
   let feedback={text:'',tone:'',busy:false};
   function report(text,tone='progress',busy=preparing){
@@ -364,13 +364,21 @@
           for(let d=1;d+max<=daysInMonth();d++)addLimit(id,Array.from({length:max+1},(_,i)=>d+i),max);
         }
       }
+      // Pair rules concern the same/adjacent days (or the shift's own span).
+      // Index nearby cells once instead of rechecking every person against
+      // every cell in the month. Long-range gap and monthly rules are compiled
+      // separately below.
+      const pairSpan=Math.max(2,Number(cfg.minGap||2),...m.slots.map(s=>Math.ceil(Number(s.col.hours||0)/24)+1));
+      const slotsByDay=new Map();for(const s of m.slots){if(!slotsByDay.has(s.day))slotsByDay.set(s.day,[]);slotsByDay.get(s.day).push(s)}
       for(let i=0;i<m.slots.length;i++)for(const id of m.slots[i].allowed){
         check();progress('Görev çakışmaları',i+1,m.slots.length);
         const a=m.slots[i];adapter.place(id,a);
-        try{for(let j=i+1;j<m.slots.length;j++)for(const other of m.slots[j].allowed){
-          if(other!==id&&!crossPairs.has(id+'|'+other))continue;
-          const b=m.slots[j];
-          if(!adapter.canPlace(other,b))conflicts.push([`${i}:${id}`,`${j}:${other}`]);
+        try{for(let day=Math.max(1,a.day-pairSpan);day<=Math.min(daysInMonth(),a.day+pairSpan);day++)for(const b of slotsByDay.get(day)||[]){
+          if(b.index<=i)continue;
+          for(const other of b.allowed){
+            if(other!==id&&(day!==a.day||!crossPairs.has(id+'|'+other)))continue;
+            if(!adapter.canPlace(other,b))conflicts.push([`${i}:${id}`,`${b.index}:${other}`]);
+          }
         }}
         finally{adapter.remove(id,a)}
         if(Date.now()-sliceStart>=8)await yieldIfNeeded();
@@ -513,14 +521,14 @@
       const short=u==='PORTABL + SKOPİ'&&kinds.some(t=>current.ids.reduce((n,id)=>n+given[id][t],0)<current.required[t]);
       const attempts=automaticUnit===u||short?[true]:bestEffortRequested?[false,true]:[false];let data,result,reason='',notes=[];
       for(const partial of attempts){
-        preparationLimit=partial?20000:6000;
+        preparationLimit=partial?90000:30000;
         try{data=await planningData(u,{check,progress,partial})}
         catch(e){if(!partial&&bestEffortRequested&&!job.cancelled){reason=e.message;continue}throw e}
         check();
         if(typeof Worker!=='function')throw Error('Bu tarayıcı arka plan hesaplamasını desteklemiyor. Liste değiştirilmedi.');
         report(partial?'Yerleştirilebilen görevler hesaplanıyor; eksikler ayrıca gösterilecek…':'Takvime tam hedeflerle yerleştirme hesaplanıyor…','progress',true);
         worker??=new Worker(workerURL);
-        const excluded=[],started=Date.now(),searchBudget=automaticUnit===u?1200:bestEffortRequested?(partial?4000:1800):3200;
+        const excluded=[],started=Date.now(),searchBudget=automaticUnit===u?1200:partial?8000:bestEffortRequested?1800:3200;
         let accepted=false;
         for(;;){
           if(job.cancelled)throw Error('İşlem iptal edildi. Önceki liste korundu.');
@@ -528,7 +536,7 @@
           try{result=await new Promise((resolve,reject)=>{
             job.reject=reject;worker.onmessage=e=>{clearTimeout(timer);resolve(e.data)};
             worker.onerror=()=>{clearTimeout(timer);reject(Error('Arka plan dağıtım motoru yüklenemedi; liste değiştirilmedi.'))};
-            timer=setTimeout(()=>reject(Error('Arka plan hesaplaması tamamlanamadı; liste değiştirilmedi.')),5200);
+            timer=setTimeout(()=>reject(Error('Arka plan hesaplaması tamamlanamadı; liste değiştirilmedi.')),Math.max(5200,searchBudget+3000));
             worker.postMessage({...data.input,excluded,timeLimit:Math.max(1,searchBudget-(Date.now()-started)),maxNodes:partial&&automaticUnit!==u?30000:7000});
           })}finally{job.workerMs+=Date.now()-workerStarted}job.reject=null;
           if(job.cancelled)throw Error('İşlem iptal edildi. Önceki liste korundu.');

@@ -96,6 +96,14 @@ test('draft history and assignment caches survive every cooperative yield',async
 test('preparation deadline restores state and prevents an unbounded calculating screen',async()=>{
  const f=fixture();let tick=0;f.c.Date=class extends Date{static now(){return tick}};const base=f.c.canTakeShiftV2414;f.c.canTakeShiftV2414=(...args)=>{tick+=1100;return base(...args)};const before=JSON.stringify(f.c.db);assert.equal(await f.c.rpysTargets399.run(),false);assert.match(f.controls.distResult.textContent,/hazırlığı zamanında tamamlanamadı/);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.c.rpysTargets399.isPlanning(),false);assert.equal(f.saved.length,0);
 });
+test('a busy partial Skopi roster completes preparation beyond the former 20-second deadline',async()=>{
+ const f=fixture(),cfg=f.c.rpysTargets399.config(unit);for(const id of [1,2,3,4,5,6])cfg.people[id]={day:3,night:2};
+ let tick=0;f.c.Date=class extends Date{static now(){return tick}};const base=f.c.canTakeShiftV2414;
+ f.c.canTakeShiftV2414=(...args)=>{tick+=85;return base(...args)};
+ const result=await f.c.rpysTargets399.run();assert.equal(result.ok,true,f.alerts.join('\n'));
+ assert.ok(tick>20000,`simulated preparation cost did not exceed old deadline: ${tick}`);
+ assert.ok(result.plan.length>0);assert.equal(f.saved.length,1);
+});
 test('cancel during preparation restores the complete original state',async()=>{
  const f=fixture(),before=JSON.stringify(f.c.db),pending=f.c.rpysTargets399.run();assert.equal(f.c.rpysTargets399.cancel(),true);assert.equal(await pending,false);assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.controls.distResult.textContent,/iptal edildi/);assert.equal(f.c.rpysTargets399.cancel(),false);
 });
