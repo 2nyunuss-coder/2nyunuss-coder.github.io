@@ -21,12 +21,12 @@ const save=()=>{try{localStorage.setItem('rpys-say-v2-independent',JSON.stringif
 function staff(){try{return Array.isArray(db.staff)?db.staff:[]}catch(e){return []}}
 function unit(p){return String(p?.unit||p?.department||p?.birim||p?.unitName||'').trim()}
 function source(){return document.querySelector(state.tab===1?'#say1Grid table':'#say2Grid table')}
-let warming=false;
-function warmSource(){if(warming||source())return;warming=true;const page=document.getElementById('saymanlikV2');const side=document.querySelector('.sidebar');const original=[...side?.querySelectorAll('.nav,button')||[]].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));try{if(original)original.click();else document.getElementById('saymanlik')?.classList.add('active')}catch(e){}setTimeout(()=>{const v=document.getElementById('saymanlikV2');document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));v?.classList.add('active');document.getElementById('rpysSayV2Nav')?.classList.add('active');warming=false;build()},550)}
+let warming=false,warmAttempts=0;
+function warmSource(){if(warming||source()||warmAttempts>=3)return;warmAttempts++;warming=true;const page=document.getElementById('saymanlikV2');const side=document.querySelector('.sidebar');const original=[...side?.querySelectorAll('.nav,button')||[]].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));try{if(original)original.click();else document.getElementById('saymanlik')?.classList.add('active')}catch(e){}setTimeout(()=>{const v=document.getElementById('saymanlikV2');document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));v?.classList.add('active');document.getElementById('rpysSayV2Nav')?.classList.add('active');warming=false;build()},550)}
 function build(){
 const page=document.getElementById('saymanlikV2');if(!page)return;
 const holder=page.querySelector('.sv2wrap');if(!holder)return;
-const src=source();holder.replaceChildren();if(!src){holder.textContent='Saymanlık kayıtları hazırlanıyor…';warmSource();return}
+const src=source();holder.replaceChildren();if(!src){holder.textContent=warmAttempts>=3?'Kaynak Saymanlık tablosu oluşturulamadı. Ana Saymanlık ekranındaki SAY1/SAY2 yüklemesi kontrol edilmeli.':'Saymanlık kayıtları hazırlanıyor…';warmSource();return}
 const table=src.cloneNode(true);table.id='saymanlikV2ReadOnlyTable';table.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id'));table.querySelectorAll('button,input,select,textarea,.sayV2handle,.sayV2resize').forEach(x=>x.remove());table.querySelectorAll('[contenteditable]').forEach(x=>x.removeAttribute('contenteditable'));holder.append(table);
 const people=staff(),names=people.map(p=>({p,n:String(p.name||'').trim().toLocaleUpperCase('tr-TR')}));
 const header=[...table.rows].find(r=>r.cells.length>4);const colData=header?[...header.cells].map(c=>{const s=c.textContent.trim().replace(/\s+/g,' ').toLocaleUpperCase('tr-TR');return names.find(n=>n.n===s)?.p||null}):[];
