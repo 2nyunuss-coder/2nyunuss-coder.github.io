@@ -1,6 +1,16 @@
-# Ameliyathane ve Birim Plan
+# RPYS Mini · Ameliyathane
 
 RPYS hesabından ve Supabase verisinden bağımsız, tarayıcıda çalışan salon ve personel planlayıcı. `/birim-plan/` adresinden açılır. Veriler mevcut `birim_plan_v1` anahtarında kalır; eski yedekler okunur. Açılış eski kaydı kendiliğinden yeniden yazmaz. Eski yedeklerde otomatik/manuel ayrımı bulunmadığı için mevcut görevler korunan manuel kayıt olarak alınır.
+
+## Sade çalışma alanı
+
+Uygulama doğrudan **Nöbet listesi** ile açılır. Günler satırlarda, salon ve vardiyalar sütunlardadır. Personeli hücreden seçin; hücreyi kilitleyin veya işaretleyip toplu atayın. Salon/gün filtreleri ve satır listesi görünümü bulunur. **Tümünü seç** yalnız görünür hücreleri seçer; filtre değişince seçim temizlenir. CSV tüm seçili birimi, yazdırma ise ekrandaki filtreli tabloyu çıkarır.
+
+Soldaki menü: Nöbet listesi, İzin/rezerve, Saymanlık/FHZ, Salon özeti, Personel, Salon/vardiya, Kurallar, Ayarlar ve yedek. Birim ve ay üst çubuktan seçilir; oklarla ay değişir. Kurallar artık salon tanımlarından ayrı bir modüldür; özel kural doğrudan eklenip düzenlenebilir. Kurum ve yeni birim tanımları ile yedek yükleme Ayarlar bölümündedir. Yan menüdeki **Yedek indir** tüm kayıtları dışa aktarır.
+
+Telefonda menü düğmeyle açılır; takvimler kendi alanlarında yatay kayar. Yazdırırken menü ve düzenleme kontrolleri kaldırılır. Personel ek bilgilerinin görünümü açılır/kapanır; gizli personel ve vardiya ekranları her hücre değişikliğinde yeniden oluşturulmaz.
+
+Planlama verisi aynı `birim_plan_v1` kaydında kalır; görünüm tercihleri ayrı `birim_plan_ui_v2` anahtarındadır. Modüller arasında gezinmek planlama verisini yeniden kaydetmez.
 
 ## Ameliyathane kurulumu
 
@@ -27,6 +37,6 @@ Kuralı düzenleyebilir, kopyalayabilir, kaldırabilir veya geçici kapatabilirs
 
 Kayıt yalnız bu tarayıcıdadır; sunucuya gönderilmez. Yedek yükleme mevcut bağımsız planlayıcı kaydını onayla değiştirir; RPYS kayıtlarına dokunmaz. Saat hedefleri kullanıcı tarafından belirlenir. Bu alan mali ücret/bordro hesabı yapmaz. Dağıtım dengeli bir taslak üretir; en büyük matematiksel çözümü garanti etmez. Resmî tatiller otomatik okunmaz; uygun olmayan tarihleri personelde veya özel kuralda girin.
 
-Sürüm: `20261021-or-12`.
+Sürüm: `20261022-mini-13`.
 
 Doğrulama: `node tests/unit-planner.test.cjs`, `node tests/target-integration.test.cjs` ve Chromium/Playwright bulunan ortamda `node tests/unit-planner.browser.test.cjs`.
