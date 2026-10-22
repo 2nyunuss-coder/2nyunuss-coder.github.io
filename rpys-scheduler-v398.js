@@ -408,7 +408,8 @@
         for(const key of restCheck().keys())if(window.rpysRules421?.enabled(unit,'noPostDuty')!==false&&!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
         if(newSpouseIssues.length){const x=newSpouseIssues[0];throw Error('Eşlerin aynı gün çalışma kuralı: '+(getPersonById(x.first)?.name||x.first)+' / '+(getPersonById(x.second)?.name||x.second)+', '+x.day+'. gün aynı gün için iki uygun görev hücresi bulunamadı. İzinli eşin çalışması gerekmez; izinli olmayan eş tek başına çalışabilir.');}
-        const gaps=gapViolations(run.returnIds||targetIds||[],unit,month);if(gaps.length)throw Error(gaps.map(x=>(getPersonById(x.id)?.name||x.id)+': '+x.leftDate+' – '+x.rightDate+' arasında '+x.blank+' boş gün; sınır '+x.maxBlank+'.').join('\n'));
+        const gapExceptions=new Set(((value?.partial?value.gapExceptions:[])||[]).map(Number));
+        const gaps=gapViolations(run.returnIds||targetIds||[],unit,month).filter(x=>!gapExceptions.has(Number(x.id)));if(gaps.length)throw Error(gaps.map(x=>(getPersonById(x.id)?.name||x.id)+': '+x.leftDate+' – '+x.rightDate+' arasında '+x.blank+' boş gün; sınır '+x.maxBlank+'.').join('\n'));
         const missingReturns=returnWorkdayViolations(run.returnIds||targetIds||[]);if(missingReturns.length)throw Error(missingReturns.map(x=>x.reason).join('\n'));
         for(const [key,id] of Object.entries(db.assign||{})){if(!key.startsWith(month+'|')||Number(before.assign?.[key])===Number(id))continue;if(reservedOn(Number(id),Number(key.split('|')[2]),month))throw Error((getPersonById(id)?.name||id)+': '+key.split('|')[2]+'. gün rezerve; bu güne görev yazılamaz.');}
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
