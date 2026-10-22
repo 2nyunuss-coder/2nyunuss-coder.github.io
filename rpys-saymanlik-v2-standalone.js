@@ -5,19 +5,19 @@ const css=document.createElement('style');css.textContent=`
 #saymanlikV2.page{padding:14px}
 #saymanlikV2 .sv2bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:11px;background:#eef5fc;border:1px solid #ccdaea;border-radius:10px}
 #saymanlikV2 .sv2bar input{width:110px}
-#saymanlikV2 .sv2wrap{max-width:100%;overflow:auto;max-height:69vh;border:1px solid #cad9e9;border-radius:9px;background:white}
+#saymanlikV2 .sv2wrap{max-width:100%;overflow:auto;max-height:72vh;border:1px solid #cad9e9;border-radius:9px;background:white}
 #saymanlikV2 table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;table-layout:auto}
-#saymanlikV2 td,#saymanlikV2 th{border:1px solid #dce5ef;padding:3px 5px;box-sizing:border-box;white-space:normal;overflow-wrap:break-word}
+#saymanlikV2 td,#saymanlikV2 th{border:1px solid #dce5ef;padding:6px 7px;font-size:12px;line-height:1.25;box-sizing:border-box;white-space:normal;overflow-wrap:break-word}
 #saymanlikV2 tr>:first-child{position:sticky;left:0;z-index:3;background:#eaf3fb}
 #saymanlikV2 tr:first-child>*{position:sticky;top:0;z-index:4}
 #saymanlikV2 .sv2handle{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:nwse-resize;background:#2782d5;border:1px solid white;border-radius:2px;z-index:8}
 #saymanlikV2 .sv2summary{font-size:12px;margin:12px 0;color:#50627b}
 #saymanlikV2 .sv2hidden{display:none!important}
-#saymanlikV2 .sv2calc{background:#eef5fd!important;font-weight:700;min-width:85px}
+#saymanlikV2 .sv2calc{background:#eef5fd!important;font-weight:700;min-width:85px}\n#saymanlikV2 table tr:nth-child(even)>td:not(.sv2calc){box-shadow:inset 0 0 0 999px rgba(238,245,253,.07)}\n#saymanlikV2 tr:first-child th{white-space:nowrap;font-size:11px;background:#e6f0fb;z-index:5}\n#saymanlikV2 .sv2summary{padding:10px;background:#f4f8fc;border-radius:8px}
 #saymanlikV2 tr>th:first-child{min-width:175px;position:sticky;left:0;background:#eaf3fb;z-index:6}
 `;document.head.append(css);
 const el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n};
-const state={tab:1,width:94,height:29,unit:'all',hide:false,widths:{},heights:{}};
+const state={tab:1,width:88,height:43,period:1,unit:'all',hide:false,widths:{},heights:{}};
 try{const s=JSON.parse(localStorage.getItem('rpys-say-v2-independent')||'{}');Object.assign(state,s)}catch(e){}
 const save=()=>{try{localStorage.setItem('rpys-say-v2-independent',JSON.stringify(state))}catch(e){}};
 function staff(){try{return Array.isArray(db.staff)?db.staff:[]}catch(e){return []}}
@@ -36,7 +36,7 @@ const heads=[...header.cells].map(c=>c.textContent.trim().replace(/\s+/g,' '));
 const norm=s=>String(s||'').toLocaleUpperCase('tr-TR').replace(/\s+/g,' ').trim();
 const people=staff();
 const persons=heads.map((name,ci)=>({name,ci,p:people.find(p=>norm(p.name)===norm(name))})).filter(x=>x.ci>0&&x.name&&(!state.unit||state.unit==='all'||unit(x.p)===state.unit));
-const dates=rows.slice(rows.indexOf(header)+1).filter(r=>/^\s*\d{1,2}\s*[/.]\s*\d{1,2}/.test(r.cells[0]?.textContent||''));
+const allDates=rows.slice(rows.indexOf(header)+1).filter(r=>/^\s*\d{1,2}\s*[/.]\s*\d{1,2}/.test(r.cells[0]?.textContent||''));const dates=state.period===0?allDates:allDates.slice(state.period===1?0:15,state.period===1?15:31);
 if(!dates.length){holder.textContent='Gün satırları bulunamadı.';return}
 const table=el('table'),top=el('tr');top.append(el('th','PERSONEL'));
 dates.forEach(r=>top.append(el('th',r.cells[0].textContent.trim().split(' ')[0])));
@@ -80,15 +80,15 @@ function install(){
 const main=document.querySelector('main.main'),side=document.querySelector('.sidebar');if(!main||!side)return false;
 if(document.getElementById('saymanlikV2'))return true;
 const page=el('section');page.id='saymanlikV2';page.className='page';
-page.innerHTML='<h2>Saymanlık V2</h2><p style="font-size:12px;color:#63758b">Orijinal Saymanlıktan bağımsız görünüm. Değişiklikler ortak kaynak veriden okunur; görev düzenleme orijinal Saymanlık ekranındadır.</p><div class="sv2bar"></div><div class="sv2wrap"></div><div class="sv2summary"></div><div style="display:flex;justify-content:space-around;margin:30px 0;text-align:center;gap:15px"><div>Hazırlayan<br>Ad Soyad / İmza</div><div>Kontrol Eden<br>Ad Soyad / İmza</div><div>Onaylayan<br>Ad Soyad / İmza</div></div>';main.append(page);
-const bar=page.querySelector('.sv2bar');
+page.innerHTML='<h2>Saymanlık V2 · Okunabilir Çalışma Görünümü</h2><p style="font-size:12px;color:#63758b">Orijinal Saymanlıktan bağımsız görünüm. Değişiklikler ortak kaynak veriden okunur; görev düzenleme orijinal Saymanlık ekranındadır.</p><div class="sv2bar"></div><div class="sv2wrap"></div><div class="sv2summary"></div><div style="display:flex;justify-content:space-around;margin:30px 0;text-align:center;gap:15px"><div>Hazırlayan<br>Ad Soyad / İmza</div><div>Kontrol Eden<br>Ad Soyad / İmza</div><div>Onaylayan<br>Ad Soyad / İmza</div></div>';main.append(page);
+const bar=page.querySelector('.sv2bar');const periods=el('select');[['1','İlk 15 Gün'],['2','Son 15 Gün'],['0','Tüm Ay']].forEach(([v,t])=>{const o=el('option',t);o.value=v;periods.append(o)});periods.value=String(state.period);periods.onchange=()=>{state.period=Number(periods.value);save();build()};
 const tabs=el('select');[['1','SAY1'],['2','SAY2']].forEach(([v,l])=>{const o=el('option',l);o.value=v;tabs.append(o)});tabs.value=String(state.tab);tabs.onchange=()=>{state.tab=Number(tabs.value);save();build()};
 const units=el('select');const refreshUnits=()=>{const all=[...new Set(staff().map(unit).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));units.replaceChildren();for(const name of ['all',...all]){const o=el('option',name==='all'?'Tüm birimler':name);o.value=name;units.append(o)}units.value=all.includes(state.unit)?state.unit:'all';state.unit=units.value};refreshUnits();units.onchange=()=>{state.unit=units.value;save();build()};
 const hide=el('button','İzin/Rapor sütunları: '+(state.hide?'Gizli':'Açık'));hide.onclick=()=>{state.hide=!state.hide;hide.textContent='İzin/Rapor sütunları: '+(state.hide?'Gizli':'Açık');save();build()};
 const refresh=el('button','↻ Verileri Yenile');refresh.onclick=()=>{refreshUnits();build()};
 const back=el('button','Orijinal Saymanlıkta Düzenle');back.onclick=()=>{const original=[...side.querySelectorAll('button,.nav')].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));if(original)original.click();else{page.classList.remove('active');document.getElementById('saymanlik')?.classList.add('active')}};
 for(const [label,key,min,max] of [['Sütun genişliği','width',50,160],['Satır yüksekliği','height',22,75]]){const wrap=el('label',label+' '),input=el('input');input.type='range';input.min=min;input.max=max;input.value=state[key];input.oninput=()=>{state[key]=Number(input.value);state[key==='width'?'widths':'heights']={};save();build()};wrap.append(input);bar.append(wrap)}
-bar.prepend(tabs,units,hide,refresh,back);
+bar.prepend(tabs,periods,units,hide,refresh,back);
 const native=[...side.querySelectorAll('.nav,button')].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));const nav=el('button','▦ Saymanlık V2');nav.type='button';nav.className=native?.className||'nav';nav.id='rpysSayV2Nav';nav.onclick=()=>{document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');side.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));nav.classList.add('active');document.body.classList.remove('rpysMobileMenuOpen');refreshUnits();build()};
 if(native)native.after(nav);else side.append(nav);
 return true;
