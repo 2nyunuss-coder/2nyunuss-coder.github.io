@@ -44,16 +44,14 @@ const summaries=['İzin Günü','Rapor Günü','Mükellef','Pol Çalışma','Aci
 summaries.forEach(s=>{const th=el('th',s);th.className='sv2calc';top.append(th)});table.append(top);
 for(const item of persons){
  const row=el('tr');row.append(el('th',item.name));let leave=0,report=0,total=0;
+ for(const sourceRow of allDates){const srcCell=sourceRow.cells[item.ci];if(!srcCell)continue;const content=srcCell.textContent.trim(),normText=norm(content);if(!/REZERV/.test(normText)){if(/RAPOR/.test(normText))report++;else if(/İZİN|IZIN/.test(normText))leave++}for(const match of content.matchAll(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/g)){let minutes=Number(match[3])*60+Number(match[4])-Number(match[1])*60-Number(match[2]);if(minutes<0)minutes+=1440;total+=minutes/60}}
+
  dates.forEach(sourceRow=>{
   const srcCell=sourceRow.cells[item.ci],cell=el('td');
   if(srcCell){
    const content=srcCell.textContent.trim();cell.textContent=content;
    const computed=getComputedStyle(srcCell);cell.style.backgroundColor=computed.backgroundColor;cell.style.color=computed.color;
-   const normText=norm(content);
-   if(!/REZERV/.test(normText)){if(/RAPOR/.test(normText))report++;else if(/İZİN|IZIN/.test(normText))leave++}
-   for(const match of content.matchAll(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/g)){
-    let minutes=Number(match[3])*60+Number(match[4])-Number(match[1])*60-Number(match[2]);if(minutes<0)minutes+=1440;total+=minutes/60;
-   }
+
   }
   row.append(cell);
  });
