@@ -76,8 +76,6 @@ for(const [ri,tr] of [...table.rows].entries())for(const [ci,cell] of [...tr.cel
 page.querySelector('.sv2summary').textContent='Toplam birim mükellefi ve fazla mesai: kaynak hesap bağlantısı henüz doğrulanmadı · '+persons.length+' personel / '+dates.length+' gün · Rezerveler izin ve rapor sayısına eklenmez.';
 
 }
-page.querySelector('.sv2summary').textContent='Kaynak: Saymanlık '+(state.tab===1?'SAY1':'SAY2')+' · Aynı canlı tablodan yenilenir · Orijinal Saymanlık ve PDF değişmez.';
-}
 function install(){
 const main=document.querySelector('main.main'),side=document.querySelector('.sidebar');if(!main||!side)return false;
 if(document.getElementById('saymanlikV2'))return true;
