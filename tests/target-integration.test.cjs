@@ -269,3 +269,9 @@ test('custom weekday restrictions follow the selected person and unit in RPYS el
 test('a person-specific consecutive-day custom rule constrains the Worker without constraining other staff',async()=>{
  const f=fixture();enableSharedRules(f,{custom:[{id:'one',name:'Berk ardışık çalışmasın',type:'maxConsecutive',personId:'1',value:1,enabled:true}]});const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.controls.distResult.textContent);assert.equal(r.partial,false,f.controls.distResult.textContent);const rows=f.c.assignmentsMonth();const ds=new Set(rows.filter(a=>a.person.id===1).map(a=>a.day));for(const d of ds)assert.ok(!ds.has(d+1));assert.equal(rows.length,51);assert.ok([2,3,4,5,6].some(id=>{const days=new Set(rows.filter(a=>a.person.id===id).map(a=>a.day));return [...days].some(d=>days.has(d+1))}));
 });
+
+test('real Worker places both available spouses on shared days with exact manual targets',async()=>{
+ const f=fixture();f.c.spouseOf=id=>Number(id)===1?2:Number(id)===2?1:null;
+ const targets=f.c.db.manualDistributionTargetsV399['2026-10|'+unit].people;Object.assign(targets[1],{day:5,night:5});Object.assign(targets[2],{day:5,night:5});Object.assign(targets[6],{day:0,night:5});
+ const r=await f.c.rpysTargets399.run();assert.equal(r.ok,true,f.alerts.join('\n'));assert.equal(r.plan.length,51,JSON.stringify(r));assert.equal(f.saved.length,1);const rows=f.c.assignmentsMonth();assert.deepEqual(rows.filter(x=>x.person.id===1).map(x=>x.day).sort((a,b)=>a-b),rows.filter(x=>x.person.id===2).map(x=>x.day).sort((a,b)=>a-b));assert.equal(f.c.rpysScheduler398.spouseDayViolations(f.c.ym()).length,0);for(const id of [1,2])for(const kind of ['day','night'])assert.equal(f.c.rpysTargets399.model(unit).actual[id][kind],targets[id][kind]);assert.equal(f.c.rpysRest16V397.allViolations().size,0);
+});

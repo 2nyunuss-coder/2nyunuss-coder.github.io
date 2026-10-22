@@ -142,3 +142,40 @@ test('manual Saymanlık actual working hours satisfy the spouse same-day rule wi
 test('past-month imported leave is honored and explicitly cleared status is not resurrected',()=>{
  const f=fixture();f.c.db.staff[1].status='Aktif';f.c.spouseOf=id=>Number(id)===1?2:1;f.c.db.assign['2026-09|pol|2|day']=1;f.c.db.importedSaymanlik={'2026-09|Person B|2':'ŞUA İZNİ'};assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-09').length,0);f.c.db.sayStatusCleared={'2026-09|Person B|2':true};assert.equal(f.c.rpysScheduler398.spouseDayViolations('2026-09').length,1);
 });
+
+function pairFixture(engine=()=>{}){
+ const f=fixture(engine),c=f.c;c.db.staff[1].status='Aktif';c.spouseOf=id=>({1:2,2:1}[id]||null);c.ruleCfg=()=>({spouseSameDay:true});c.isDutyCellApplicable=()=>true;c.isOnLeave=(id,d)=>c.rpysScheduler398.spouseUnavailable(id,d);c.canTakeShiftV2414=(id,d,col,unit)=>!c.isOnLeave(id,d)&&c.canTakeShift(id,d,col,unit);f.slots=['day','long'].map(k=>({type:'pol',col:f.cols[k]}));return f;
+}
+test('spouse placement reserves both eligible cells without changing the draft until commit',()=>{
+ const f=pairFixture(),c=f.c,before=JSON.stringify(c.db);const plan=c.rpysScheduler398.spousePlacements(1,2,f.slots[0],'UNIT',[1,2],f.slots);assert.equal(plan.length,2);assert.equal(JSON.stringify(c.db),before);
+ const hours={},count={},unitHours={},unitCount={};c.rpysScheduler398.placeSpouseGroup(1,2,f.slots[0],'UNIT',[1,2],f.slots,hours,count,unitHours,unitCount);
+ assert.equal(c.db.assign['2026-10|pol|2|day'],1);assert.equal(c.db.assign['2026-10|pol|2|long'],2);assert.deepEqual(hours,{1:8,2:16});assert.deepEqual(count,{1:1,2:1});assert.deepEqual(unitCount,count);assert.deepEqual(unitHours,hours);assert.equal(c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
+});
+test('the transaction commits an available spouse pair once instead of rolling back after the first spouse',()=>{
+ let f;f=pairFixture(c=>{c.rpysScheduler398.placeSpouseGroup(1,2,f.slots[0],'UNIT',[1,2],f.slots,{},{});c.saveNowV245()});f.c.autoDistribute();assert.equal(Object.keys(f.c.db.assign).length,2);assert.equal(f.saved.length,1);assert.deepEqual(f.alerts,[]);
+});
+for(const mode of ['leave-record','saymanlik'])test('the working spouse is placed alone when the other has '+mode,()=>{
+ const f=pairFixture(),c=f.c;if(mode==='leave-record')c.db.leaves=[{personId:2,start:'2026-10-02',end:'2026-10-02'}];else c.db.cellStatus={'2026-10|Person B|2':'sua'};
+ const plan=c.rpysScheduler398.placeSpouseGroup(1,2,f.slots[0],'UNIT',[1,2],f.slots,{},{});assert.equal(plan.length,1);assert.equal(c.db.assign['2026-10|pol|2|day'],1);assert.equal(Object.keys(c.db.assign).length,1);assert.equal(c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
+});
+for(const mode of ['locked-empty','manual','unselected','rest','single-slot'])test('pair planning leaves the whole draft unchanged when the second spouse has '+mode,()=>{
+ const f=pairFixture(),c=f.c;let ids=[1,2],slots=f.slots;
+ if(mode==='locked-empty')c.db.rpysCellLocks['2026-10|pol|2|long']={exists:false};if(mode==='manual'){c.db.assign['2026-10|pol|2|long']=3;c.db.manualDutyOverrides['2026-10|pol|2|long']={newPid:3}}
+ if(mode==='unselected')ids=[1];if(mode==='rest')c.db.assign['2026-10|pol|1|long']=2;if(mode==='single-slot')slots=[f.slots[0]];
+ const before=JSON.stringify(c.db);assert.equal(c.rpysScheduler398.placeSpouseGroup(1,2,f.slots[0],'UNIT',ids,slots,{},{}).length,0);assert.equal(JSON.stringify(c.db),before);
+});
+test('a spouse already working in another unit satisfies pairing without being assigned a second duty',()=>{
+ const f=pairFixture(),c=f.c;c.db.assign['2026-10|pol|2|other']=2;const before=JSON.stringify(c.db.assign['2026-10|pol|2|other']);const rows=c.rpysScheduler398.placeSpouseGroup(1,2,f.slots[0],'UNIT',[1],f.slots,{},{});assert.equal(rows.length,1);assert.equal(JSON.stringify(c.db.assign['2026-10|pol|2|other']),before);assert.equal(Object.keys(c.db.assign).length,2);assert.equal(c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
+});
+test('gap or balance repairs cannot split an already paired day',()=>{
+ const f=pairFixture(),c=f.c;c.db.assign={'2026-10|pol|2|day':1,'2026-10|pol|2|long':2};const before=JSON.stringify(c.db.assign);const result=c.rpysScheduler398.preserveSpousePairs(()=>{delete c.db.assign['2026-10|pol|2|day'];c.db.assign['2026-10|pol|5|day']=1;return 1});assert.equal(result,0);assert.equal(JSON.stringify(c.db.assign),before);
+});
+
+test('the sequential Skopi draft completes both spouse days before committing once',()=>{
+ let f;f=pairFixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.db.assign['2026-10|pol|5|long']=2;c.rpysScheduler398.alignSpouseDays('UNIT',[1,2,3]);c.saveNowV245()});const c=f.c;c.db.staff.push({id:3,name:'Other',status:'Aktif'});c.unitSlots=()=>f.slots;const eligible=c.canTakeShiftV2414;c.canTakeShiftV2414=(id,d,col,u)=>eligible(id,d,col,u)&&!Object.entries(c.db.assign).some(([k,p])=>p===id&&Number(k.split('|')[2])===d);
+ c.autoDistribute();assert.equal(f.saved.length,1,f.alerts.join(' '));assert.equal(c.rpysScheduler398.spouseDayViolations('2026-10').length,0);assert.equal(Object.keys(c.db.assign).length,4);assert.equal(c.db.assign['2026-10|pol|2|long'],2);assert.equal(c.db.assign['2026-10|pol|5|day'],1);
+});
+test('sequential pairing leaves an infeasible day empty while keeping other lawful work and locks',()=>{
+ let f;const audit=[];f=pairFixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.db.assign['2026-10|pol|8|day']=3;c.rpysScheduler398.alignSpouseDays('UNIT',[1,2,3],audit);c.saveNowV245()});const c=f.c;c.db.staff.push({id:3,name:'Other',status:'Aktif'});c.unitSlots=()=>[f.slots[0]];c.db.rpysCellLocks['2026-10|pol|4|day']={exists:false};const eligible=c.canTakeShiftV2414;c.canTakeShiftV2414=(id,d,col,u)=>id!==3||d!==2?eligible(id,d,col,u):false;
+ c.autoDistribute();assert.equal(f.saved.length,1,f.alerts.join(' '));assert.equal(c.db.assign['2026-10|pol|2|day'],undefined);assert.equal(c.db.assign['2026-10|pol|8|day'],3);assert.ok(c.db.rpysCellLocks['2026-10|pol|4|day']);assert.ok(audit.some(x=>x.kind==='spouse-day-shortfall'));assert.equal(c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
+});

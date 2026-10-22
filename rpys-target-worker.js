@@ -1,9 +1,27 @@
 /* Pure CSP solver. No database, DOM, credentials or persistence in this worker. */
 (function(scope){
 'use strict';
+// Conditional same-day requirements: assigning one spouse requires one of the
+// eligible cells for the other spouse. Leave/fixed-work exemptions are resolved
+// by the calendar adapter before the worker receives this immutable input.
+function propagateDependencies(dependencies,values,domains,picked){
+ for(const r of dependencies){
+  if(r.anyOf.some(v=>picked.has(v)))continue;
+  const possible=r.anyOf.filter(v=>domains[values.get(v)?.slot]?.includes(v));
+  if(picked.has(r.when)){
+   if(!possible.length)return false;
+   if(possible.length===1)domains[values.get(possible[0]).slot]=[possible[0]];
+  }else if(!possible.length){const slot=values.get(r.when)?.slot;if(domains[slot])domains[slot]=domains[slot].filter(v=>v!==r.when)}
+ }return true;
+}
+function dependencyComplete(dependencies,chosen){
+ let kept=new Set(chosen),changed=true;
+ while(changed){changed=false;for(const r of dependencies)if(kept.has(r.when)&&!r.anyOf.some(v=>kept.has(v))){kept.delete(r.when);changed=true}}
+ return chosen.filter(v=>kept.has(v));
+}
 function solveTargets(input){
  if(input.allowPartial)return solvePartial(input);
- const {slots,ids,remaining,conflicts=[],requirements:required=[],forbidden=[],limits=[],gapRules=[],excluded=[]}=input;
+ const {slots,ids,remaining,conflicts=[],requirements:required=[],forbidden=[],limits=[],gapRules=[],excluded=[],dependencies=[]}=input;
  const start=Date.now(),limit=input.timeLimit??3200,maxNodes=input.maxNodes??7000;
  const requirements=required.slice();
  for(const rule of gapRules){
@@ -48,6 +66,7 @@ function solveTargets(input){
    if(left[id][kind]>0&&candidates.length===left[id][kind])for(const s of candidates)domains[s.index]=[`${s.index}:${id}`];
   }
   const picked=new Set(chosen);
+  if(!propagateDependencies(dependencies,values,domains,picked))return null;
   for(const r of requirements)if(!r.values.some(v=>picked.has(v))&&!r.values.some(v=>domains[values.get(v)?.slot]?.includes(v))){lastFailure=r.reason||'Zorunlu görev günü için uygun personel kalmadı.';return null;}
   for(const group of forbidden)if(group.every(v=>picked.has(v)))return null;
   for(const group of limits){
@@ -154,7 +173,7 @@ function partialCalendar(input,values,domains,left,chosen){
 // monthly gap/return condition is an explicit partial-plan warning, never a
 // reason to discard all otherwise eligible assignments for that person.
 function solvePartial(input){
- const {slots,ids,remaining,conflicts=[],limits=[]}=input,start=Date.now(),budget=input.timeLimit??1200,maxNodes=input.maxNodes??7000;
+ const {slots,ids,remaining,conflicts=[],limits=[],dependencies=[]}=input,start=Date.now(),budget=input.timeLimit??1200,maxNodes=input.maxNodes??7000;
  const values=new Map(),clashes=new Map();for(const s of slots)for(const id of s.allowed){const v=`${s.index}:${id}`;values.set(v,{slot:s.index,id,kind:s.kind});clashes.set(v,new Set())}
  for(const [a,b] of conflicts){clashes.get(a)?.add(b);clashes.get(b)?.add(a)}
  const initial=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`));let best=[],nodes=0,timedOut=false,phaseStopped=false;
@@ -169,7 +188,9 @@ function solvePartial(input){
   if(strict&&(nodes>strictNodes||Date.now()>strictUntil)){phaseStopped=true;return}
   domains=domains.map(d=>d===null?null:d.filter(v=>left[values.get(v).id][values.get(v).kind]>0));
   const picked=new Set(chosen);for(const group of limits){const used=group.values.filter(v=>picked.has(v)).length;if(used>group.max)return;if(used===group.max){const ban=new Set(group.values);domains=domains.map(d=>d===null?null:d.filter(v=>!ban.has(v)))}}
-  const calendar=strict?partialCalendar(input,values,domains,left,chosen):null,valid=strict?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen;
+  if(!propagateDependencies(dependencies,values,domains,picked))return;
+  const calendar=strict?partialCalendar(input,values,domains,left,chosen):null;
+  const valid=dependencyComplete(dependencies,strict?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen);
   if(valid.length>best.length)best=valid.slice();if(best.length===goal)return;
   if(calendar&&!calendar.feasible)return;
   const cells=slots.filter(s=>domains[s.index]?.length);if(!cells.length||chosen.length+Math.min(cells.length,ids.reduce((n,id)=>n+left[id].day+left[id].night,0))<=best.length)return;

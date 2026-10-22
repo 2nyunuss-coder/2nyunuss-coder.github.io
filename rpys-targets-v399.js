@@ -196,7 +196,7 @@
       if((rule.kind==='unitPersonMonthlyMax'||(rule.kind==='personUnitMonthlyMax'&&Number(rule.personId)===id))&&targets[id].day+targets[id].night>Number(rule.max||0))throw Error(`${getPersonById(id).name}: hedef toplamı özel kuraldaki ${rule.max} görev sınırını aşıyor.`);
     }
   }
-  const workerURL=new URL('rpys-target-worker.js?v=20261021-or-12',document.currentScript?.src||document.baseURI).href;
+  const workerURL=new URL('rpys-target-worker.js?v=20261022-pairs-15',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null,bestEffortRequested=false;
   let feedback={text:'',tone:'',busy:false};
   function report(text,tone='progress',busy=preparing){
@@ -374,6 +374,16 @@
         }
       }
       for(const rule of [...textFor(m.u),...customFor(m.u)].filter(r=>r.active!==false&&r.unit===u&&['unitPersonMonthlyMax','personUnitMonthlyMax'].includes(r.kind)))for(const id of m.ids)if(rule.kind==='unitPersonMonthlyMax'||Number(rule.personId)===id)limits.push({values:m.slots.filter(s=>s.allowed.includes(id)).map(s=>`${s.index}:${id}`),max:Math.max(0,Number(rule.max||0)-m.fixed[id].day-m.fixed[id].night)});
+      const dependencies=[];
+      if(ruleOn(u,'spouseSameDay')&&typeof spouseOf==='function')for(const s of m.slots)for(const id of s.allowed){
+        const other=Number(spouseOf(id)||0);if(!other)continue;
+        if(window.rpysScheduler398.spouseUnavailable(other,s.day,ym())||window.rpysScheduler398.spouseWorkingOnDay(other,s.day,ym())||isOnLeave(other,s.day))continue;
+        dependencies.push({when:`${s.index}:${id}`,anyOf:m.slots.filter(x=>x.index!==s.index&&x.day===s.day&&x.allowed.includes(other)).map(x=>`${x.index}:${other}`),reason:`${getPersonById(id).name} / ${getPersonById(other)?.name||other}: ${s.day}. gün iki eş için uygun görev gerekiyor; izinli eş çalışmak zorunda değil.`});
+      }
+      if(partial)for(const id of m.ids){
+        const blocked=dependencies.filter(r=>Number(r.when.split(':')[1])===id&&!r.anyOf.length).map(r=>m.slots[Number(r.when.split(':')[0])].day);
+        if(blocked.length)problems.push(`${getPersonById(id).name}: eşlerin aynı gün çalışma kuralı için ${[...new Set(blocked)].join(', ')}. günlerde eşine uygun ikinci görev yok. Eşi başka birimde çalışmıyor ve izinli değil; personel seçimini ve uygun hücreleri kontrol edin. İzinli eşin çalışması gerekmez.`);
+      }
       const obligations=requirementsFor(m,calendar),softRequirements=new Set(),softGaps=new Set();
       for(const id of m.ids){
         const chosenDays=[],availableDays=new Set(m.slots.filter(s=>s.allowed.includes(id)).map(s=>s.day));
@@ -395,7 +405,7 @@
         if(minimum>need){const reason=`${getPersonById(rule.id).name}: hedef ${targets[rule.id].day} gündüz + ${targets[rule.id].night} nöbet = ${targets[rule.id].day+targets[rule.id].night} görev. Etkin ${rule.maxBlank} boş gün kuralı ay başını, ay sonunu ve izin dışı dönemleri de kapsıyor; korunan görevlerle birlikte en az ${m.fixed[rule.id].day+m.fixed[rule.id].night+minimum} görev gerekiyor. En az ${minimum-need} görev eksik. Öneri: bu kişinin toplam hedefini artırıp diğer kişilerin hedeflerini dengeleyin veya görev aralığı ayarını gözden geçirin. Hedefler ve liste değiştirilmedi.`;if(partial){softGaps.add(rule.id);problems.push(reason)}else throw Error(reason)}
       }
       if(partial)for(const rule of gapRules)rule.soft=softGaps.has(rule.id);
-      return {m,targets,problems,input:{payroll,allowPartial:partial,ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,hours:Number(s.col.hours||0),category:s.col.cat==='Poliklinik'?'pol':s.col.cat==='Acil'?'ac':s.type==='acil'?'ac':'pol',allowed:s.allowed})),conflicts,requirements,limits,gapRules}};
+      return {m,targets,problems,input:{payroll,allowPartial:partial,ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,hours:Number(s.col.hours||0),category:s.col.cat==='Poliklinik'?'pol':s.col.cat==='Acil'?'ac':s.type==='acil'?'ac':'pol',allowed:s.allowed})),conflicts,requirements,limits,gapRules,dependencies}};
     }finally{db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache()}
   }
   function validatePartial(m,plan){

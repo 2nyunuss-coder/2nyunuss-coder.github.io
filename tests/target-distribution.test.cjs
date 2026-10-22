@@ -110,3 +110,20 @@ test('an impossible calendar condition never deletes all of a persons eligible p
  const data={allowPartial:true,ids:[1,2],remaining:{1:{day:2,night:0},2:{day:2,night:0}},slots:Array.from({length:4},(_,index)=>({index,day:index+1,kind:'day',allowed:[1,2]})),conflicts:[],requirements:[{id:1,values:[]}],gapRules:[{id:2,segments:[[1,30]],fixedDays:[],includeEdges:true,maxBlank:5}]};
  const before=JSON.stringify(data),r=solveTargets(data);validate(data,r);assert.equal(r.plan.length,4);assert.equal(r.timedOut,false);assert.ok(r.nodes<7000);assert.equal(JSON.stringify(data),before);
 });
+
+function spouseExample(partial=false){
+ const input={ids:[1,2,3],remaining:{1:{day:1,night:0},2:{day:1,night:0},3:{day:1,night:0}},slots:[{index:0,day:2,kind:'day',allowed:[1,3]},{index:1,day:2,kind:'day',allowed:[2,3]},{index:2,day:5,kind:'day',allowed:[1,2,3]}],dependencies:[{when:'0:1',anyOf:['1:2']},{when:'1:2',anyOf:['0:1']},{when:'2:1',anyOf:[]},{when:'2:2',anyOf:[]}],conflicts:[],allowPartial:partial};return input;
+}
+for(const partial of [false,true])test('spouses are placed on a shared day in '+(partial?'partial':'exact')+' target search',()=>{
+ const input=spouseExample(partial),before=JSON.stringify(input),r=solveTargets(input);validate(input,r);assert.deepEqual(r.plan.filter(x=>x.id<3).map(x=>input.slots[x.slot].day),[2,2]);assert.equal(JSON.stringify(input),before);
+});
+test('partial target search retains a complete pair and omits an impossible extra spouse assignment',()=>{
+ const input=spouseExample(true);input.remaining[1].day=2;input.slots.push({index:3,day:6,kind:'day',allowed:[1]});input.dependencies.push({when:'3:1',anyOf:[]});const r=solveTargets(input);assert.equal(r.plan.length,3);const picked=new Set(r.plan.map(x=>`${x.slot}:${x.id}`));assert.ok(picked.has('0:1')&&picked.has('1:2'));assert.ok(!picked.has('3:1'));assert.equal(r.timedOut,false);
+});
+test('an absent spouse has no same-day dependency and the working spouse can cover the duty alone',()=>{
+ const input={ids:[1,2],remaining:{1:{day:1,night:0},2:{day:0,night:0}},slots:[{index:0,day:2,kind:'day',allowed:[1]}],conflicts:[],dependencies:[]};validate(input,solveTargets(input));
+});
+test('a competing singleton cell cannot cause an unmatched spouse to escape a dependency',()=>{
+ const input=spouseExample();input.slots[1].allowed=[3];input.dependencies[0].anyOf=[];const r=solveTargets(input);assert.equal(r.ok,false);assert.equal(r.timedOut,false);
+ const partial=solveTargets({...input,allowPartial:true});const picked=new Set(partial.plan.map(x=>`${x.slot}:${x.id}`));for(const r of input.dependencies)assert.ok(!picked.has(r.when)||r.anyOf.some(v=>picked.has(v)));
+});
