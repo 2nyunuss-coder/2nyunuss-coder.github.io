@@ -59,15 +59,45 @@ const css=document.createElement('style');css.textContent=`
 #saymanlikV2 .sv2wrap .sv2day .sv2short{font-size:10px!important}
 #saymanlikV2 .sv2handle{width:7px;height:7px;border:0;border-radius:1px;right:0;bottom:0;opacity:0}
 #saymanlikV2 .sv2selected .sv2handle{opacity:.8}
+#saymanlikV2.page{width:100%!important;max-width:none!important;min-height:calc(100dvh - 125px)!important;padding:8px!important}
+#saymanlikV2 .sv2wrap{width:100%!important;max-height:calc(100dvh - 305px)!important;min-height:360px;overflow:auto!important}
+#saymanlikV2 .sv2cards{margin:5px 0 7px!important;gap:5px!important}
+#saymanlikV2 .sv2card{padding:6px 10px!important}
+#saymanlikV2 .sv2card b{font-size:15px!important}
+#saymanlikV2 .sv2bar{padding:6px!important;margin-bottom:6px!important;gap:5px!important}
+#saymanlikV2 .sv2wrap td.sv2day{padding:2px 3px!important}
+#saymanlikV2 .sv2short{font-size:14px!important;font-weight:800!important;line-height:1.12!important}
+#saymanlikV2 .sv2shortHour{font-size:9px!important;line-height:1.1!important;margin-top:2px!important;white-space:normal!important;overflow-wrap:anywhere}
+#saymanlikV2 .sv2wrap tr>th:first-child{min-width:155px!important;max-width:200px;white-space:normal!important}
+#saymanlikV2 .sv2heading{margin-bottom:3px}
 @media(max-width:1000px){#saymanlikV2 .sv2cards{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:650px){#saymanlikV2 .sv2cards{grid-template-columns:repeat(2,minmax(0,1fr))}#saymanlikV2 .sv2bar{align-items:stretch}#saymanlikV2 .sv2bar select,#saymanlikV2 .sv2bar button{min-height:36px}}
 `;document.head.append(css);
 const el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n};
-const state={tab:1,width:58,height:39,period:1,unit:'all',hide:false,group:true,search:'',collapsed:{},widths:{},heights:{}};
+const state={tab:1,width:66,height:38,period:1,unit:'all',hide:false,group:false,search:'',collapsed:{},widths:{},heights:{}};
 try{const s=JSON.parse(localStorage.getItem('rpys-say-v2-independent')||'{}');Object.assign(state,s)}catch(e){}
+// V10: gruplama ilk açılışta kapalıdır; kullanıcı dilediğinde açabilir.
+if(!state.groupChoiceV10){state.group=false;state.groupChoiceV10=true}
 const save=()=>{try{localStorage.setItem('rpys-say-v2-independent',JSON.stringify(state))}catch(e){}};
 function staff(){try{return Array.isArray(db.staff)?db.staff:[]}catch(e){return []}}
-function unit(p){return String(p?.unit||p?.department||p?.birim||p?.unitName||'').trim()}
+function month(){try{return typeof ym==='function'?ym():''}catch{return ''}}
+function memberships(){
+ const map=new Map(),mk=month();try{for(const [key,ids] of Object.entries(db.unitPools||{})){
+  if(!mk||!key.startsWith(mk+'|')||!Array.isArray(ids))continue;
+  const name=key.slice(mk.length+1);for(const pid of ids){const id=String(pid);if(!map.has(id))map.set(id,name)}
+ }}catch(e){}return map;
+}
+function unit(p,membership){return (p&&membership?.get(String(p.id)))||String(p?.unit||p?.department||p?.birim||p?.unitName||p?.departmentName||'').trim()}
+function shiftTimes(p,dateCell){
+ if(!p)return '';
+ const match=String(dateCell||'').match(/^(\d{1,2})\s*[/.]\s*(\d{1,2})/),mk=month();if(!match||!mk)return '';
+ const day=Number(match[1]),shifts=[];
+ try{for(const [key,pid] of Object.entries(db.assign||{})){
+  const parts=key.split('|');if(parts[0]!==mk||Number(parts[2])!==day||String(pid)!==String(p.id))continue;
+  const meta=db.assignmentMeta?.[key]||{},base=typeof dutyColumnByKey==='function'?dutyColumnByKey(parts[1],parts.slice(3).join('|')):null;
+  const value=String(meta.shift||base?.shift||'');const t=value.match(/\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}/)?.[0];if(t&&!shifts.includes(t))shifts.push(t);
+ }}catch(e){}return shifts.join(' / ');
+}
 function source(){const host=document.querySelector(state.tab===1?'#say1Grid':'#say2Grid');return host?.querySelector('table')||null}
 let warming=false,warmAttempts=0;
 function warmSource(){if(warming||source()||warmAttempts>=3)return;warmAttempts++;warming=true;const page=document.getElementById('saymanlikV2');const side=document.querySelector('.sidebar');const original=[...side?.querySelectorAll('.nav,button')||[]].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));try{if(original)original.click();else document.getElementById('saymanlik')?.classList.add('active')}catch(e){}setTimeout(()=>{const v=document.getElementById('saymanlikV2');document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));v?.classList.add('active');document.getElementById('rpysSayV2Nav')?.classList.add('active');warming=false;build()},550)}
@@ -81,7 +111,8 @@ if(!header){holder.textContent='Personel başlıkları bulunamadı.';return}
 const heads=[...header.cells].map(c=>c.textContent.trim().replace(/\s+/g,' '));
 const norm=s=>String(s||'').toLocaleUpperCase('tr-TR').replace(/\s+/g,' ').trim();
 const people=staff();
-const persons=heads.map((name,ci)=>({name,ci,p:people.find(p=>norm(p.name)===norm(name))})).filter(x=>x.ci>0&&x.name&&(!state.unit||state.unit==='all'||(x.p&&unit(x.p)===state.unit))&&norm(x.name).includes(norm(state.search)));
+const membership=memberships();
+const persons=heads.map((name,ci)=>({name,ci,p:people.find(p=>norm(p.name)===norm(name))})).filter(x=>x.ci>0&&x.name&&(!state.unit||state.unit==='all'||(x.p&&unit(x.p,membership)===state.unit))&&norm(x.name).includes(norm(state.search)));
 const allDates=rows.slice(rows.indexOf(header)+1).filter(r=>/^\s*\d{1,2}\s*[/.]\s*\d{1,2}/.test(r.cells[0]?.textContent||''));const dates=state.period===0?allDates:allDates.slice(state.period===1?0:15,state.period===1?15:31);
 if(!dates.length){holder.textContent='Gün satırları bulunamadı.';return}
 const table=el('table'),top=el('tr');top.append(el('th','PERSONEL'));
@@ -89,11 +120,11 @@ dates.forEach(r=>top.append(el('th',r.cells[0].textContent.trim().split(' ')[0])
 const summaries=['İzin Günü','Rapor Günü','Mükellef','Pol Çalışma','Acil Çalışma','Toplam Çalışma','Toplam FM'];
 summaries.forEach(s=>{const th=el('th',s);th.className='sv2calc';top.append(th)});table.append(top);
 let sumLeave=0,sumReport=0,sumHours=0;
-const ordered=state.group?[...persons].sort((a,b)=>(unit(a.p)||'Diğer').localeCompare(unit(b.p)||'Diğer','tr')||a.ci-b.ci):persons;
+const ordered=state.group?[...persons].sort((a,b)=>(unit(a.p,membership)||'Atanmamış').localeCompare(unit(b.p,membership)||'Atanmamış','tr')||a.ci-b.ci):persons;
 let lastGroup='';
 for(const item of ordered){
- const group=unit(item.p)||'Diğer';
- if(state.group&&group!==lastGroup){lastGroup=group;const g=el('tr');g.className='sv2group';const label=el('th',(state.collapsed[group]?'▸ ':'▾ ')+group+' ('+ordered.filter(x=>(unit(x.p)||'Diğer')===group).length+')');label.colSpan=dates.length+summaries.length+1;label.title='Grubu aç/kapat';label.addEventListener('click',()=>{state.collapsed[group]=!state.collapsed[group];save();build()});g.append(label);table.append(g)}
+ const group=unit(item.p,membership)||'Atanmamış';
+ if(state.group&&group!==lastGroup){lastGroup=group;const g=el('tr');g.className='sv2group';const label=el('th',(state.collapsed[group]?'▸ ':'▾ ')+group+' ('+ordered.filter(x=>(unit(x.p,membership)||'Atanmamış')===group).length+')');label.colSpan=dates.length+summaries.length+1;label.title='Grubu aç/kapat';label.addEventListener('click',()=>{state.collapsed[group]=!state.collapsed[group];save();build()});g.append(label);table.append(g)}
  if(state.group&&state.collapsed[group]){
   for(const sourceRow of allDates){const content=sourceRow.cells[item.ci]?.textContent.trim()||'',n=norm(content);if(!/REZERV/.test(n)){if(/RAPOR/.test(n))sumReport++;else if(/İZİN|IZIN/.test(n))sumLeave++}for(const m of content.matchAll(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/g)){let t=Number(m[3])*60+Number(m[4])-Number(m[1])*60-Number(m[2]);if(t<0)t+=1440;sumHours+=t/60}}
   continue;
@@ -104,7 +135,10 @@ for(const item of ordered){
  dates.forEach(sourceRow=>{
   const srcCell=sourceRow.cells[item.ci],cell=el('td');
   if(srcCell){
-   const content=srcCell.textContent.trim();cell.classList.add('sv2day');const parsed=content.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);if(parsed){let minutes=Number(parsed[3])*60+Number(parsed[4])-Number(parsed[1])*60-Number(parsed[2]);if(minutes<0)minutes+=1440;const code=el('span',minutes>=14?'N':'G');code.className='sv2short';cell.append(code);const hour=el('span',(minutes/60).toLocaleString('tr-TR')+' sa');hour.className='sv2shortHour';cell.append(hour);cell.title=content;}else if(content){const label=/REZERV/i.test(content)?'RV':/RAPOR/i.test(content)?'R':/İZİN|IZIN/i.test(content)?'İ':content.length>16?content.slice(0,14)+'…':content;const txt=el('span',label);txt.className='sv2short';cell.append(txt);cell.title=content}else{cell.classList.add('sv2empty');cell.textContent='·';}
+   const content=srcCell.textContent.trim();cell.classList.add('sv2day');const parsed=content.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);const times=shiftTimes(item.p,sourceRow.cells[0]?.textContent);const hours=content.match(/\b(\d+(?:[.,]\d+)?)\s*sa\b/i)?.[1];
+   if(parsed){let minutes=Number(parsed[3])*60+Number(parsed[4])-Number(parsed[1])*60-Number(parsed[2]);if(minutes<0)minutes+=1440;const code=el('span',minutes>=14?'N':'G');code.className='sv2short';cell.append(code);const hour=el('span',times||parsed[0]);hour.className='sv2shortHour';cell.append(hour);cell.title=content;}
+   else if(content){const label=/REZERV/i.test(content)?'RV':/RAPOR/i.test(content)?'R':/İZİN|IZIN/i.test(content)?'İ':/^(N|G|I)(?:\s|$)/i.test(content)?content[0].toLocaleUpperCase('tr-TR'):content.length>16?content.slice(0,14)+'…':content;const txt=el('span',label);txt.className='sv2short';cell.append(txt);if(times||hours){const sub=el('span',times||(hours+' sa'));sub.className='sv2shortHour';cell.append(sub)}cell.title=content+(times?' | '+times:'');}
+   else{cell.classList.add('sv2empty');cell.textContent='·';}
    const computed=getComputedStyle(srcCell);cell.style.backgroundColor=computed.backgroundColor;cell.style.color=computed.color;
    cell.tabIndex=0;cell.setAttribute('role','button');cell.setAttribute('aria-label',item.name+' '+sourceRow.cells[0].textContent.trim()+' '+content);
    const select=()=>{page.querySelector('.sv2selected')?.classList.remove('sv2selected');cell.classList.add('sv2selected');page.querySelector('.sv2formula').textContent=item.name+' | '+sourceRow.cells[0].textContent.trim()+' | '+(content||'Boş')+' — Düzenlemek için Orijinal Saymanlıkta Düzenle seçeneğini kullan.'};
@@ -143,15 +177,16 @@ const page=el('section');page.id='saymanlikV2';page.className='page';
 page.innerHTML='<div class="sv2heading"><h2>Saymanlık V2</h2><small>Excel tarzı çalışma görünümü · V1 verileri korunur</small></div><div class="sv2bar"></div><div class="sv2cards"></div><div class="sv2formula">Bir hücre seçerek tam içeriğini görüntüleyebilirsin.</div><div class="sv2wrap"></div><div class="sv2legend"><span>🟩 Çalışma</span><span>🟨 Nöbet</span><span>İZ: İzin</span><span>R: Rapor</span><span>RV: Rezerve</span><span>Hücre köşesinden boyutlandır</span></div><div class="sv2summary"></div><div style="display:flex;justify-content:space-around;margin:30px 0;text-align:center;gap:15px"><div>Hazırlayan<br>Ad Soyad / İmza</div><div>Kontrol Eden<br>Ad Soyad / İmza</div><div>Onaylayan<br>Ad Soyad / İmza</div></div>';main.append(page);
 const bar=page.querySelector('.sv2bar');const periods=el('select');[['1','İlk 15 Gün'],['2','Son 15 Gün'],['0','Tüm Ay']].forEach(([v,t])=>{const o=el('option',t);o.value=v;periods.append(o)});periods.value=String(state.period);periods.onchange=()=>{state.period=Number(periods.value);save();build()};
 const tabs=el('select');[['1','SAY1'],['2','SAY2']].forEach(([v,l])=>{const o=el('option',l);o.value=v;tabs.append(o)});tabs.value=String(state.tab);tabs.onchange=()=>{state.tab=Number(tabs.value);save();build()};
-const units=el('select');const refreshUnits=()=>{const all=[...new Set(staff().map(unit).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));units.replaceChildren();for(const name of ['all',...all]){const o=el('option',name==='all'?'Tüm birimler':name);o.value=name;units.append(o)}units.value=all.includes(state.unit)?state.unit:'all';state.unit=units.value};refreshUnits();units.onchange=()=>{state.unit=units.value;save();build()};
+const units=el('select');const refreshUnits=()=>{const membership=memberships(),all=[...new Set(staff().map(p=>unit(p,membership)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));units.replaceChildren();for(const name of ['all',...all]){const o=el('option',name==='all'?'Tüm birimler':name);o.value=name;units.append(o)}units.value=all.includes(state.unit)?state.unit:'all';state.unit=units.value};refreshUnits();units.onchange=()=>{state.unit=units.value;save();build()};
 const hide=el('button','İzin/Rapor sütunları: '+(state.hide?'Gizli':'Açık'));hide.onclick=()=>{state.hide=!state.hide;hide.textContent='İzin/Rapor sütunları: '+(state.hide?'Gizli':'Açık');save();build()};
-const grouping=el('button','Birim grupları: '+(state.group?'Açık':'Kapalı'));grouping.onclick=()=>{state.group=!state.group;grouping.textContent='Birim grupları: '+(state.group?'Açık':'Kapalı');save();build()};
+const grouping=el('button',state.group?'✓ Birimlere göre ayrıldı':'Birimlere göre ayır');grouping.onclick=()=>{state.group=!state.group;grouping.textContent=state.group?'✓ Birimlere göre ayrıldı':'Birimlere göre ayır';save();build()};
+const fullscreen=el('button','⛶ Tam ekran');fullscreen.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await page.requestFullscreen()}catch(e){console.warn('Tam ekran kullanılamıyor',e)}};
 const search=el('input');search.type='search';search.placeholder='Personel ara';search.setAttribute('aria-label','Personel ara');search.value=state.search||'';search.addEventListener('input',()=>{state.search=search.value;save();build()});
 const refresh=el('button','↻ Verileri Yenile');refresh.onclick=()=>{refreshUnits();build()};
 const resetSize=el('button','↺ Hücre boyutlarını sıfırla');resetSize.onclick=()=>{state.width=58;state.height=39;state.widths={};state.heights={};save();bar.querySelectorAll('input[type="range"]').forEach((input,i)=>{input.value=i===0?58:39});build()};
 const back=el('button','Orijinal Saymanlıkta Düzenle');back.onclick=()=>{const original=[...side.querySelectorAll('button,.nav')].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));if(original)original.click();else{page.classList.remove('active');document.getElementById('saymanlik')?.classList.add('active')}};
 for(const [label,key,min,max] of [['Gün hücresi genişliği','width',42,110],['Tüm satırların yüksekliği','height',28,75]]){const wrap=el('label',label+' '),input=el('input');input.type='range';input.min=min;input.max=max;input.value=state[key];input.oninput=()=>{state[key]=Number(input.value);state[key==='width'?'widths':'heights']={};save();build()};wrap.append(input);bar.append(wrap)}
-bar.prepend(tabs,periods,units,search,grouping,hide,refresh,resetSize,back);
+bar.prepend(tabs,periods,units,search,grouping,hide,fullscreen,refresh,resetSize,back);
 const native=[...side.querySelectorAll('.nav,button')].find(x=>/saymanlık/i.test(x.textContent)&&!/V2/i.test(x.textContent));const nav=el('button','▦ Saymanlık V2');nav.type='button';nav.className=native?.className||'nav';nav.id='rpysSayV2Nav';nav.onclick=()=>{document.querySelectorAll('main.main > section.page').forEach(x=>x.classList.remove('active'));page.classList.add('active');side.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));nav.classList.add('active');document.body.classList.remove('rpysMobileMenuOpen');refreshUnits();build()};
 if(native)native.after(nav);else side.append(nav);
 return true;
