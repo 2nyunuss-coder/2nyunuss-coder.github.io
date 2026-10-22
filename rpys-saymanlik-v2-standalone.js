@@ -13,11 +13,17 @@ const css=document.createElement('style');css.textContent=`
 #saymanlikV2 .sv2handle{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:nwse-resize;background:#2782d5;border:1px solid white;border-radius:2px;z-index:8}
 #saymanlikV2 .sv2summary{font-size:12px;margin:12px 0;color:#50627b}
 #saymanlikV2 .sv2hidden{display:none!important}
+#saymanlikV2 td.sv2day{padding:3px 2px!important;text-align:center;vertical-align:middle;font-size:10px!important;line-height:1.15!important;white-space:normal!important}
+#saymanlikV2 .sv2time{display:block;font-size:9px!important;font-weight:650;letter-spacing:-.15px;line-height:1.15;white-space:nowrap}
+#saymanlikV2 .sv2text{display:block;font-size:9px!important;line-height:1.15;font-weight:650;overflow-wrap:anywhere}
+#saymanlikV2 td.sv2day.sv2empty{color:transparent!important}
+#saymanlikV2 .sv2calc{font-size:10px!important;text-align:center}
+#saymanlikV2 .sv2bar select,#saymanlikV2 .sv2bar button{font-size:12px}
 #saymanlikV2 .sv2calc{background:#eef5fd!important;font-weight:700;min-width:85px}\n#saymanlikV2 table tr:nth-child(even)>td:not(.sv2calc){box-shadow:inset 0 0 0 999px rgba(238,245,253,.07)}\n#saymanlikV2 tr:first-child th{white-space:nowrap;font-size:11px;background:#e6f0fb;z-index:5}\n#saymanlikV2 .sv2summary{padding:10px;background:#f4f8fc;border-radius:8px}
 #saymanlikV2 tr>th:first-child{min-width:175px;position:sticky;left:0;background:#eaf3fb;z-index:6}
 `;document.head.append(css);
 const el=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n};
-const state={tab:1,width:88,height:43,period:1,unit:'all',hide:false,widths:{},heights:{}};
+const state={tab:1,width:88,height:49,period:1,unit:'all',hide:false,widths:{},heights:{}};
 try{const s=JSON.parse(localStorage.getItem('rpys-say-v2-independent')||'{}');Object.assign(state,s)}catch(e){}
 const save=()=>{try{localStorage.setItem('rpys-say-v2-independent',JSON.stringify(state))}catch(e){}};
 function staff(){try{return Array.isArray(db.staff)?db.staff:[]}catch(e){return []}}
@@ -49,7 +55,7 @@ for(const item of persons){
  dates.forEach(sourceRow=>{
   const srcCell=sourceRow.cells[item.ci],cell=el('td');
   if(srcCell){
-   const content=srcCell.textContent.trim();cell.textContent=content;
+   const content=srcCell.textContent.trim();cell.classList.add('sv2day');const parsed=content.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);if(parsed){const time=el('span',parsed[0]);time.className='sv2time';cell.append(time);const other=content.replace(parsed[0],'').trim();if(other){const txt=el('span',other);txt.className='sv2text';cell.append(txt)}}else if(content){const txt=el('span',content);txt.className='sv2text';cell.append(txt)}else{cell.classList.add('sv2empty');}
    const computed=getComputedStyle(srcCell);cell.style.backgroundColor=computed.backgroundColor;cell.style.color=computed.color;
 
   }
