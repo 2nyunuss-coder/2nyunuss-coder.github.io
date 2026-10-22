@@ -57,6 +57,7 @@
       ['count[chosen]=(count[chosen]||0)+1;filled++;','count[chosen]=(count[chosen]||0)+1;filled++;_assignCache={};_allAssignCache=null;_calcCache={};']
     ]);
     change('autoDistribute','autoDistributePolRotation',[
+      ['}catch(err){\n    rollbackSchedulerTxV243(_v243Before);','}catch(err){\n    rollbackSchedulerTxV243(_v243Before);if(window.rpysScheduler398.running())throw err;'],
       ['for(const x of outsiders){delete db.assign[x.k];if(db.assignmentMeta)delete db.assignmentMeta[x.k]}','for(const x of outsiders){if(window.rpysScheduler398.mayClear(x.k)){delete db.assign[x.k];if(db.assignmentMeta)delete db.assignmentMeta[x.k]}}'],
       ['if(unit==="PORTABL + SKOPİ")purgeNonSkopiPoolAssignments();','// Only selected-unit unprotected cells can be rebuilt.'],
       ['delete db.assign[kk];','if(window.rpysScheduler398.protectedCell(kk))continue;\n        delete db.assign[kk];']
@@ -104,6 +105,21 @@
       ['audit.push({day:d,slot:s.col.key,personId:preferred,kind:"normal",theoretical:true})','for(const x of placed)audit.push({day:d,slot:x.slot.col.key,personId:x.id,kind:x.id===preferred?"normal":"spouse",theoretical:x.id===preferred})'],
       ['audit.push({day:d,slot:s.col.key,personId:chosen,kind:"substitute",theoretical:false})','for(const x of placed)audit.push({day:d,slot:x.slot.col.key,personId:x.id,kind:x.id===chosen?"substitute":"spouse",theoretical:false})']
     ]);
+    change('genericDistributeV251','spouseAnchorDaysV251',[
+      ['  for(let d=1;d<=daysInMonth();d++){','  filled+=window.rpysScheduler398.reserveReturnWorkdays(unit,ids,slots,hours,count,unitHours,unitCount);\n  for(let d=1;d<=daysInMonth();d++){']
+    ]);
+    change('distributeExactV251','selectedUnitOutsidersV2411',[
+      ['  let r=unitRulesV251(unit),daySlots=', '  const returnFilled=window.rpysScheduler398.reserveReturnWorkdays(unit,ids,slots,hours,count,unitHours,unitCount);\n  let r=unitRulesV251(unit),daySlots='],
+      ['weekendCount={...weekExisting},filled=0,skipped=0,','weekendCount={...weekExisting},filled=returnFilled,skipped=0,']
+    ]);
+    change('distributePolRotation2','polRotationWeeklyPreview',[
+      ['  Object.assign(hours,currentMonthHoursMap(ids));Object.assign(count,currentMonthCountMap(ids));','  Object.assign(hours,currentMonthHoursMap(ids));Object.assign(count,currentMonthCountMap(ids));\n  filled+=window.rpysScheduler398.reserveReturnWorkdays("POLİKLİNİK RÖNTGEN",ids,slots,hours,count);']
+    ]);
+    change('distributeSkopiSequential','leaveDutyRuleSummary',[
+      ['  let metrics=skopiCurrentMetrics(ids);','  anchorResult.placed+=window.rpysScheduler398.reserveReturnWorkdays("PORTABL + SKOPİ",ids,activeSlots.map(col=>({type:"acil",col})),currentMonthHoursMap(ids),currentMonthCountMap(ids));\n  let metrics=skopiCurrentMetrics(ids);'],
+      ['skopiObligationRebalance(ids,dayCol,nightCol,audit)','window.rpysScheduler398.preserveSpousePairs(()=>skopiObligationRebalance(ids,dayCol,nightCol,audit))'],
+      ['skopiFillRemainingValidSlots(ids,dayCol,nightCol,audit)','window.rpysScheduler398.preserveSpousePairs(()=>skopiFillRemainingValidSlots(ids,dayCol,nightCol,audit))']
+    ]);
     change('manualSyncBadge','clearManualDutySyncForMonth',[
       ['return db.manualDutyOverrides?.[k]?\'<span class="manualSyncBadge" title="Elle değiştirildi • Saymanlık canlı senkron">ELLE↔SAY</span>\':""','return window.rpysScheduler398.manualBadgeHtml(k)']
     ]);
@@ -116,8 +132,10 @@
   function wrapEligibility(name){
     const base=window[name];if(typeof base!=='function'||base.__rpys398)return;
     const fn=function(id,day,col){
+      if(reservedOn(id,day))return false;
       if(!run&&window.__RPYS_MANUAL_16_APPROVED__===String(dateStr(day))+"|"+String(id)+"|"+String(col?.key||col?.unit||""))return true;
       if(!activeOn(id,day))return false;
+      if(run&&Number(col?.hours||0)>=16&&window.rpysRules421?.enabled(col?.unit||run.unit,'noPostDuty')!==false){const next=calendarDate(dateStr(day),1);if(returnWorkdays(id,next.slice(0,7)).includes(Number(next.slice(8))))return false;}
       if(run&&col?.key){
         for(const type of ['pol','acil'])if(dutyColumnByKey(type,col.key)&&protectedCell(keyFor(type,day,col.key)))return false;
       }
@@ -126,10 +144,13 @@
   }
   const personNameKey=value=>String(value||'').trim().toLocaleUpperCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
   function calendarValue(store,person,month,day){
+    if(!store)return null;
     const exact=month+'|'+person.name+'|'+Number(day);if(own(store,exact))return store[exact];
-    const name=personNameKey(person.name);for(const [key,value] of Object.entries(store||{})){const p=key.split('|');if(p[0]===month&&Number(p.at(-1))===Number(day)&&personNameKey(p.slice(1,-1).join('|'))===name)return value}return null;
+    const entries=Object.entries(store);if(!entries.length)return null;
+    const name=personNameKey(person.name);for(const [key,value] of entries){const p=key.split('|');if(p[0]===month&&Number(p.at(-1))===Number(day)&&personNameKey(p.slice(1,-1).join('|'))===name)return value}return null;
   }
   function absentStatus(value){
+    if(!value)return false;
     let code=String(value||'').trim().toLocaleLowerCase('tr-TR');
     if(typeof sayStatusFromText==='function')code=sayStatusFromText(value)||code;
     if(['izin','sua','yillik','yıllık','idari','mazeret','rapor','gecici','ketem','ketemgecici','ayrilis','atamaoncesi','tayinoncesi'].includes(code))return true;
@@ -139,11 +160,57 @@
     const person=getPersonById(id);if(!person)return false;const date=month+'-'+String(day).padStart(2,'0');
     if((db.leaves||[]).some(l=>Number(l.personId??l.idPerson??l.person?.id)===Number(id)&&l.start<=date&&l.end>=date))return true;
     try{if(typeof personStatusAt==='function'&&personStatusAt(person,date)!=='Aktif')return true}catch(_){}
-    if(calendarValue(db.sayStatusCleared,person,month,day))return false;
+    return absentStatus(effectiveStatus(person,day,month));
+  }
+  function effectiveStatus(person,day,month=ym()){
+    if(calendarValue(db.sayStatusCleared,person,month,day))return '';
     let effective='';try{if(month===ym()&&typeof getCellStatus==='function')effective=getCellStatus(person.name,Number(day))||''}catch(_){}
     if(!effective){const manual=calendarValue(db.cellStatus,person,month,day),imported=calendarValue(db.importedSaymanlik,person,month,day);effective=manual==='izin'&&imported?imported:manual||imported||''}
-    return absentStatus(effective);
+    return effective;
   }
+  function reservedOn(id,day,month=ym()){
+    const days=db.reserves?.[month+'|'+Number(id)];if(Array.isArray(days)&&days.some(d=>Number(d)===Number(day)))return true;
+    const person=getPersonById(id);if(!person)return false;
+    const status=effectiveStatus(person,day,month);return !!status&&/^(RESERVE|REZERVE|REZERV|REZ)(?:$|[\s/])/.test(personNameKey(status));
+  }
+  const calendarDate=(date,offset)=>new Date(Date.parse(date+'T12:00:00Z')+offset*86400000).toISOString().slice(0,10);
+  function returnWorkdays(id,month=ym()){
+    const cache=run&&(run.calendarCache??=new Map()),key=month+'|'+id;if(cache?.has(key))return cache.get(key);
+    const person=getPersonById(id);if(!person)return [];
+    const dayCache=new Map(),away=date=>{
+      if(dayCache.has(date))return dayCache.get(date);
+      if((db.leaves||[]).some(l=>Number(l.personId??l.idPerson??l.person?.id)===Number(id)&&l.start<=date&&l.end>=date)){dayCache.set(date,true);return true;}
+      const mk=date.slice(0,7),d=Number(date.slice(8)),status=effectiveStatus(person,d,mk);
+      // Employment boundary markers are not leave-return events.
+      const result=reservedOn(id,d,mk)||!!status&&absentStatus(status)&&!['ayrilis','atamaoncesi','tayinoncesi'].includes(String(status).toLocaleLowerCase('tr-TR'));dayCache.set(date,result);return result;
+    };
+    const first=month+'-01',next=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),1)).toISOString().slice(0,10),out=new Set();
+    for(let date=calendarDate(first,-8);date<next;date=calendarDate(date,1)){
+      if(!away(date)||away(calendarDate(date,1)))continue;
+      let candidate=calendarDate(date,1),guard=0;
+      while(guard++<370){const weekday=new Date(candidate+'T12:00:00Z').getUTCDay(),holiday=typeof rpysHolidayInfo==='function'&&rpysHolidayInfo(candidate)?.type==='full';if(weekday!==0&&weekday!==6&&!holiday&&!away(candidate))break;candidate=calendarDate(candidate,1)}
+      if(guard<370&&candidate.startsWith(month+'-')&&(typeof personStatusAt!=='function'||personStatusAt(person,candidate)==='Aktif'))out.add(Number(candidate.slice(8)));
+    }
+    const days=[...out].sort((a,b)=>a-b);cache?.set(key,days);return days;
+  }
+  function returnWorkdayViolations(ids,month=ym()){
+    return ids.flatMap(id=>returnWorkdays(Number(id),month).filter(d=>!spouseWorkingOnDay(Number(id),d,month)).map(day=>({id:Number(id),day,reason:(getPersonById(id)?.name||id)+': '+month+'-'+String(day).padStart(2,'0')+' izin/rezerve dönüşü ilk iş günü işbaşı görevi eksik.'})));
+  }
+  function reserveReturnWorkdays(unit,ids,slots,hours,count,unitHours,unitCount){
+    if(run)run.returnIds=[...new Set([...(run.returnIds||[]),...ids.map(Number)])];
+    const required=returnWorkdayViolations(ids),plans=required.map(x=>({...x,options:slots.filter(s=>spousePlacements(x.id,x.day,s,unit,ids,slots).length)})).sort((a,b)=>a.options.length-b.options.length||a.day-b.day);
+    let filled=0;
+    for(const x of plans){
+      if(spouseWorkingOnDay(x.id,x.day))continue;
+      // Prefer a daytime shift; a duty in another unit also satisfies job return.
+      const choices=slots.slice().sort((a,b)=>Number(a.col.hours||0)-Number(b.col.hours||0));
+      const slot=choices.find(s=>spousePlacements(x.id,x.day,s,unit,ids,slots).length);
+      if(!slot)throw Error(x.reason+' İzin/rezerve, kilitli veya manuel hücre, eş günü, başka birim görevi ve dinlenme kısıtlarıyla uygun hücre bulunamadı. Korunan kayıtlar değiştirilmedi.');
+      filled+=placeSpouseGroup(x.id,x.day,slot,unit,ids,slots,hours,count,unitHours,unitCount).length;
+    }
+    return filled;
+  }
+
   function spouseWorkingOnDay(id,day,month=ym()){
     const person=getPersonById(id);if(!person)return false;
     for(const [key,pid] of Object.entries(db.assign||{})){const p=key.split('|');if(p[0]===month&&Number(p[2])===Number(day)&&Number(pid)===Number(id))return true}
@@ -166,7 +233,7 @@
         if(a.has(d)===b.has(d))continue;
         const missing=a.has(d)?other:id;
         const date=month+'-'+String(d).padStart(2,'0'),person=staff.find(p=>Number(p.id)===missing);
-        let leave=spouseUnavailable(missing,d,month);
+        let leave=spouseUnavailable(missing,d,month)||reservedOn(missing,d,month);
         try{if(month===ym()&&typeof isOnLeave==='function')leave=leave||!!isOnLeave(missing,d)}catch(_){}
         if(leave)continue;
         out.push({key:pk+'|'+d,day:d,first:id,second:other,missing});
@@ -183,7 +250,7 @@
     const first={id,slot,key:keyFor(slot.type,day,slot.col.key)};
     const enabled=window.rpysRules421?window.rpysRules421.enabled(unit,'spouseSameDay'):typeof ruleCfg==='function'&&ruleCfg().spouseSameDay;
     const other=enabled&&typeof spouseOf==='function'?Number(spouseOf(id)||0):0;
-    if(!other||spouseUnavailable(other,day)||spouseWorkingOnDay(other,day)||typeof isOnLeave==='function'&&isOnLeave(other,day))return [first];
+    if(!other||spouseUnavailable(other,day)||reservedOn(other,day)||spouseWorkingOnDay(other,day)||typeof isOnLeave==='function'&&isOnLeave(other,day))return [first];
     if(!ids.map(Number).includes(other))return [];
     const second=slots.find(s=>keyFor(s.type,day,s.col.key)!==first.key&&free(s)&&eligible(other,day,s.col,unit));
     return second?[first,{id:other,slot:second,key:keyFor(second.type,day,second.col.key)}]:[];
@@ -203,7 +270,7 @@
     const original=run?.beforeSpouses||new Set(),selected=new Set(ids.map(Number)),slots=unitSlots(unit),eligible=window.canTakeShiftV2414||window.canTakeShift;
     const currentIssues=()=>spouseDayViolations(ym()).filter(x=>!original.has(x.key));
     const attempt=(key,id,previous)=>{
-      const prior=new Set(currentIssues().map(x=>x.key)),old=db.assign[key];delete db.assign[key];invalidate();
+      const prior=new Set(currentIssues().map(x=>x.key)),old=db.assign[key];if(old&&old!==id&&returnWorkdays(Number(old)).includes(Number(key.split('|')[2])))return false;delete db.assign[key];invalidate();
       const p=key.split('|'),day=Number(p[2]),base=dutyColumnByKey(p[1],p[3]),col={...base,...db.assignmentMeta?.[key]};
       const ok=!id||eligible(id,day,col,unit);
       if(ok&&id)db.assign[key]=id;invalidate();
@@ -229,9 +296,9 @@
     }
   }
   function preserveSpousePairs(operation){
-    const before=clone(db.assign),issues=new Set(spouseDayViolations(ym()).map(x=>x.key));
+    const before=clone(db.assign),issues=new Set(spouseDayViolations(ym()).map(x=>x.key)),returnBefore=new Set(returnWorkdayViolations(run?.returnIds||[]).map(x=>x.id+'|'+x.day));
     const result=operation();invalidate();
-    if(spouseDayViolations(ym()).some(x=>!issues.has(x.key))){db.assign=before;invalidate();return 0}
+    if(spouseDayViolations(ym()).some(x=>!issues.has(x.key))||returnWorkdayViolations(run?.returnIds||[]).some(x=>!returnBefore.has(x.id+'|'+x.day))){db.assign=before;invalidate();return 0}
     return result;
   }
   function wrapRun(name){
@@ -287,7 +354,7 @@
         };
       }
       // These queries depend on unchanged leave/calendar/status data, never on assignments.
-      for(const name of ['isOnLeave','isMandatoryPreLeaveThursday','isMandatoryReturnWorkday','isPreLeaveThursday','isReturnWeekendBlockedV2414','isProtectedLeaveWeekend','isSkopiPreLeaveFridayBlocked','fullWeekLeaveInfo','leaveReturnInfoV2414','finalObligation']){
+      for(const name of ['isOnLeave','isReserved','isMandatoryPreLeaveThursday','isMandatoryReturnWorkday','isPreLeaveThursday','isReturnWeekendBlockedV2414','isProtectedLeaveWeekend','isSkopiPreLeaveFridayBlocked','fullWeekLeaveInfo','leaveReturnInfoV2414','finalObligation']){
         if(typeof window[name]!=='function')continue;
         const baseQuery=window[name],cache=new Map();staticQueries[name]=baseQuery;
         window[name]=function(){const k=JSON.stringify(Array.from(arguments));if(!cache.has(k))cache.set(k,baseQuery.apply(this,arguments));return cache.get(k)};
@@ -303,6 +370,8 @@
         for(const key of restCheck().keys())if(window.rpysRules421?.enabled(unit,'noPostDuty')!==false&&!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
         if(newSpouseIssues.length){const x=newSpouseIssues[0];throw Error('Eşlerin aynı gün çalışma kuralı: '+(getPersonById(x.first)?.name||x.first)+' / '+(getPersonById(x.second)?.name||x.second)+', '+x.day+'. gün aynı gün için iki uygun görev hücresi bulunamadı. İzinli eşin çalışması gerekmez; izinli olmayan eş tek başına çalışabilir.');}
+        const missingReturns=returnWorkdayViolations(run.returnIds||targetIds||[]);if(missingReturns.length)throw Error(missingReturns.map(x=>x.reason).join('\n'));
+        for(const [key,id] of Object.entries(db.assign||{})){if(!key.startsWith(month+'|')||Number(before.assign?.[key])===Number(id))continue;if(reservedOn(Number(id),Number(key.split('|')[2]),month))throw Error((getPersonById(id)?.name||id)+': '+key.split('|')[2]+'. gün rezerve; bu güne görev yazılamaz.');}
         if(JSON.stringify(db.rpysCellLocks)!==JSON.stringify(before.rpysCellLocks))throw Error('Hücre kilitleri değiştirilemez.');
         for(const key of new Set([...Object.keys(before.assign||{}),...Object.keys(db.assign||{}),...Object.keys(before.assignmentMeta||{}),...Object.keys(db.assignmentMeta||{}),...Object.keys(before.rpysCellLocks||{})])){
           if((protectedCell(key)||before.rpysCellLocks?.[key]||manualAssignmentCell(key,before))&&
@@ -326,7 +395,7 @@
     if(!targetRunner)throw Error('Güvenli hedef dağıtım motoru henüz yüklenemedi. Sayfayı yenileyin.');
     return targetRunner();
   }
-  window.rpysScheduler398={runTargets,repair,repairCache,install,protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
+  window.rpysScheduler398={runTargets,repair,repairCache,install,validateReturnsFor:ids=>{if(run)run.returnIds=ids},protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);

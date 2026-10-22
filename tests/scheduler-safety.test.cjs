@@ -179,3 +179,31 @@ test('sequential pairing leaves an infeasible day empty while keeping other lawf
  let f;const audit=[];f=pairFixture(c=>{c.db.assign['2026-10|pol|2|day']=1;c.db.assign['2026-10|pol|8|day']=3;c.rpysScheduler398.alignSpouseDays('UNIT',[1,2,3],audit);c.saveNowV245()});const c=f.c;c.db.staff.push({id:3,name:'Other',status:'Aktif'});c.unitSlots=()=>[f.slots[0]];c.db.rpysCellLocks['2026-10|pol|4|day']={exists:false};const eligible=c.canTakeShiftV2414;c.canTakeShiftV2414=(id,d,col,u)=>id!==3||d!==2?eligible(id,d,col,u):false;
  c.autoDistribute();assert.equal(f.saved.length,1,f.alerts.join(' '));assert.equal(c.db.assign['2026-10|pol|2|day'],undefined);assert.equal(c.db.assign['2026-10|pol|8|day'],3);assert.ok(c.db.rpysCellLocks['2026-10|pol|4|day']);assert.ok(audit.some(x=>x.kind==='spouse-day-shortfall'));assert.equal(c.rpysScheduler398.spouseDayViolations('2026-10').length,0);
 });
+
+test('reserve is recognized from the personnel calendar, Saymanlık and imported statuses despite cleared imports',()=>{
+ const f=fixture(),c=f.c;c.db.reserves={'2026-10|1':['10',11]};assert.equal(c.rpysScheduler398.reservedOn(1,10),true);assert.equal(c.canTakeShift(1,10,f.cols.day,'UNIT'),false);
+ c.db.cellStatus={'2026-10|Person A|17':'reserve'};assert.equal(c.rpysScheduler398.reservedOn(1,17),true);c.db.importedSaymanlik={'2026-10|Person A|18':'REZERVE'};assert.equal(c.rpysScheduler398.reservedOn(1,18),true);c.db.sayStatusCleared={'2026-10|Person A|18':true};assert.equal(c.rpysScheduler398.reservedOn(1,18),false);assert.equal(c.rpysScheduler398.reservedOn(1,10),true);
+});
+test('leave and reserve endings produce the first business day for every employee and across month boundaries',()=>{
+ const f=fixture(),c=f.c;c.db.staff[1].status='Aktif';c.db.reserves={'2026-10|1':[10,11]};assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[12]);c.db.leaves=[{personId:2,start:'2026-09-25',end:'2026-09-30'},{idPerson:2,start:'2026-10-05',end:'2026-10-09'}];assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(2)),[1,12]);
+ c.db.cellStatus={'2026-10|Person A|14':'idari'};c.db.importedSaymanlik={'2026-10|Person A|15':'ŞUA İZNİ'};c.rpysHolidayInfo=date=>date==='2026-10-16'?{type:'full'}:null;assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[12,19]);
+});
+test('adjacent leave and reserve blocks merge and return skips holidays and continued absences',()=>{
+ const f=fixture(),c=f.c;c.db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-09'}];c.db.reserves={'2026-10|1':[10,11,12]};c.rpysHolidayInfo=date=>date==='2026-10-13'?{type:'full'}:null;assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[14]);
+});
+test('an existing job in another unit or manual Saymanlık work satisfies mandatory return without duplicate duties',()=>{
+ const f=fixture(),c=f.c;c.db.reserves={'2026-10|1':[10,11]};c.db.assign['2026-10|pol|12|other']=1;assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);c.db.assign={};c.db.sayManualWork={'2026-10|Person A|12':{total:7}};assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);c.db.sayManualWork['2026-10|Person A|12'].total=0;assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,1);
+});
+test('normal distribution reserves the return day and prevents a prior long duty from consuming its rest day',()=>{
+ let f;f=fixture(c=>{const slots=[{type:'pol',col:f.cols.day}];assert.equal(c.canTakeShift(1,11,f.cols.long,'UNIT'),false);c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],slots,{},{});c.save()});const c=f.c;c.isDutyCellApplicable=()=>true;c.db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-09'}];c.autoDistribute();assert.equal(c.db.assign['2026-10|pol|12|day'],1);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
+});
+test('a locked return cell explains the exact person and date and never changes the old roster',()=>{
+ let f;f=fixture(c=>{c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],[{type:'pol',col:f.cols.day}],{},{});c.save()});const c=f.c;c.isDutyCellApplicable=()=>true;c.db.reserves={'2026-10|1':[10,11]};c.db.rpysCellLocks['2026-10|pol|12|day']={exists:false};const before=JSON.stringify(c.db);c.autoDistribute();assert.equal(JSON.stringify(c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Person A: 2026-10-12/);assert.match(f.alerts[0],/ilk iş günü/);
+});
+test('a motor cannot save a new reserve-day duty even if it bypassed candidate eligibility',()=>{
+ const f=fixture(c=>{c.db.assign['2026-10|pol|10|day']=1;c.save()});f.c.db.cellStatus={'2026-10|Person A|10':'reserve'};const before=JSON.stringify(f.c.db);f.c.autoDistribute();assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/10. gün rezerve/);
+});
+
+test('a Sunday night cannot consume the next months mandatory Monday return',()=>{
+ const f=fixture(c=>{assert.equal(c.canTakeShift(1,31,f.cols.long,'UNIT'),false);c.save()});f.c.ym=()=> '2026-05';f.c.dateStr=d=>'2026-05-'+String(d).padStart(2,'0');f.c.db.leaves=[{personId:1,start:'2026-05-25',end:'2026-05-29'}];assert.deepEqual(Array.from(f.c.rpysScheduler398.returnWorkdays(1,'2026-06')),[1]);f.c.autoDistribute();assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
+});

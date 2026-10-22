@@ -5,7 +5,7 @@ const currentUnit=()=>context||window.rpysScheduler398?.currentUnit?.()||documen
 const withUnit=(unit,fn)=>{const old=context;context=unit||currentUnit();try{return fn()}finally{context=old}};
 function settings(unit=currentUnit()){
  const global=typeof ruleCfgBase==='function'?ruleCfgBase():{},legacy=db.unitRuleConfig?.[unit]||{},saved=db.distributionRulesV421?.[unit]||{};
- return R.config({...global,...legacy,leaveWeekendBlock:legacy.leaveWeekendWork!==true,...saved});
+ return {...R.config({...global,...legacy,leaveWeekendBlock:legacy.leaveWeekendWork!==true,...saved}),returnMonday:true,blockReserve:true};
 }
 let ruleCfgBase=null;
 const enabled=(unit,key)=>settings(unit||currentUnit())[key]!==false;
@@ -25,10 +25,12 @@ function customReason(id,day,col,unit){
 }
 function requiredDates(id,unit){return ownCustom(unit).filter(r=>r.type==='requiredDate'&&(!r.personId||Number(r.personId)===Number(id))).flatMap(r=>r.dates.filter(date=>date.slice(0,7)===ym()).map(date=>({day:Number(date.slice(8)),reason:r.name})))}
 function install(){
- const sidebar=document.querySelector?.('.sidebar');if(sidebar&&!document.getElementById('rpysRulesCenter421')){const area=document.createElement('div');area.id='rpysRulesCenter421';area.style.cssText='padding:10px;margin:8px 0;border:1px solid #6482a0;border-radius:8px';const b=document.createElement('button');b.type='button';b.className='btn alt';b.textContent='⚙ Kural ekle / düzenle';b.onclick=()=>open(currentUnit()||(typeof allUnitNames==='function'?allUnitNames()[0]:''));const v=document.createElement('small');v.id='rpys-app-version';v.style.cssText='display:block;margin-top:6px';v.textContent='RPYS · 20261022-pairs-15';area.append(b,v);const brand=sidebar.querySelector('.brand');if(brand)brand.after(area);else sidebar.append(area)}
+ const reserveControl=document.getElementById('rcReserve');if(reserveControl){reserveControl.checked=true;reserveControl.disabled=true;reserveControl.title='Rezerve günlere görev yazma kuralı zorunludur.'}
+ const sidebar=document.querySelector?.('.sidebar');if(sidebar&&!document.getElementById('rpysRulesCenter421')){const area=document.createElement('div');area.id='rpysRulesCenter421';area.style.cssText='padding:10px;margin:8px 0;border:1px solid #6482a0;border-radius:8px';const b=document.createElement('button');b.type='button';b.className='btn alt';b.textContent='⚙ Kural ekle / düzenle';b.onclick=()=>open(currentUnit()||(typeof allUnitNames==='function'?allUnitNames()[0]:''));const v=document.createElement('small');v.id='rpys-app-version';v.style.cssText='display:block;margin-top:6px';v.textContent='RPYS · 20261022-return-16';area.append(b,v);const brand=sidebar.querySelector('.brand');if(brand)brand.after(area);else sidebar.append(area)}
  if(typeof window.ruleCfg==='function'&&!window.ruleCfg.__rules421){ruleCfgBase=window.ruleCfg;const f=function(){const c=settings();return {...ruleCfgBase(),...c,nextDayBlock:c.noPostDuty,spouseSameDay:c.spouseSameDay,maxGap:c.maxGapDays}};f.__rules421=true;window.ruleCfg=f;}
  const wrap=(name,fn)=>{const base=window[name];if(typeof base!=='function'||base.__rules421)return;const f=function(...args){return fn.call(this,base,args)};f.__rules421=true;window[name]=f};
  wrap('unitRulesV251',(base,[u])=>{const b=base(u),s=settings(u);return {...b,...s,leaveWeekendWork:!s.leaveWeekendBlock}});
+ wrap('unitRuleCheckboxV251',(base,args)=>args[0]==='returnMonday'?base('returnMonday','İzin/rezerve sonrası ilk iş günü işbaşı',true,'Tüm personel için zorunludur; rezerve ve resmî tatiller dikkate alınır.'):base(...args));
  wrap('unitMaxGapDaysV251',(base,[u])=>Number(settings(u).maxGapDays));
  for(const name of ['previousDayHadDuty','workedLongPreviousDay'])wrap(name,(base,args)=>enabled(currentUnit(),'noPostDuty')?base(...args):false);
  wrap('personHasOverlap',(base,args)=>enabled(currentUnit(),'overlap')?base(...args):false);
@@ -40,9 +42,10 @@ function install(){
  wrap('isSkopiPreLeaveFridayBlocked',(base,args)=>enabled(currentUnit(),'preLeaveThursday')?base(...args):false);
  for(const [name,key] of [['isReturnMondayRequiredV251','returnMonday'],['isPreLeaveThursdayRequiredV251','preLeaveThursday']])wrap(name,(base,args)=>enabled(args[2]||currentUnit(),key)?base(...args):false);
  wrap('isOnLeave',(base,args)=>{const distributing=!!context||window.rpysScheduler398?.running?.()||window.rpysTargets399?.isPlanning?.();return distributing&&!enabled(currentUnit(),'blockLeave')?false:base(...args)||!!window.rpysScheduler398?.spouseUnavailable(args[0],args[1],ym())});
- wrap('isReserved',(base,args)=>enabled(currentUnit(),'blockReserve')?base(...args):false);
+ wrap('isReserved',(base,args)=>base(...args)||!!window.rpysScheduler398?.reservedOn(args[0],args[1],ym()));
+ for(const name of ['isMandatoryReturnWorkday','isMandatoryReturnMondayV2414','isReturnMondayRequiredV251'])wrap(name,(base,args)=>window.rpysScheduler398?.returnWorkdays?window.rpysScheduler398.returnWorkdays(args[0],ym()).includes(Number(args[1])):base(...args));
  wrap('schedulerHardViolationsV2494',(base,args)=>{const out=base(...args),c=settings();for(const key of out.keys()){const type=String(key).split('|')[1];if(type==='leave'&&!c.blockLeave||type==='rest'&&!c.noPostDuty||type==='leaveweekend'&&!c.leaveWeekendBlock)out.delete(key)}return out});
- const exempt=(id,day)=>{const other=typeof spouseOf==='function'?spouseOf(id):null;return !!other&&(!!window.rpysScheduler398?.spouseUnavailable(other,day,ym())||!!window.rpysScheduler398?.spouseWorkingOnDay(other,day,ym()))};
+ const exempt=(id,day)=>{const other=typeof spouseOf==='function'?spouseOf(id):null;return !!other&&(!!window.rpysScheduler398?.spouseUnavailable(other,day,ym())||!!window.rpysScheduler398?.reservedOn(other,day,ym())||!!window.rpysScheduler398?.spouseWorkingOnDay(other,day,ym()))};
  wrap('strictSpouseDayEligible',(base,args)=>!enabled(currentUnit(),'spouseSameDay')||exempt(args[0],args[1])||base(...args));
  for(const name of ['enforceSpouseTodayCandidates','spouseCandidatesV251','balancedSpouseFilterV2412','spouseAnchorGateV2413'])wrap(name,(base,args)=>{const result=base(...args),allowed=new Set((result||[]).map(Number));return (args[0]||[]).filter(id=>allowed.has(Number(id))||exempt(id,args[1]))});
  wrap('crossUnitSpouseMismatchV2411',(base,[ids,unit])=>{const selected=new Set((ids||[]).map(Number)),rows=assignmentsMonth();return (window.rpysScheduler398?.spouseDayViolations(ym())||[]).filter(x=>(selected.has(x.first)||selected.has(x.second))&&rows.some(a=>a.col.unit===unit&&Number(a.day)===x.day&&selected.has(Number(a.person.id)))).map(x=>(getPersonById(x.first)?.name||x.first)+' / '+(getPersonById(x.second)?.name||x.second)+': '+x.day+'. gün eş çalışma günü eksik')});
@@ -54,8 +57,8 @@ function install(){
 }
 function open(unit=currentUnit()){
  if(!unit)return alert('Önce birim seçin.');const legacy=textRules(unit).map((r,i)=>({...r,_ruleKey:String(r.id??('index:'+i))})).filter(r=>r.kind!=='config'&&(!r.unit||r.unit===unit));
- return R.openPanel({unit,units:typeof allUnitNames==='function'?allUnitNames():[unit],onUnitChange:u=>open(u),settings:settings(unit),people:db.staff||[],legacy,onSave:(cfg,edited)=>{
-  cfg.legacyRules={...(cfg.legacyRules||{}),...Object.fromEntries(edited.map(r=>[r._ruleKey,r.active!==false]))};db.distributionRulesV421??={};db.distributionRulesV421[unit]=cfg;db.unitRuleConfig??={};db.unitRuleConfig[unit]={...(db.unitRuleConfig[unit]||{}),...cfg,leaveWeekendWork:!cfg.leaveWeekendBlock};
+ return R.openPanel({unit,units:typeof allUnitNames==='function'?allUnitNames():[unit],onUnitChange:u=>open(u),settings:settings(unit),mandatoryKeys:['returnMonday','blockReserve'],people:db.staff||[],legacy,onSave:(cfg,edited)=>{
+  cfg.returnMonday=true;cfg.blockReserve=true;cfg.legacyRules={...(cfg.legacyRules||{}),...Object.fromEntries(edited.map(r=>[r._ruleKey,r.active!==false]))};db.distributionRulesV421??={};db.distributionRulesV421[unit]=cfg;db.unitRuleConfig??={};db.unitRuleConfig[unit]={...(db.unitRuleConfig[unit]||{}),...cfg,leaveWeekendWork:!cfg.leaveWeekendBlock};
   window.__RPYS_LAST_USER_EDIT_V396__=Date.now();_assignCache={};_allAssignCache=null;_calcCache={};saveNowV245({label:unit+' kural listesi'});window.rpysTargets399?.render();window.renderAutoUnitRuleSummaryV251?.();
  }});
 }
