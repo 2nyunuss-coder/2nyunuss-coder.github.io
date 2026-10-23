@@ -179,7 +179,13 @@ function solvePartial(input){
  const initial=slots.map(s=>s.allowed.map(id=>`${s.index}:${id}`));let best=[],nodes=0,timedOut=false,phaseStopped=false;
  propagateDependencies(dependencies,values,initial,new Set());
  const paired=new Map();for(const r of dependencies){const x=values.get(r.when);if(x&&r.anyOf.length&&r.anyOf.every(v=>values.get(v)?.id!==x.id&&slots[values.get(v)?.slot]?.day===slots[x.slot].day))paired.set(r.when,r.anyOf);}
- const strictUntil=start+budget*(input.strictAllCalendars?1:.35),strictNodes=input.strictAllCalendars?maxNodes:Math.max(1,Math.floor(maxNodes*.35));
+ // Use one bounded search budget: prefer complete calendars, then preserve
+ // safe work and report spacing shortfalls when every calendar cannot fit.
+ // Return-day dependencies and assignment conflicts remain hard in both.
+ const canRelaxGaps=input.allowGapShortfall===true;
+ const relaxedInput=canRelaxGaps?{...input,strictAllCalendars:false,gapRules:(input.gapRules||[]).map(r=>({...r,soft:true}))}:input;
+ const strictShare=input.strictAllCalendars ? (canRelaxGaps ? .7 : 1) : .35;
+ const strictUntil=start+budget*strictShare,strictNodes=Math.max(1,Math.floor(maxNodes*strictShare));
  function upper(domains,left){let n=0;for(const kind of ['day','night']){const owners=new Map();function add(i,seen){for(const v of domains[i]||[]){const id=values.get(v).id;if(seen.has(id))continue;seen.add(id);const mine=owners.get(id)||[];if(mine.length<left[id][kind]){mine.push(i);owners.set(id,mine);return true}for(let k=0;k<mine.length;k++)if(add(mine[k],seen)){mine[k]=i;return true}}return false}for(const s of slots)if(s.kind===kind&&domains[s.index]?.length&&add(s.index,new Set()))n++}return n}
  const personCeilings=Object.fromEntries(ids.map(id=>[id,remaining[id].day+remaining[id].night]));
  for(const group of limits){const set=new Set(group.values),first=values.get(group.values[0]);if(first&&group.values.every(v=>values.get(v)?.id===first.id)&&[...values].filter(([,x])=>x.id===first.id).every(([v])=>set.has(v)))personCeilings[first.id]=Math.min(personCeilings[first.id],Math.max(0,group.max))}
@@ -193,9 +199,10 @@ function solvePartial(input){
   if(!propagateDependencies(dependencies,values,domains,picked))return;
   // In the second pass, gap/soft calendar preferences may be reported as
   // unmet, but they must not erase otherwise safe duties for a whole person.
-  const calendar=strict||input.strictAllCalendars?partialCalendar(input,values,domains,left,chosen):null;
+  const phaseInput=!strict&&canRelaxGaps?relaxedInput:input;
+  const calendar=strict||phaseInput.strictAllCalendars||canRelaxGaps?partialCalendar(phaseInput,values,domains,left,chosen):null;
   const eligible=calendar?chosen.filter(v=>calendar.complete.has(values.get(v).id)):chosen;
-  const valid=input.strictAllCalendars&&calendar.complete.size!==ids.length?[]:dependencyComplete(dependencies,eligible);
+  const valid=phaseInput.strictAllCalendars&&calendar.complete.size!==ids.length?[]:dependencyComplete(dependencies,eligible);
   if(valid.length>best.length)best=valid.slice();if(best.length===goal)return;
   if(calendar&&!calendar.feasible)return;
   const cells=slots.filter(s=>domains[s.index]?.length);if(!cells.length||chosen.length+Math.min(cells.length,ids.reduce((n,id)=>n+left[id].day+left[id].night,0))<=best.length)return;
@@ -213,7 +220,7 @@ function solvePartial(input){
   const skipped=domains.slice();skipped[s.index]=null;visit(skipped,left,chosen,strict);
  }
  if((input.requirements||[]).some(r=>!r.soft)||(input.gapRules||[]).some(r=>!r.soft))visit(initial,remaining,[],true);
- if(best.length<goal&&!timedOut&&!input.strictAllCalendars){phaseStopped=false;visit(initial,remaining,[],false)}
+ if(best.length<goal&&!timedOut&&(!input.strictAllCalendars||canRelaxGaps)){phaseStopped=false;visit(initial,remaining,[],false)}
  return {ok:true,partial:true,plan:best.map(v=>values.get(v)),nodes,timedOut,optimal:!timedOut||best.length===goal,elapsed:Date.now()-start};
 }
 if(typeof module!=='undefined')module.exports={solveTargets};
