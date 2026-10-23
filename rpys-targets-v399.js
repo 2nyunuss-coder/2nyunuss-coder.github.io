@@ -714,6 +714,7 @@
     const m=model(u),cfg=config(u),locked=isMonthLocked(),disabled=locked?'disabled':'';
     let fairness=null;try{fairness=fairTargets(m)}catch(e){console.warn('RPYS fair target preview',e)}
     host.innerHTML=`<h3>Personel Gündüz / Nöbet Hedefleri</h3><div class="smallhelp">${escape(ym())} · ${escape(u)} · Hedef motoru 21.10.2026</div>
+      ${u==='ACİL RÖNTGEN'?'<p class="smallhelp">“Kurallara Göre Eşit Dağıt” açık vardiyaları birim kurallarıyla dengeler. Elle girdiğiniz sayıları uygulamak için “Hedeflere Göre Dağıt”ı kullanın.</p>':''}
       <label class="rpysTargetsToggle399"><input type="checkbox" data-target-enable ${cfg.enabled?'checked':''} ${disabled}> Elle girdiğim hedeflere göre dağıt</label>
       <p class="smallhelp">Sayılar bu birimdeki <b>ayın toplam görevi</b> içindir. 16 saat ve üzeri nöbet; daha kısa vardiya gündüz sayılır. Mevcut ve korunan görevler toplamın içindedir. <b>Hafta sonu nöbeti</b>, Cumartesi/Pazar başlayan nöbetlerin sayısıdır ve toplam nöbet hedefinin içindedir. Bu alanı boş bırakırsanız hafta sonu için ayrı sayı kısıtı uygulanmaz.</p>
       <p class="smallhelp">Tam dağıtım mümkün değilse mevcut kayıtlar korunur, yerleşebilen yeni görevler uygulanır. Önce görev aralığı ve zorunlu izin dönüşü/öncesi kurallarını tamamlayan plan aranır. Tamamlanamayan aralık/dönüş koşulları ayrıca açıklanır; kişinin uygun diğer görevleri korunur. İzin, dinlenme, çakışma ve hedef üst sınırları her görevde denetlenir.</p>
@@ -745,7 +746,7 @@
     persist();const m=model(u),host=document.getElementById('rpysTargetPanel399');host.querySelector('.rpysTargetSummary399').textContent=totals(m);
     for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=metrics.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
   }
-  window.rpysTargets399={version:'20261023-safe-partial-23',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,prepareAutomatic,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
+  window.rpysTargets399={version:'20261023-acil-equal-24',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,prepareAutomatic,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isBusy:()=>preparing,clearFeedback:()=>report('','progress',false),isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{

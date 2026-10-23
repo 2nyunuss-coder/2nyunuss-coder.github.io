@@ -2,7 +2,7 @@
 (()=>{
   if(window.rpysScheduler398?.runTargets)return;
   const clone=x=>JSON.parse(JSON.stringify(x)), own=(o,k)=>Object.prototype.hasOwnProperty.call(o||{},k);
-  let run=null,targetRunner=null;
+  let run=null,targetRunner=null,equalUnit=null;
   const invalidate=()=>{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null};
   function sayHoursOnly(key,data=db){
     const override=data.manualDutyOverrides?.[key],meta=data.assignmentMeta?.[key];
@@ -40,6 +40,9 @@
     return source.replace("let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)","if(window.rpysScheduler398?.running()||window.rpysTargets399?.isPlanning?.())return old.apply(this,arguments);let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)");
   }
   function repair(source){
+    // This button requests the established equal-distribution engine, even
+    // when editable manual targets from an earlier run remain enabled.
+    source=source.replace('id="autoDistributeBtnV251" class="btn" onclick="autoDistribute()"','id="autoDistributeBtnV251" class="btn" onclick="rpysScheduler398.runEqual()"');
     const change=(name,next,edits)=>{
       const start=source.indexOf('function '+name+'('),end=source.indexOf('\nfunction '+next+'(',start);
       if(start<0||end<0)throw Error('Liste motoru kaynak kontrolü başarısız: '+name);
@@ -57,6 +60,8 @@
       ['count[chosen]=(count[chosen]||0)+1;filled++;','count[chosen]=(count[chosen]||0)+1;filled++;_assignCache={};_allAssignCache=null;_calcCache={};']
     ]);
     change('autoDistribute','autoDistributePolRotation',[
+      ['let outsiderAfter=selectedUnitOutsidersV2411(unit,ids,slots);','let outsiderAfter=selectedUnitOutsidersV2411(unit,ids,slots).filter(x=>!window.rpysScheduler398.preservedCell(x.k,x.pid));'],
+      ['eski kayıt seçili personel havuzunun dışında; yalnız bu birimde temizlenecek.','kayıt seçili personel havuzunun dışında; manuel/kilitli ve korunan kayıtlar değiştirilmeyecek.'],
       ['}catch(err){\n    rollbackSchedulerTxV243(_v243Before);','}catch(err){\n    rollbackSchedulerTxV243(_v243Before);if(window.rpysScheduler398.running())throw err;'],
       ['for(const x of outsiders){delete db.assign[x.k];if(db.assignmentMeta)delete db.assignmentMeta[x.k]}','for(const x of outsiders){if(window.rpysScheduler398.mayClear(x.k)){delete db.assign[x.k];if(db.assignmentMeta)delete db.assignmentMeta[x.k]}}'],
       ['if(unit==="PORTABL + SKOPİ")purgeNonSkopiPoolAssignments();','// Only selected-unit unprotected cells can be rebuilt.'],
@@ -350,8 +355,9 @@
     const fn=function(){
       if(run)return base.apply(this,arguments);
       const targetUnit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
-      if(targetUnit&&window.rpysTargets399?.prepareAutomatic&&!window.rpysTargets399.enabledFor(targetUnit)&&window.rpysRules421?.enabled(targetUnit,'maxGapEnabled'))return window.rpysTargets399.prepareAutomatic(targetUnit,()=>fn.apply(this,arguments));
-      if(window.rpysTargets399?.enabledFor(targetUnit)&&!window.rpysTargets399.hasPrepared(targetUnit))return window.rpysTargets399.prepare(targetUnit,()=>fn.apply(this,arguments));
+      const equal=name==='autoDistribute'&&equalUnit===targetUnit&&targetUnit==='ACİL RÖNTGEN';
+      if(!equal&&targetUnit&&window.rpysTargets399?.prepareAutomatic&&!window.rpysTargets399.enabledFor(targetUnit)&&window.rpysRules421?.enabled(targetUnit,'maxGapEnabled'))return window.rpysTargets399.prepareAutomatic(targetUnit,()=>fn.apply(this,arguments));
+      if(!equal&&window.rpysTargets399?.enabledFor(targetUnit)&&!window.rpysTargets399.hasPrepared(targetUnit))return window.rpysTargets399.prepare(targetUnit,()=>fn.apply(this,arguments));
       if(isMonthLocked()){alert('Bu ay kilitli. Liste değiştirilmedi.');return false}
       const before=clone(db),month=ym(),rebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
       const unit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
@@ -405,12 +411,12 @@
         window[name]=function(){const k=JSON.stringify(Array.from(arguments));if(!cache.has(k))cache.set(k,baseQuery.apply(this,arguments));return cache.get(k)};
       }
       for(const key of ['save','saveNowV245','flushSave'])if(typeof window[key]==='function'){saved[key]=window[key];window[key]=(...args)=>{pending.push(args);return null}}
-        const targetIds=window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.model(unit).ids:null;
+        const targetIds=equal?Array.from(document.getElementById('autoPeople')?.selectedOptions||[],o=>Number(o.value)).filter(id=>getPersonById(id)):window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.model(unit).ids:null;
         if(targetIds)run.targetIds=new Set(targetIds);
         const restCheck=()=>targetIds&&window.rpysRest16V397.allViolationsForMonth?window.rpysRest16V397.allViolationsForMonth(targetIds,month):window.rpysRest16V397.allViolations();
         const beforeRest=restCheck();
         const beforeSpouses=new Set(spouseDayViolations(month).map(x=>x.key));run.beforeSpouses=beforeSpouses;
-        value=window.rpysRest16V397.runIndexed(()=>window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
+        value=window.rpysRest16V397.runIndexed(()=>!equal&&window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
         if(value&&typeof value.then==='function')throw Error('Beklenmeyen asenkron motor; liste korunarak işlem durduruldu.');
         for(const key of restCheck().keys())if(window.rpysRules421?.enabled(unit,'noPostDuty')!==false&&!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
@@ -442,7 +448,16 @@
     if(!targetRunner)throw Error('Güvenli hedef dağıtım motoru henüz yüklenemedi. Sayfayı yenileyin.');
     return targetRunner();
   }
-  window.rpysScheduler398={runTargets,repair,repairCache,install,validateReturnsFor:ids=>{if(run)run.returnIds=ids},protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
+  function runEqual(){
+    if(run||equalUnit||window.rpysTargets399?.isBusy?.())return false;
+    const unit=document.getElementById('autoUnit')?.value;
+    // Keep other units' current engines unchanged. ACİL uses its original
+    // quotas, equalisation and repair passes inside the same safe transaction.
+    if(unit!=='ACİL RÖNTGEN')return window.autoDistribute();
+    window.rpysTargets399?.clearFeedback?.();
+    equalUnit=unit;try{return window.autoDistribute()}finally{equalUnit=null}
+  }
+  window.rpysScheduler398={runTargets,runEqual,repair,repairCache,install,validateReturnsFor:ids=>{if(run)run.returnIds=ids},preservedCell:(key,id)=>!!run&&Number(run.before.assign?.[key])===Number(id)&&protectedCell(key),protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
