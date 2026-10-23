@@ -67,6 +67,9 @@
       ['if(unit==="PORTABL + SKOPİ")purgeNonSkopiPoolAssignments();','// Only selected-unit unprotected cells can be rebuilt.'],
       ['delete db.assign[kk];','if(window.rpysScheduler398.protectedCell(kk))continue;\n        delete db.assign[kk];']
     ]);
+    change('autoDistribute','autoDistributePolRotation',[
+      ['  logAction(`${unit} için otomatik dağıtım yapıldı: ${filled} görev.`);','  if(unit==="ACİL RÖNTGEN"){const completion=window.rpysScheduler398.fillAcilGaps(unit,ids,slots,hours,count,unitHours,unitCount);if(completion){filled+=completion.added;skipped=completion.unfilled.filter(x=>!x.locked).length;db.v251PlanAudit??={};db.v251PlanAudit[ym()+"|"+unit]={...(db.v251PlanAudit[ym()+"|"+unit]||{}),completion};}}\n  logAction(`${unit} için otomatik dağıtım yapıldı: ${filled} görev.`);']
+    ]);
     change('enforceSkopiLeaveAnchors','distributeSkopiSequential',[
       ['if(db.assign[k]&&(db.assignmentMeta?.[k]?.manual||db.manualDutyOverrides?.[k]))','if(db.assign[k]&&window.rpysScheduler398.manualAssignmentCell(k))']
     ]);
@@ -314,6 +317,100 @@
     }
     if(plan.length)invalidate();return plan;
   }
+  // Complete a greedy equal plan using bounded augmenting chains. An accepted
+  // chain fills an extra cell; every displaced duty is re-homed before commit.
+  // Manual/locked/pre-existing preserve-mode cells and other units never move.
+  function fillAcilGaps(unit,ids,slots,hours,count,unitHours,unitCount){
+    if(!run||equalUnit!==unit||unit!=='ACİL RÖNTGEN')return null;
+    ids=ids.map(Number);const selected=new Set(ids),records=[];
+    for(let day=1;day<=daysInMonth();day++)for(const slot of slots)if(isDutyCellApplicable(slot.type,slot.col,day)){
+      const key=keyFor(slot.type,day,slot.col.key),meta=db.assignmentMeta?.[key]||{};
+      records.push({day,key,type:slot.type,col:{...slot.col,...(meta.shift?{shift:meta.shift}:{}),...(meta.hours!=null?{hours:Number(meta.hours)}:{})}});
+    }
+    const initial={...db.assign},started=Date.now(),deadline=started+250,maxNodes=1800;let nodes=0,limited=false;
+    const partners=rec=>records.filter(x=>x.day===rec.day).map(x=>({type:x.type,col:x.col}));
+    const summary=()=>{
+      const before=records.filter(x=>initial[x.key]).length,filled=records.filter(x=>db.assign[x.key]).length;
+      const unfilled=records.filter(x=>!db.assign[x.key]).map(rec=>({day:rec.day,key:rec.key,shift:rec.col.shift||rec.col.key,locked:protectedCell(rec.key),people:ids.map(id=>({id,name:getPersonById(id)?.name||String(id),reason:acilBlockReason(id,rec,unit,ids,partners(rec))}))}));
+      return {added:filled-before,beforeFilled:before,filled,total:records.length,unfilled,nodes,limited,elapsed:Date.now()-started};
+    };
+    if(!records.some(x=>!db.assign[x.key]&&!protectedCell(x.key)))return summary();
+    const eligible=window.canTakeShiftV2414||window.canTakeShift,undo=[];
+    const write=(key,id)=>{undo.push({key,had:own(db.assign,key),id:db.assign[key]});if(id)db.assign[key]=id;else delete db.assign[key];invalidate()};
+    const rollback=mark=>{while(undo.length>mark){const x=undo.pop();if(x.had)db.assign[x.key]=x.id;else delete db.assign[x.key]}invalidate()};
+    const budget=()=>{if(++nodes>maxNodes||Date.now()>deadline){limited=true;return false}return true};
+    const options=rec=>ids.map(id=>({id,group:spousePlacements(id,rec.day,rec,unit,ids,partners(rec))})).filter(x=>x.group.length);
+    const loads=()=>{const n=new Map(ids.map(id=>[id,{hours:0,count:0}]));for(const rec of records){const x=n.get(Number(db.assign[rec.key]));if(x){x.hours+=Number(rec.col.hours||0);x.count++}}return n};
+    const order=()=>{const n=loads();return ids.slice().sort((a,b)=>n.get(a).count-n.get(b).count||n.get(a).hours-n.get(b).hours||a-b)};
+    const issueKey=x=>x.id+'|'+x.day;
+    const beforeSpouses=new Set(spouseDayViolations(ym()).map(x=>x.key)),beforeReturns=new Set(returnWorkdayViolations(ids).map(issueKey));
+    const mustRemain=[];if(window.rpysRules421?.enabled(unit,'preLeaveThursday')!==false&&typeof isMandatoryPreLeaveThursday==='function')for(const id of ids)for(let d=1;d<=daysInMonth();d++)if(isMandatoryPreLeaveThursday(id,d)&&spouseWorkingOnDay(id,d))mustRemain.push({id,day:d});
+    const gapScore=()=>gapViolations(ids,unit).reduce((n,x)=>n+Math.max(0,x.blank-x.maxBlank),0);let allowedGap=gapScore();
+    const valid=()=>{
+      if(spouseDayViolations(ym()).some(x=>!beforeSpouses.has(x.key))||returnWorkdayViolations(ids).some(x=>!beforeReturns.has(issueKey(x)))||mustRemain.some(x=>!spouseWorkingOnDay(x.id,x.day)))return false;
+      const affected=new Set(records.filter(x=>Number(initial[x.key]||0)!==Number(db.assign[x.key]||0)).flatMap(x=>[Number(initial[x.key]),Number(db.assign[x.key])]).filter(Boolean));
+      for(const rec of records){const id=Number(db.assign[rec.key]);if(!affected.has(id)||!selected.has(id))continue;const saved=db.assign[rec.key];delete db.assign[rec.key];invalidate();let ok;
+        try{ok=eligible(id,rec.day,rec.col,unit)}finally{db.assign[rec.key]=saved;invalidate()}
+        if(!ok&&!(Number(run.before.assign?.[rec.key])===id&&protectedCell(rec.key)))return false;
+      }
+      return gapScore()<=allowedGap;
+    };
+    function search(pending,depth,visited){
+      if(!budget())return false;pending=pending.filter(x=>!db.assign[x.key]);if(!pending.length)return valid();
+      const rec=pending[0],rest=pending.slice(1),rank=order();
+      for(const id of rank){if(!budget())return false;const mark=undo.length,group=spousePlacements(id,rec.day,rec,unit,ids,partners(rec));
+        if(group.length){for(const x of group)write(x.key,x.id);if(search(rest,depth,visited))return true;rollback(mark)}
+      }
+      if(depth<=0)return false;
+      const cfg=typeof ruleCfg==='function'?ruleCfg():{},span=Math.max(4,Number(cfg.minGap||2));
+      for(const id of rank){const spouse=typeof spouseOf==='function'?Number(spouseOf(id)||0):0;
+        const blockers=records.filter(x=>db.assign[x.key]&&selected.has(Number(db.assign[x.key]))&&!protectedCell(x.key)&&!visited.has(x.key)&&Math.abs(x.day-rec.day)<=span&&(Number(db.assign[x.key])===id||spouse&&x.day===rec.day||Number(db.assign[x.key])===spouse)).sort((a,b)=>Math.abs(a.day-rec.day)-Math.abs(b.day-rec.day));
+        for(const blocker of blockers){if(!budget())return false;const mark=undo.length;write(blocker.key,0);const group=spousePlacements(id,rec.day,rec,unit,ids,partners(rec));
+          if(group.length){for(const x of group)write(x.key,x.id);const next=new Set(visited);next.add(rec.key);next.add(blocker.key);if(search([blocker,...rest],depth-1,next))return true}rollback(mark);
+        }
+      }return false;
+    }
+    let progress=true;
+    while(progress&&!limited){progress=false;const empty=records.filter(x=>!db.assign[x.key]&&!protectedCell(x.key)).map(x=>({rec:x,n:options(x).length})).sort((a,b)=>a.n-b.n||a.rec.day-b.rec.day);
+      for(const {rec} of empty){if(db.assign[rec.key])continue;const mark=undo.length;if(search([rec],3,new Set([rec.key]))){undo.length=0;allowedGap=gapScore();progress=true}else rollback(mark);if(limited)break;}
+    }
+    // Reconcile the existing engine's counters only after validated chains.
+    for(const rec of records){const old=Number(initial[rec.key]||0),next=Number(db.assign[rec.key]||0);if(old===next)continue;
+      for(const [id,sign] of [[old,-1],[next,1]])if(selected.has(id)){const h=Number(rec.col.hours||0)*sign;for(const map of [hours,unitHours])if(map)map[id]=Number(map[id]||0)+h;for(const map of [count,unitCount])if(map)map[id]=Number(map[id]||0)+sign;}
+    }
+    return summary();
+  }
+  function acilBlockReason(id,rec,unit,ids,slots){
+    const person=getPersonById(id),date=dateStr(rec.day),on=key=>window.rpysRules421?.enabled(unit,key)!==false;
+    if(!person||typeof personStatusAt==='function'&&personStatusAt(person,date)!=='Aktif')return 'Bu gün aktif personel değil';
+    if(reservedOn(id,rec.day))return 'Rezerve';
+    if(spouseUnavailable(id,rec.day))return 'İzin / rapor / çalışmaya kapalı durum';
+    const custom=window.rpysRules421?.customReason(id,rec.day,rec.col,unit);if(custom)return 'Özel kural: '+custom;
+    if(on('leaveWeekendBlock')&&typeof isProtectedLeaveWeekend==='function'&&isProtectedLeaveWeekend(id,rec.day,unit))return 'İzin çevresindeki hafta sonu koruması';
+    if(on('overlap')&&typeof personHasOverlap==='function'&&personHasOverlap(id,rec.day,rec.col))return 'Aynı saatlerde mevcut görev';
+    if(on('avoidSameDay')&&typeof personAssignedSameDay==='function'&&personAssignedSameDay(id,rec.day,unit))return 'Aynı gün mevcut görev';
+    if(on('noPostDuty')&&window.rpysRest16V397?.candidateResult(id,rec.day,rec.col)?.ok===false)return 'Nöbet ertesi dinlenme / sonraki gün mevcut görev';
+    const cfg=typeof ruleCfg==='function'?ruleCfg():{};
+    if(on('minGapEnabled')&&Number(rec.col.hours||0)>=Number(cfg.longHours||23)&&typeof lastLongDutyGapDays==='function'){const gap=lastLongDutyGapDays(id,rec.day);if(gap!=null&&gap<Number(cfg.minGap||2))return 'Asgari nöbet aralığı: '+Number(cfg.minGap||2)+' gün';}
+    if(on('avoidAlternate')&&Number(rec.col.hours||0)>=Number(cfg.longHours||23)&&typeof consecutiveAlternatePattern==='function'&&consecutiveAlternatePattern(id,rec.day))return 'Gün aşırı nöbet sınırı';
+    if(typeof passesTextRules==='function'&&!passesTextRules(id,rec.day,rec.col,unit))return 'Özel personel / birim kuralı';
+    const eligible=window.canTakeShiftV2414||window.canTakeShift;
+    if(eligible(id,rec.day,rec.col,unit)){if(!spousePlacements(id,rec.day,rec,unit,ids,slots).length)return 'Eş kuralı için aynı gün ikinci uygun hücre / seçili eş yok';return 'Yerel uygunluk var; tüm listeyi koruyan yer değiştirme tamamlanamadı';}
+    return 'Etkin takvim veya personel kuralı; hücrenin uygun personel listesinden incelenebilir';
+  }
+  function renderAcilCompletion(unit){
+    const report=db.v251PlanAudit?.[ym()+'|'+unit]?.completion;if(!report||typeof document.createElement!=='function')return;
+    document.getElementById('rpysAcilCompletion425')?.remove();const host=document.getElementById('distResult');if(!host)return;
+    const available=report.total-report.unfilled.filter(x=>x.locked).length;
+    // The old engine's gap note was computed before the completion pass and
+    // used its earlier calendar definition. Display only the current result.
+    const ids=Array.from(document.getElementById('autoPeople')?.selectedOptions||[],o=>Number(o.value));
+    const gaps=gapViolations(ids,unit).length;
+    host.textContent=host.textContent.replace(/ Not: 5 günlük aralık kontrolünde \d+ sapma/g,'').replace(/, \d+ hücre uygun kişi kalmadığı için boş/g,', '+report.unfilled.filter(x=>!x.locked).length+' hücre boş kaldı');
+    host.textContent+='\nGörev hücreleri: '+report.filled+' / '+available+'.'+(report.unfilled.some(x=>x.locked)?' Kilitli boş hücreler dağıtım dışında.':'')+(gaps?' 5 günlük aralık: '+gaps+' sapma.':'')+(report.limited?' Yer değiştirme sınırına ulaşıldı; kalanların imkânsız olduğu kanıtlanmış değildir.':'');
+    if(!report.unfilled.length)return;
+    const box=document.createElement('details');box.id='rpysAcilCompletion425';const title=document.createElement('summary');title.textContent='Boş kalan '+report.unfilled.length+' hücre: personel bazında nedenler';const body=document.createElement('div');body.style.whiteSpace='pre-wrap';body.textContent=report.unfilled.map(x=>x.day+'. gün '+x.shift+(x.locked?' — boş hücre kilitli; dağıtım dışında':'\n'+x.people.map(p=>'  '+p.name+': '+p.reason).join('\n'))).join('\n\n');box.append(title,body);host.after(box);
+  }
   function alignSpouseDays(unit,ids,audit=[]){
     if(typeof spouseOf!=='function')return;
     const original=run?.beforeSpouses||new Set(),selected=new Set(ids.map(Number)),slots=unitSlots(unit),eligible=window.canTakeShiftV2414||window.canTakeShift;
@@ -434,7 +531,7 @@
       finally{for(const [key,original] of Object.entries(saved))window[key]=original;for(const [key,original] of Object.entries(staticQueries))window[key]=original;window.dutyColumnByKey=lookup;if(allMonths)window.allAssignmentsAllMonths=allMonths;if(overlap)window.personHasOverlap=overlap;run=null}
       if(error){try{renderAll()}catch(_){}console.error('RPYS398 motor koruması',error,error.cellKey||'');window.rpysTargets399?.reportError?.(error.message||String(error));alert('İşlem tamamlanamadı; önceki liste aynen korundu.\n\n'+(error.message||error));return false}
       if(pending.length){const saveFn=saved.saveNowV245||saved.save;saveFn?.({allowAssignDrop:rebuild,label:'6.1.1 güvenli liste dağıtımı'});}
-      invalidate();return value;
+      invalidate();if(equal&&pending.length)renderAcilCompletion(unit);return value;
     };fn.__rpys398=true;window[name]=fn;if(name==='autoDistribute')targetRunner=fn;
   }
   function install(){
@@ -457,7 +554,7 @@
     window.rpysTargets399?.clearFeedback?.();
     equalUnit=unit;try{return window.autoDistribute()}finally{equalUnit=null}
   }
-  window.rpysScheduler398={runTargets,runEqual,repair,repairCache,install,validateReturnsFor:ids=>{if(run)run.returnIds=ids},preservedCell:(key,id)=>!!run&&Number(run.before.assign?.[key])===Number(id)&&protectedCell(key),protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
+  window.rpysScheduler398={runTargets,runEqual,repair,repairCache,install,fillAcilGaps,validateReturnsFor:ids=>{if(run)run.returnIds=ids},preservedCell:(key,id)=>!!run&&Number(run.before.assign?.[key])===Number(id)&&protectedCell(key),protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
