@@ -184,21 +184,21 @@ test('reserve is recognized from the personnel calendar, Saymanlık and imported
  const f=fixture(),c=f.c;c.db.reserves={'2026-10|1':['10',11]};assert.equal(c.rpysScheduler398.reservedOn(1,10),true);assert.equal(c.canTakeShift(1,10,f.cols.day,'UNIT'),false);
  c.db.cellStatus={'2026-10|Person A|17':'reserve'};assert.equal(c.rpysScheduler398.reservedOn(1,17),true);c.db.importedSaymanlik={'2026-10|Person A|18':'REZERVE'};assert.equal(c.rpysScheduler398.reservedOn(1,18),true);c.db.sayStatusCleared={'2026-10|Person A|18':true};assert.equal(c.rpysScheduler398.reservedOn(1,18),false);assert.equal(c.rpysScheduler398.reservedOn(1,10),true);
 });
-test('leave and reserve endings produce the first business day for every employee and across month boundaries',()=>{
- const f=fixture(),c=f.c;c.db.staff[1].status='Aktif';c.db.reserves={'2026-10|1':[10,11]};assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[12]);c.db.leaves=[{personId:2,start:'2026-09-25',end:'2026-09-30'},{idPerson:2,start:'2026-10-05',end:'2026-10-09'}];assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(2)),[1,12]);
- c.db.cellStatus={'2026-10|Person A|14':'idari'};c.db.importedSaymanlik={'2026-10|Person A|15':'ŞUA İZNİ'};c.rpysHolidayInfo=date=>date==='2026-10-16'?{type:'full'}:null;assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[12,19]);
+test('only leave endings produce mandatory workdays, including across month boundaries',()=>{
+ const f=fixture(),c=f.c;c.db.staff[1].status='Aktif';c.db.reserves={'2026-10|1':[10,11]};assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[]);c.db.leaves=[{personId:2,start:'2026-09-25',end:'2026-09-30'},{idPerson:2,start:'2026-10-05',end:'2026-10-09'}];assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(2)),[1,12]);
+ c.db.cellStatus={'2026-10|Person A|14':'idari'};c.db.importedSaymanlik={'2026-10|Person A|15':'ŞUA İZNİ'};c.rpysHolidayInfo=date=>date==='2026-10-16'?{type:'full'}:null;assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[19]);
 });
-test('adjacent leave and reserve blocks merge and return skips holidays and continued absences',()=>{
+test('a real leave return skips reserve days and holidays without scheduling on them',()=>{
  const f=fixture(),c=f.c;c.db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-09'}];c.db.reserves={'2026-10|1':[10,11,12]};c.rpysHolidayInfo=date=>date==='2026-10-13'?{type:'full'}:null;assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[14]);
 });
 test('an existing job in another unit or manual Saymanlık work satisfies mandatory return without duplicate duties',()=>{
- const f=fixture(),c=f.c;c.db.reserves={'2026-10|1':[10,11]};c.db.assign['2026-10|pol|12|other']=1;assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);c.db.assign={};c.db.sayManualWork={'2026-10|Person A|12':{total:7}};assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);c.db.sayManualWork['2026-10|Person A|12'].total=0;assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,1);
+ const f=fixture(),c=f.c;c.db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-09'}];c.db.assign['2026-10|pol|12|other']=1;assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);c.db.assign={};c.db.sayManualWork={'2026-10|Person A|12':{total:7}};assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);c.db.sayManualWork['2026-10|Person A|12'].total=0;assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,1);
 });
 test('normal distribution reserves the return day and prevents a prior long duty from consuming its rest day',()=>{
  let f;f=fixture(c=>{const slots=[{type:'pol',col:f.cols.day}];assert.equal(c.canTakeShift(1,11,f.cols.long,'UNIT'),false);c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],slots,{},{});c.save()});const c=f.c;c.isDutyCellApplicable=()=>true;c.db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-09'}];c.autoDistribute();assert.equal(c.db.assign['2026-10|pol|12|day'],1);assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);
 });
 test('a locked return cell explains the exact person and date and never changes the old roster',()=>{
- let f;f=fixture(c=>{c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],[{type:'pol',col:f.cols.day}],{},{});c.save()});const c=f.c;c.isDutyCellApplicable=()=>true;c.db.reserves={'2026-10|1':[10,11]};c.db.rpysCellLocks['2026-10|pol|12|day']={exists:false};const before=JSON.stringify(c.db);c.autoDistribute();assert.equal(JSON.stringify(c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Person A: 2026-10-12/);assert.match(f.alerts[0],/ilk iş günü/);
+ let f;f=fixture(c=>{c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],[{type:'pol',col:f.cols.day}],{},{});c.save()});const c=f.c;c.isDutyCellApplicable=()=>true;c.db.leaves=[{personId:1,start:'2026-10-05',end:'2026-10-09'}];c.db.rpysCellLocks['2026-10|pol|12|day']={exists:false};const before=JSON.stringify(c.db);c.autoDistribute();assert.equal(JSON.stringify(c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/Person A: 2026-10-12/);assert.match(f.alerts[0],/ilk iş günü/);
 });
 test('a motor cannot save a new reserve-day duty even if it bypassed candidate eligibility',()=>{
  const f=fixture(c=>{c.db.assign['2026-10|pol|10|day']=1;c.save()});f.c.db.cellStatus={'2026-10|Person A|10':'reserve'};const before=JSON.stringify(f.c.db);f.c.autoDistribute();assert.equal(JSON.stringify(f.c.db),before);assert.equal(f.saved.length,0);assert.match(f.alerts[0],/10. gün rezerve/);
@@ -217,4 +217,11 @@ test('month boundaries are checked and reserve periods reset the blank run exact
 });
 test('previous-month real duties and imported reserve statuses share the same cross-month check',()=>{
  const f=gapFixture(),c=f.c;c.db.assign={'2026-09|pol|25|day':1,'2026-10|pol|6|day':1};c.db.importedSaymanlik=Object.fromEntries([28,29,30].map(d=>['2026-09|Person A|'+d,'REZERVE']));assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);delete c.db.assign['2026-10|pol|6|day'];c.db.assign['2026-10|pol|7|day']=1;const issues=c.rpysScheduler398.gapViolations([1],'UNIT');assert.equal(issues.length,1);assert.equal(issues[0].blank,6);assert.equal(issues[0].leftDate,'2026-09-25');
+});
+
+test('reserve in calendars or Saymanlık never creates workday requirements, even across a month boundary',()=>{
+ const f=fixture(),c=f.c;c.db.reserves={'2026-09|1':[30],'2026-10|1':[10,11,30,31]};c.db.cellStatus={'2026-10|Person A|17':'reserve'};c.db.importedSaymanlik={'2026-10|Person A|18':'REZERVE'};assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1)),[]);assert.deepEqual(Array.from(c.rpysScheduler398.returnWorkdays(1,'2026-11')),[]);assert.equal(c.rpysScheduler398.returnWorkdayViolations([1]).length,0);
+});
+test('a locked post-reserve workday does not abort normal distribution or change the lock',()=>{
+ let f;f=fixture(c=>{assert.equal(c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],[{type:'pol',col:f.cols.day}],{},{}),0);c.save()});const c=f.c;c.db.reserves={'2026-10|1':[10,11]};c.db.rpysCellLocks['2026-10|pol|12|day']={exists:false};const locks=JSON.stringify(c.db.rpysCellLocks);c.autoDistribute();assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);assert.equal(JSON.stringify(c.db.rpysCellLocks),locks);assert.equal(Object.keys(c.db.assign).length,0);
 });

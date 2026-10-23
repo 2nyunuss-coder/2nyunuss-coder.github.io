@@ -182,19 +182,20 @@
       if((db.leaves||[]).some(l=>Number(l.personId??l.idPerson??l.person?.id)===Number(id)&&l.start<=date&&l.end>=date)){dayCache.set(date,true);return true;}
       const mk=date.slice(0,7),d=Number(date.slice(8)),status=effectiveStatus(person,d,mk);
       // Employment boundary markers are not leave-return events.
-      const result=reservedOn(id,d,mk)||!!status&&absentStatus(status)&&!['ayrilis','atamaoncesi','tayinoncesi'].includes(String(status).toLocaleLowerCase('tr-TR'));dayCache.set(date,result);return result;
+      // Reserve blocks assignment, but does not create a leave-return event.
+      const result=!!status&&absentStatus(status)&&!['ayrilis','atamaoncesi','tayinoncesi'].includes(String(status).toLocaleLowerCase('tr-TR'));dayCache.set(date,result);return result;
     };
     const first=month+'-01',next=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),1)).toISOString().slice(0,10),out=new Set();
     for(let date=calendarDate(first,-8);date<next;date=calendarDate(date,1)){
       if(!away(date)||away(calendarDate(date,1)))continue;
       let candidate=calendarDate(date,1),guard=0;
-      while(guard++<370){const weekday=new Date(candidate+'T12:00:00Z').getUTCDay(),holiday=typeof rpysHolidayInfo==='function'&&rpysHolidayInfo(candidate)?.type==='full';if(weekday!==0&&weekday!==6&&!holiday&&!away(candidate))break;candidate=calendarDate(candidate,1)}
+      while(guard++<370){const weekday=new Date(candidate+'T12:00:00Z').getUTCDay(),holiday=typeof rpysHolidayInfo==='function'&&rpysHolidayInfo(candidate)?.type==='full';if(weekday!==0&&weekday!==6&&!holiday&&!away(candidate)&&!reservedOn(id,Number(candidate.slice(8)),candidate.slice(0,7)))break;candidate=calendarDate(candidate,1)}
       if(guard<370&&candidate.startsWith(month+'-')&&(typeof personStatusAt!=='function'||personStatusAt(person,candidate)==='Aktif'))out.add(Number(candidate.slice(8)));
     }
     const days=[...out].sort((a,b)=>a-b);cache?.set(key,days);return days;
   }
   function returnWorkdayViolations(ids,month=ym()){
-    return ids.flatMap(id=>returnWorkdays(Number(id),month).filter(d=>!spouseWorkingOnDay(Number(id),d,month)).map(day=>({id:Number(id),day,reason:(getPersonById(id)?.name||id)+': '+month+'-'+String(day).padStart(2,'0')+' izin/rezerve dönüşü ilk iş günü işbaşı görevi eksik.'})));
+    return ids.flatMap(id=>returnWorkdays(Number(id),month).filter(d=>!spouseWorkingOnDay(Number(id),d,month)).map(day=>({id:Number(id),day,reason:(getPersonById(id)?.name||id)+': '+month+'-'+String(day).padStart(2,'0')+' izin dönüşü ilk iş günü işbaşı görevi eksik.'})));
   }
   function reserveReturnWorkdays(unit,ids,slots,hours,count,unitHours,unitCount){
     if(run)run.returnIds=[...new Set([...(run.returnIds||[]),...ids.map(Number)])];
