@@ -225,3 +225,13 @@ test('reserve in calendars or Saymanlık never creates workday requirements, eve
 test('a locked post-reserve workday does not abort normal distribution or change the lock',()=>{
  let f;f=fixture(c=>{assert.equal(c.rpysScheduler398.reserveReturnWorkdays('UNIT',[1],[{type:'pol',col:f.cols.day}],{},{}),0);c.save()});const c=f.c;c.db.reserves={'2026-10|1':[10,11]};c.db.rpysCellLocks['2026-10|pol|12|day']={exists:false};const locks=JSON.stringify(c.db.rpysCellLocks);c.autoDistribute();assert.equal(f.saved.length,1);assert.equal(f.alerts.length,0);assert.equal(JSON.stringify(c.db.rpysCellLocks),locks);assert.equal(Object.keys(c.db.assign).length,0);
 });
+
+test('a historical gap already longer than five days cannot block the selected month, whose own gaps remain checked',()=>{
+ const f=gapFixture(),c=f.c;c.db.assign={'2026-09|pol|13|day':1,'2026-10|pol|1|day':1,'2026-10|pol|7|day':1};const rule=c.rpysScheduler398.gapCalendar([1],'UNIT')[0];assert.equal(rule.crossMonth.before,null);assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);delete c.db.assign['2026-10|pol|7|day'];c.db.assign['2026-10|pol|8|day']=1;assert.ok(c.rpysScheduler398.gapViolations([1],'UNIT').some(x=>x.blank===6&&x.kind==='month'));assert.equal(c.db.assign['2026-09|pol|13|day'],1);
+});
+test('leave disconnects historical breaches but retains the real continuous blank run into this month',()=>{
+ const f=gapFixture(),c=f.c;c.db.assign={'2026-09|pol|13|day':1,'2026-10|pol|3|day':1};c.db.leaves=[{personId:1,start:'2026-09-20',end:'2026-09-27'}];assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);assert.notEqual(c.rpysScheduler398.gapCalendar([1],'UNIT')[0].crossMonth.before,null);delete c.db.assign['2026-10|pol|3|day'];c.db.assign['2026-10|pol|4|day']=1;assert.ok(c.rpysScheduler398.gapViolations([1],'UNIT').some(x=>x.blank===6&&x.kind==='cross-month'));
+});
+test('recent history still requires a timely first task and a distant next-month task cannot veto this month',()=>{
+ const f=gapFixture(),c=f.c;c.db.assign={'2026-09|pol|25|day':1,'2026-10|pol|1|day':1};assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);delete c.db.assign['2026-10|pol|1|day'];c.db.assign['2026-10|pol|2|day']=1;assert.ok(c.rpysScheduler398.gapViolations([1],'UNIT').some(x=>x.blank===6&&x.kind==='cross-month'));c.db.assign={'2026-10|pol|26|day':1,'2026-11|pol|20|day':1};assert.equal(c.rpysScheduler398.gapCalendar([1],'UNIT')[0].crossMonth.after,null);assert.equal(c.rpysScheduler398.gapViolations([1],'UNIT').length,0);
+});

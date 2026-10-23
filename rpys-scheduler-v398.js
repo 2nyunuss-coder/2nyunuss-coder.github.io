@@ -234,7 +234,13 @@
       for(let d=1;d<=last;d++)if(reservedOn(id,d,month)||spouseUnavailable(id,d,month))add(d);
       blocked.sort((a,b)=>a[0]-b[0]);const runs=[];let cursor=from;for(const [a,b] of blocked){if(a>cursor)runs.push([cursor,a-1]);cursor=Math.max(cursor,b+1)}if(cursor<=to)runs.push([cursor,to]);
       const segments=runs.map(([a,b])=>[Math.max(1,a),Math.min(last,b)]).filter(([a,b])=>a<=b),fixedDays=days.filter(d=>d>=1&&d<=last);
-      return {id,maxBlank,includeEdges:!!window.rpysRules421||!!window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__,segments,fixedDays,crossMonth:{before,after,fixedDays,last,runs,month},date};
+      // Only a blank run that reaches the selected month can constrain its
+      // plan. A breach already wholly outside this month cannot be repaired
+      // by any assignment in it; keep the original historical duties intact.
+      const relevantRuns=runs.filter(([a,b])=>a<=last&&b>=1);
+      const pastBlank=Math.max(0,...relevantRuns.map(([a,b])=>Math.max(0,Math.min(b,0)-a+1)));
+      const futureBlank=Math.max(0,...relevantRuns.map(([a,b])=>Math.max(0,b-Math.max(a,last+1)+1)));
+      return {id,maxBlank,includeEdges:!!window.rpysRules421||!!window.__RPYS_RULEPATCH8_EDGE_GAP_SPOUSE__,segments,fixedDays,crossMonth:{before:pastBlank>maxBlank?null:before,after:futureBlank>maxBlank?null:after,fixedDays,last,runs:relevantRuns,month},date};
     });
   }
   function gapViolations(ids,unit,month=ym()){
