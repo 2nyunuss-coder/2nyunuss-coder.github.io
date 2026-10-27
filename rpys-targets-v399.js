@@ -207,8 +207,18 @@
   const workerURL=new URL('rpys-target-worker.js?v=20261023-safe-partial-23',document.currentScript?.src||document.baseURI).href;
   let preparing=false,prepared=null,draftActive=false,currentJob=null,activeRecordIndex=null,bestEffortRequested=false;
   let feedback={text:'',tone:'',busy:false};
+  function equalControls(busy){
+    const button=document.getElementById('autoDistributeBtnV251');if(!button)return;
+    button.disabled=busy||isMonthLocked();button.setAttribute('aria-busy',String(busy));
+    const label=busy?'Hesaplanıyor…':'Kurallara Göre Eşit Dağıt';if(button.textContent!==label)button.textContent=label;
+    let stop=document.getElementById('rpysEqualCancel426');
+    if(!stop&&busy&&automaticUnit===document.getElementById('autoUnit')?.value){
+      stop=document.createElement('button');stop.id='rpysEqualCancel426';stop.type='button';stop.className='btn alt';stop.textContent='Dağıtımı iptal et';stop.onclick=cancel;button.after(stop);
+    }
+    if(stop)stop.hidden=!busy||automaticUnit!==document.getElementById('autoUnit')?.value;
+  }
   function report(text,tone='progress',busy=preparing){
-    feedback={text:String(text||''),tone,busy};
+    feedback={text:String(text||''),tone,busy};equalControls(busy);
     const panel=document.getElementById('rpysTargetPanel399'),box=panel?.querySelector?.('[data-target-feedback]');
     if(box){box.hidden=!feedback.text;box.textContent=feedback.text;box.dataset.tone=tone;box.setAttribute('role',tone==='error'?'alert':'status')}
     for(const b of panel?.querySelectorAll?.('[data-target-action="run"]')||[]){b.disabled=busy||isMonthLocked();b.textContent=busy?'Hesaplanıyor…':'Hedeflere Göre Dağıt';b.setAttribute('aria-busy',String(busy))}
@@ -444,7 +454,7 @@
       return {m,targets,problems,input:{payroll,allowPartial:partial,hardGaps:gapRules.length>0,strictAllCalendars:automaticUnit===u,allowGapShortfall:automaticUnit===u,ids:m.ids,names:Object.fromEntries(m.ids.map(id=>[id,getPersonById(id).name])),remaining,slots:m.slots.map(s=>({index:s.index,day:s.day,kind:s.kind,hours:Number(s.col.hours||0),category:s.col.cat==='Poliklinik'?'pol':s.col.cat==='Acil'?'ac':s.type==='acil'?'ac':'pol',allowed:s.allowed})),conflicts,requirements,limits,gapRules,dependencies}};
     }finally{db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache()}
   }
-  function validatePartial(m,plan){
+  function* partialValidation(m,plan){
     const notes=[],retained=[],seen=new Set(),calendar=calendarFor(m),used=Object.fromEntries(m.ids.map(id=>[id,empty()])),targets=readTargets(m,{partial:true});
     const spouseIssues=()=>window.rpysScheduler398.spouseDayViolations?.(ym())||[],beforeSpouses=new Set(spouseIssues().map(x=>x.key));
     for(const x of plan){
@@ -455,7 +465,7 @@
         const weekend=used[x.id].weekendNight,weekday=used[x.id].night-weekend,fixed=m.fixed[x.id],t=targets[x.id];
         if(weekend>Math.max(0,t.weekendNight-fixed.weekendNight)||weekday>Math.max(0,t.night-t.weekendNight-(fixed.night-fixed.weekendNight)))throw Error('Hafta sonu/hafta içi nöbet alt hedefi aşılamaz. Liste korunuyor.');
       }
-      seen.add(s.key);db.assign[s.key]=x.id;retained.push(x);
+      seen.add(s.key);db.assign[s.key]=x.id;retained.push(x);yield;
     }
     clearCache();
     // Validate the whole draft, pruning only new unsafe assignments to a fixed
@@ -467,6 +477,7 @@
         const x=retained[i],s=m.slots[x.slot];delete db.assign[s.key];clearCache();let ok;
         try{ok=!calendarReason(calendar,x.id,s.day,s.col)&&canTakeShiftV2414(x.id,s.day,s.col,m.u)}finally{if(ok)db.assign[s.key]=x.id;clearCache()}
         if(!ok){retained.splice(i,1);changed=true;notes.push(`${getPersonById(x.id).name}: ${s.day}. gün ${labels[s.kind]} yerleştirilemedi; izin/dinlenme/mevcut görev veya özel uygunluk kuralı.`)}
+        yield;
       }
       for(const requirement of requirementsFor(m,calendar).filter(r=>r.hard)){
         for(let i=retained.length-1;i>=0;i--)if(Number(retained[i].id)===requirement.id){const x=retained[i];delete db.assign[m.slots[x.slot].key];retained.splice(i,1);changed=true;notes.push(`${getPersonById(x.id).name}: zorunlu izin dönüşü ilk iş günü yerleşmediği için yeni görevleri uygulanmadı. Korunan kayıtlar ve hedefleri değiştirilmedi.`)}
@@ -483,6 +494,9 @@
     const rules=finalRules(m);if(rules!==true)notes.push(String(rules));
     for(const r of requirementsFor(m))notes.push(`${getPersonById(r.id).name}: ${[...r.days].join(', ')}. gün ${r.reason} görevi eksik.`);
     return {plan:retained,notes:[...new Set(notes)],gapExceptions:[...new Set(gapIssues.map(x=>Number(x.id)))]};
+  }
+  function validatePartial(m,plan){
+    const steps=partialValidation(m,plan);let step;do{step=steps.next()}while(!step.done);return step.value;
   }
   function planningFingerprint(){
     const ignored=new Set(['_meta','ui','auditLog','poliklinikTakipConfig','polTrackConfig','polTracking322','quickPrint383','sayRoster']);
@@ -511,7 +525,10 @@
     const progress=(phase,done,total)=>{if(Date.now()-lastProgress<200)return;lastProgress=Date.now();report(`${phase}: ${done} / ${total} · ${Math.floor((Date.now()-job.started)/1000)} sn`,'progress',true)};
     report('Hedefler ve uygun günler denetleniyor; geçici plan arka planda hazırlanıyor…','progress',true);
     try{
-      const sourceUnit=document.getElementById('autoUnit')?.value,fingerprint=planningFingerprint(),month=ym(),selectionRebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
+      const sourceUnit=document.getElementById('autoUnit')?.value,fingerprint=planningFingerprint(),month=ym(),sourceSelection=JSON.stringify(selected(u)),selectionRebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
+      // Let the browser paint the progress/cancel controls before any work.
+      await new Promise(resolve=>setTimeout(resolve,0));check();
+      if(ym()!==month||document.getElementById('autoUnit')?.value!==sourceUnit||JSON.stringify(selected(u))!==sourceSelection||!!document.getElementById('rebuildSelectedUnitV246')?.checked!==selectionRebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Yeni bilgilerle dağıtımı tekrar başlatın; plan kaydedilmedi.');
       // Short Skopi targets cannot cover every editable cell. Start with a
       // partial plan and honor the user's rebuild selection for unlocked cells.
       const current=model(u,selected(u)),given=readTargets(current,{partial:true});
@@ -545,14 +562,34 @@
           const currentFingerprint=planningFingerprint();if(currentFingerprint!==fingerprint){const a=JSON.parse(fingerprint),b=JSON.parse(currentFingerprint);console.warn('RPYS plan değişiklik denetimi',Object.keys({...a,...b}).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).join(', '))}
           if(ym()!==month||currentFingerprint!==fingerprint||document.getElementById('autoUnit')?.value!==sourceUnit||JSON.stringify(selected(u))!==JSON.stringify(data.m.ids)||!!document.getElementById('rebuildSelectedUnitV246')?.checked!==selectionRebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Yeni bilgilerle dağıtımı tekrar başlatın; plan kaydedilmedi.');
           report('Yerleştirilen görevlerin güvenlik ve hedef kontrolleri yapılıyor…','progress',true);
-          const live=db,originalAll=window.allAssignmentsAllMonths;db=JSON.parse(JSON.stringify(live));draftActive=true;clearCache();let verdict;
+          let live=db,originalAll=window.allAssignmentsAllMonths;const validationDraft=JSON.parse(JSON.stringify(live));db=validationDraft;draftActive=true;clearCache();let verdict,validationIndex,validationHistory,sliceStart=Date.now();
+          const yieldValidation=async()=>{
+            if(Date.now()-sliceStart<8)return;
+            db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache();
+            await new Promise(resolve=>setTimeout(resolve,0));
+            live=db;originalAll=window.allAssignmentsAllMonths;
+            db=validationDraft;draftActive=true;activeRecordIndex=validationIndex;window.allAssignmentsAllMonths=validationHistory;clearCache();sliceStart=Date.now();check();
+          };
           try{
             const beforeSpouses=new Set((window.rpysScheduler398.spouseDayViolations?.(ym())||[]).map(x=>x.key));
             for(const k of data.m.mutable){delete db.assign[k];if(db.assignmentMeta)delete db.assignmentMeta[k]}
-            clearCache();activeRecordIndex=recordIndex(data.m);window.allAssignmentsAllMonths=historyIndex(data.m);
-            if(partial){const checked=validatePartial(data.m,result.plan);result.plan=checked.plan;gapExceptions=checked.gapExceptions;notes=[...data.problems,...checked.notes];verdict=true}
+            clearCache();validationIndex=recordIndex(data.m);validationHistory=historyIndex(data.m);activeRecordIndex=validationIndex;window.allAssignmentsAllMonths=validationHistory;
+            if(partial){
+              const steps=partialValidation(data.m,result.plan);let step;
+              do{step=steps.next();if(!step.done)await yieldValidation()}while(!step.done);
+              const checked=step.value;result.plan=checked.plan;gapExceptions=checked.gapExceptions;notes=[...data.problems,...checked.notes];verdict=true;
+            }
             else{const adapter=searchAdapter(data.m);for(const x of result.plan)adapter.place(x.id,data.m.slots[x.slot]);verdict=adapter.finalCheck();if(verdict===true){const issues=(window.rpysScheduler398.spouseDayViolations?.(ym())||[]).filter(x=>!beforeSpouses.has(x.key));if(issues.length){const x=issues[0];verdict=`${getPersonById(x.first)?.name||x.first} / ${getPersonById(x.second)?.name||x.second}: ${x.day}. gün eşlerin aynı gün çalışma kuralı.`}}}
+            if(automaticUnit===u&&u==='ACİL RÖNTGEN'&&verdict===true){
+              // Explain holes on the isolated plan, yielding between people.
+              // A no-op reports the preserved live calendar instead.
+              if(!result.plan.length){db.assign={...live.assign};db.assignmentMeta={...live.assignmentMeta};clearCache();}
+              const steps=window.rpysScheduler398.equalCompletionSteps(u,data.m.ids,result.plan.length);let step;
+              do{step=steps.next();if(!step.done)await yieldValidation()}while(!step.done);
+              job.completion=step.value;
+            }
           }finally{db=live;draftActive=false;activeRecordIndex=null;window.allAssignmentsAllMonths=originalAll;clearCache()}
+          if(ym()!==month||planningFingerprint()!==fingerprint||document.getElementById('autoUnit')?.value!==sourceUnit||JSON.stringify(selected(u))!==sourceSelection||!!document.getElementById('rebuildSelectedUnitV246')?.checked!==selectionRebuild)throw Error('Hesaplama sırasında veriler veya seçim değişti. Plan kaydedilmedi.');
           if(verdict===true){accepted=true;break}
           if(automaticUnit===u&&result.timedOut)throw Error('Verilen sürede bütün kuralları sağlayan plan bulunamadı; bu sonuç hedeflerin imkânsız olduğunu kanıtlamaz.\n'+String(verdict));
           if(bestEffortRequested){reason=String(verdict);break}
@@ -560,20 +597,26 @@
           if(Date.now()-started>=searchBudget)throw Error(String(verdict)+'\nGeçerli alternatif plan süre içinde bulunamadı; liste ve hedefler korundu.');
         }
         if(accepted){
-          if(partial&&!result.plan.length){report('Yerleştirilebilen yeni görev yok. Mevcut liste korundu.\n'+[reason,...data.problems,...notes].filter(Boolean).join('\n'),'warning',false);return {ok:false,partial:true,plan:[],notes}}
-          prepared={u,partial,timedOut:!!result.timedOut,reason:partial?reason:'',notes:partial&&result.timedOut?[...notes,'Bulunan kısmi plan uygulandı; daha fazla görevin yerleşemeyeceği kanıtlanmış değildir.']:notes,plan:result.plan.map(x=>({id:x.id,slot:data.m.slots[x.slot]})),nodes:result.nodes,gapExceptions:partial?gapExceptions:[]};break;
+          if(partial&&!result.plan.length){
+            report('Yerleştirilebilen yeni görev yok. Mevcut liste korundu.\n'+[reason,...data.problems,...notes].filter(Boolean).join('\n'),'warning',false);
+            return {ok:false,partial:true,plan:[],notes};
+          }
+          prepared={u,completion:job.completion,validatedEqual:automaticUnit===u&&u==='ACİL RÖNTGEN',fingerprint,partial,timedOut:!!result.timedOut,reason:partial?reason:'',notes:partial&&result.timedOut?[...notes,'Bulunan kısmi plan uygulandı; daha fazla görevin yerleşemeyeceği kanıtlanmış değildir.']:notes,plan:result.plan.map(x=>({id:x.id,slot:data.m.slots[x.slot]})),nodes:result.nodes,gapExceptions:partial?gapExceptions:[]};break;
         }
       }
       if(!prepared)throw Error(reason||'Yerleştirilebilen plan bulunamadı; mevcut liste korundu.');
       report('Plan doğrulandı. Güvenli kayıt hazırlanıyor…','progress',true);
-      return resume();
-    }catch(e){console.error('RPYS dağıtım hazırlığı',e);report(e.message||String(e),'error',false);alert('Dağıtım uygulanmadı; mevcut liste ve hedefler korundu.\n\n'+(e.message||e));return false}
-    finally{clearTimeout(timer);worker?.terminate();preparing=false;prepared=null;currentJob=null;activeRecordIndex=null;report(feedback.text,feedback.tone,false)}
+      const applied=resume();
+      if(applied?.ok&&automaticUnit===u&&u==='ACİL RÖNTGEN')job.completion=db.v251PlanAudit?.[key(u)]?.completion;else if(!applied?.ok)job.completion=null;
+      return applied;
+    }catch(e){job.completion=null;console.error('RPYS dağıtım hazırlığı',e);report(e.message||String(e),'error',false);alert('Dağıtım uygulanmadı; mevcut liste ve hedefler korundu.\n\n'+(e.message||e));return false}
+    finally{clearTimeout(timer);worker?.terminate();preparing=false;prepared=null;currentJob=null;activeRecordIndex=null;report(feedback.text,feedback.tone,false);if(job.completion)window.rpysScheduler398.renderAcilCompletion(u,job.completion)}
   }
   function distribute(u){
     if(!window.rpysScheduler398?.running())throw Error('Güvenli dağıtım oturumu gerekli.');
     const partial=!!prepared?.partial,m=model(u,selected(u));if(!m.ids.length)throw Error('Önce bu birimde çalışacak personelleri seç.');
-    const targets=readTargets(m,{partial});
+    const targets=readTargets(m,{partial}),validatedEqual=automaticUnit===u&&u==='ACİL RÖNTGEN'&&prepared?.validatedEqual===true;
+    if(validatedEqual&&planningFingerprint()!==prepared.fingerprint)throw Error('Hesaplama sırasında veriler veya seçim değişti. Plan kaydedilmedi.');
     if(!partial)validateMonthlyLimits(m,targets);
     activeRecordIndex=recordIndex(m);
     for(const k of m.mutable){if(db.assign[k]&&!window.rpysScheduler398.mayClear(k))throw Error('Korunan kayıt değiştirilemez.');delete db.assign[k];if(db.assignmentMeta)delete db.assignmentMeta[k];}
@@ -587,14 +630,18 @@
       if(!eligibility.has(k))eligibility.set(k,!!canTakeShiftV2414(id,s.day,s.col,u));
       return eligibility.get(k);
     };
-    for(const s of m.slots)s.allowed=m.ids.filter(id=>remaining[id][s.kind]>0&&canPlace(id,s));
+    if(!validatedEqual)for(const s of m.slots)s.allowed=m.ids.filter(id=>remaining[id][s.kind]>0&&canPlace(id,s));
     const requirements=partial?[]:requirementsFor(m);
     for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun hücre yok.`);
     for(const s of m.slots)if(!partial&&!s.allowed.length)throw Error(`${s.day}. gün ${s.col.shift||s.col.key}: hedefi kalan uygun personel yok (izin, dinlenme, başka görev veya korunan kayıt).`);
     if(!hasPrepared(u))throw Error('Önce arka plan dağıtım planı hazırlanmalı.');
     const result={ok:true,partial,timedOut:!!prepared.timedOut,plan:prepared.plan,nodes:prepared.nodes,gapExceptions:partial?(prepared.gapExceptions||[]):[]};
     let unresolved=[];
-    if(partial){
+    if(validatedEqual){
+      const seen=new Set(),slots=new Map(m.slots.map(s=>[s.key,s]));
+      for(const x of result.plan){const s=slots.get(x.slot.key);if(!s||seen.has(s.key)||!m.mutable.has(s.key)||!m.ids.includes(Number(x.id))||!x.slot.allowed.includes(x.id)||remaining[x.id][s.kind]--<=0)throw Error('Doğrulanmış arka plan hücreleri güncel listeyle uyuşmuyor.');seen.add(s.key);db.assign[s.key]=x.id;}
+      result.notes=prepared.notes;
+    }else if(partial){
       const checked=validatePartial(m,prepared.plan.map(x=>({id:x.id,slot:m.slots.findIndex(s=>s.key===x.slot.key),kind:x.slot.kind})));
       result.gapExceptions=checked.gapExceptions;
       unresolved=checked.notes;
@@ -610,7 +657,7 @@
     if(automaticUnit===u){
       const unfilled=m.slots.filter(s=>!db.assign[s.key]);result.partial=unfilled.length>0||result.gapExceptions.length>0||result.notes?.length>0;result.unfilled=unfilled;result.shortfalls=[];
       db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
-      db.v251PlanAudit??={};db.v251PlanAudit[key(u)]={at:new Date().toISOString(),engine:'csp-worker-gap-calendar',gaps:window.rpysScheduler398.gapViolations(m.ids,u,ym()),filled:result.plan.length,unfilled:unfilled.map(s=>({day:s.day,key:s.key})),notes:result.notes||[]};
+      db.v251PlanAudit??={};db.v251PlanAudit[key(u)]={at:new Date().toISOString(),engine:'csp-worker-gap-calendar',gaps:window.rpysScheduler398.gapViolations(m.ids,u,ym()),filled:result.plan.length,unfilled:unfilled.map(s=>({day:s.day,key:s.key})),notes:result.notes||[],...(u==='ACİL RÖNTGEN'?{completion:prepared.completion}:{})};
       window.rpysScheduler398.validateReturnsFor?.([...new Set(result.plan.map(x=>Number(x.id)))]);saveNowV245({allowAssignDrop:m.rebuild,label:u+' boş gün sınırıyla güvenli otomatik dağıtım'});renderAll();render();
       report(`${u}: ${result.partial?'Kısmi dağıtım uygulandı. ':''}${result.plan.length} görev yerleştirildi; ${unfilled.length} hücre boş. İzin/rezerve, çakışma, nöbet ertesi dinlenme ve korunan kayıtlar denetlendi.${result.gapExceptions.length?` ${gapLimit(u)} boş gün sınırı bazı kişilerde karşılanamadı; uygun görevler uygulandı.`:''}${result.timedOut?' Daha fazla görevin yerleşemeyeceği kanıtlanmış değildir.':''}\n${[...new Set([...(result.notes||[]),...unfilled.map(s=>`${s.day}. gün ${s.col.shift||s.col.key}: uygun personel yerleştirilemedi (izin, dinlenme, başka görev veya özel kurallar); elle kontrol edilebilir.`)])].join('\n')}` ,result.partial?'warning':'success',false);return result;
     }
@@ -746,7 +793,7 @@
     persist();const m=model(u),host=document.getElementById('rpysTargetPanel399');host.querySelector('.rpysTargetSummary399').textContent=totals(m);
     for(const cell of host.querySelectorAll('[data-target-diff]')){const id=cell.dataset.targetDiff,v=cfg.people[id]||{};cell.textContent=metrics.map(t=>v[t]==null?'—':Number(v[t])-m.actual[id][t]).join(' / ');}
   }
-  window.rpysTargets399={version:'20261023-acil-complete-25',enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,prepareAutomatic,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isBusy:()=>preparing,clearFeedback:()=>report('','progress',false),isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
+  window.rpysTargets399={version:'20261027-acil-worker-26',isAutomatic:u=>automaticUnit===u,enabledFor,distribute,model,readTargets,render,install,suggest,config,prepare,prepareAutomatic,hasPrepared,planningData,historyFor,fairTargets,run:runTargets,cancel,isBusy:()=>preparing,clearFeedback:()=>report('','progress',false),isPlanning:()=>draftActive,recordCandidates:(id,dates)=>(draftActive||(prepared&&window.rpysScheduler398?.running()))&&activeRecordIndex?activeRecordIndex(Number(id),dates):null,reportError:message=>report(message,'error',false)};
   document.addEventListener('input',input,true);
   document.addEventListener('change',e=>{if(['autoUnit','autoPeople','month','rebuildSelectedUnitV246'].includes(e.target?.id))queueRender();});
   document.addEventListener('click',e=>{

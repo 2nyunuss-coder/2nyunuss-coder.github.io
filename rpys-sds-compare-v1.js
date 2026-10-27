@@ -198,14 +198,34 @@
     download.onclick=()=>{if(!output)return;const blob=new Blob(["\ufeff",output],{type:"application/msword;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="SDS_Goruntuleme_Karsilastirmasi.doc";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)};
     print.onclick=()=>{if(!output)return;const w=window.open("","_blank");if(!w)return alert("Yazdırma penceresi engellendi. İzin verip tekrar deneyin.");w.onload=()=>setTimeout(()=>w.print(),200);w.document.open();w.document.write(output);w.document.close()};
   }
-  function mount(){
+  function mount(roots=[document]){
     if(!document.body||document.getElementById("rpysSdsCompareOpen"))return;
-    const card=[...document.querySelectorAll("section,div,article")].filter(el=>/Hekim\s*\/\s*Branş İstem Dosyalarını Yükle/i.test(el.innerText||"")&&el.querySelector("button")).sort((a,b)=>(a.innerText||"").length-(b.innerText||"").length)[0];
+    // Progress messages and personnel options belong to other pages. Never
+    // read their layout/text merely to look for this SDS upload card.
+    const candidates=new Map();
+    for(let root of roots){
+      if(root.nodeType===3)root=root.parentElement;
+      if(!root||root.closest?.('#nobet,#saymanlik'))continue;
+      const elements=[...(root.matches?.('section,div,article')?[root]:[]),...root.querySelectorAll?.('section,div,article')||[]];
+      for(const el of elements){
+        if(el.closest('#nobet,#saymanlik')||el.querySelector('#nobet,#saymanlik')||!el.querySelector('button'))continue;
+        const text=el.textContent||'';if(/Hekim\s*\/\s*Branş İstem Dosyalarını Yükle/i.test(text))candidates.set(el,text.length);
+      }
+    }
+    const card=[...candidates].sort((a,b)=>a[1]-b[1])[0]?.[0];
     if(!card)return;
     const b=document.createElement("button");b.id="rpysSdsCompareOpen";b.type="button";b.className="btn alt";b.textContent="Önceki Ay + Bu Ayı Karşılaştır";b.style.cssText="display:inline-block;margin:0 0 0 8px;padding:8px 10px;font-weight:700";b.onclick=openDialog;
     const fileButton=[...card.querySelectorAll("button")].find(x=>/^Dosya Seç$/i.test((x.innerText||x.textContent||"").trim()));
     if(fileButton)fileButton.insertAdjacentElement("afterend",b);else card.append(b);
   }
-  const start=()=>{mount();new MutationObserver(mount).observe(document.body,{childList:true,subtree:true})};
+  const start=()=>{
+    mount();let timer=0;const pending=new Set();
+    new MutationObserver(changes=>{
+      if(!document?.body||document.getElementById('rpysSdsCompareOpen'))return;
+      for(const m of changes){if(m.target.closest?.('#nobet,#saymanlik'))continue;for(const node of m.addedNodes)pending.add(node)}
+      if(!pending.size||timer)return;
+      timer=setTimeout(()=>{timer=0;const roots=[...pending];pending.clear();mount(roots)},0);
+    }).observe(document.body,{childList:true,subtree:true});
+  };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
 })();

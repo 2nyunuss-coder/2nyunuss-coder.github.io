@@ -8,6 +8,8 @@
   element.innerHTML=html;htmlByElement.set(element,html);
  }
  function repairPatch(js,slug){
+  if(slug==='rpys-patch371')js=js.replace('function scanSayButtons(){','function scanSayButtons(){if(window.rpysTargets399?.isBusy?.())return;');
+  if(slug==='rpys-patch383')js=js.replace('function rename(){','function rename(){if(window.rpysTargets399?.isBusy?.())return;');
   if(slug==='rpys-patch319fixed')js=js.replace("if(!m||$('#'+id))continue;", "if(!m||$('#'+id)||window.rpysStability420.hasEquivalent(m,lab))continue;");
   const names={
    'rpys-patch332':['bindSuitable','stableSuitable','openSuitable332'],
@@ -41,6 +43,10 @@
   return js;
  }
  function repairEmbedded(js){
+  if(js.includes('rpys383print'))js=js.replace('function rename(){','function rename(){if(window.rpysTargets399?.isBusy?.())return;');
+  js=js.replace('function scanSayButtons(){','function scanSayButtons(){if(window.rpysTargets399?.isBusy?.())return;');
+  // The print patch is also embedded in the core, not only fetched remotely.
+  js=js.replace("else el.textContent='🖨 Listeyi Yazdır';","else if(el.textContent!=='🖨 Listeyi Yazdır')el.textContent='🖨 Listeyi Yazdır';");
   if(js.includes('rpysF20UnitTotal'))js=js.replace(/^function totalsRows\(\)\{[^\n]*$/m,'function totalsRows(){window.rpysStability420.renderGrandTotals()}');
   js=js.replace(/^const spouseBad=\(ids\)=>[^\n]*$/m,"const spouseBad=(ids)=>(window.rpysScheduler398?.spouseDayViolations?.(ym())||[]).filter(x=>ids.map(Number).includes(x.first)||ids.map(Number).includes(x.second)).length;").replace(/^const spouseBad10=ids=>[^\n]*$/m,"const spouseBad10=ids=>(window.rpysScheduler398?.spouseDayViolations?.(ym())||[]).filter(x=>ids.map(Number).includes(x.first)||ids.map(Number).includes(x.second)).length;");
   if(js.includes('rpysF20PolTrackSummary'))js=js.replace(/(function summary\(\)\{[^\n]*?)h\.innerHTML=(`[^\n]*`)/g,"$1window.rpysStability420.updateHtml(h,$2,'.tablewrap')");

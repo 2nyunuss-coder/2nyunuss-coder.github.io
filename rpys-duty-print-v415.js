@@ -128,7 +128,12 @@ document.addEventListener('click',event=>{
  const th=[...(table?.tHead?.rows?.[1]?.querySelectorAll('th.shift')||[])].find(x=>shiftInfo(x)?.key===button.dataset.shiftKey);if(!th)return;
  const state=collapsedShifts();state.delete(button.dataset.shiftKey);saveCollapsedShifts(state);applyShiftVisibility(th,false);
 },true);
-const shiftObserver=new MutationObserver(scanShiftHeaders);
+let shiftScanTimer=0;
+const shiftObserver=new MutationObserver(changes=>{
+ const headersChanged=changes.some(m=>m.target.closest?.('#nobet table.schedule thead')||[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches('table.schedule,thead')||n.querySelector('table.schedule,thead'))));
+ if(!headersChanged||shiftScanTimer)return;
+ shiftScanTimer=setTimeout(()=>{shiftScanTimer=0;scanShiftHeaders()},0);
+});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})});
 else {scanShiftHeaders();shiftObserver.observe(document.documentElement,{childList:true,subtree:true})}
 const shiftStyle=document.createElement('style');shiftStyle.textContent='#nobet .schedule th.shift{cursor:context-menu!important}.rpysDutyHiddenShifts{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 7px}.rpysDutyHiddenShifts button{border:1px solid #94a3b8;border-radius:5px;background:#eef4f9;color:#17365d;padding:4px 8px;font-size:11px;cursor:pointer}';document.head.append(shiftStyle);

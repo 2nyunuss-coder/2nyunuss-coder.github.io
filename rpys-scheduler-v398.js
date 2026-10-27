@@ -2,7 +2,7 @@
 (()=>{
   if(window.rpysScheduler398?.runTargets)return;
   const clone=x=>JSON.parse(JSON.stringify(x)), own=(o,k)=>Object.prototype.hasOwnProperty.call(o||{},k);
-  let run=null,targetRunner=null,equalUnit=null;
+  let run=null,targetRunner=null;
   const invalidate=()=>{_assignCache={};_allAssignCache=null;_calcCache={};_peopleCache=null};
   function sayHoursOnly(key,data=db){
     const override=data.manualDutyOverrides?.[key],meta=data.assignmentMeta?.[key];
@@ -40,8 +40,7 @@
     return source.replace("let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)","if(window.rpysScheduler398?.running()||window.rpysTargets399?.isPlanning?.())return old.apply(this,arguments);let s=sig();if(s!==lastSig){lastSig=s;invalidate('assignment-signature')}return old.apply(this,arguments)");
   }
   function repair(source){
-    // This button requests the established equal-distribution engine, even
-    // when editable manual targets from an earlier run remain enabled.
+    // Equal distribution is independent of saved editable manual targets.
     source=source.replace('id="autoDistributeBtnV251" class="btn" onclick="autoDistribute()"','id="autoDistributeBtnV251" class="btn" onclick="rpysScheduler398.runEqual()"');
     const change=(name,next,edits)=>{
       const start=source.indexOf('function '+name+'('),end=source.indexOf('\nfunction '+next+'(',start);
@@ -66,9 +65,6 @@
       ['for(const x of outsiders){delete db.assign[x.k];if(db.assignmentMeta)delete db.assignmentMeta[x.k]}','for(const x of outsiders){if(window.rpysScheduler398.mayClear(x.k)){delete db.assign[x.k];if(db.assignmentMeta)delete db.assignmentMeta[x.k]}}'],
       ['if(unit==="PORTABL + SKOPİ")purgeNonSkopiPoolAssignments();','// Only selected-unit unprotected cells can be rebuilt.'],
       ['delete db.assign[kk];','if(window.rpysScheduler398.protectedCell(kk))continue;\n        delete db.assign[kk];']
-    ]);
-    change('autoDistribute','autoDistributePolRotation',[
-      ['  logAction(`${unit} için otomatik dağıtım yapıldı: ${filled} görev.`);','  if(unit==="ACİL RÖNTGEN"){const completion=window.rpysScheduler398.fillAcilGaps(unit,ids,slots,hours,count,unitHours,unitCount);if(completion){filled+=completion.added;skipped=completion.unfilled.filter(x=>!x.locked).length;db.v251PlanAudit??={};db.v251PlanAudit[ym()+"|"+unit]={...(db.v251PlanAudit[ym()+"|"+unit]||{}),completion};}}\n  logAction(`${unit} için otomatik dağıtım yapıldı: ${filled} görev.`);']
     ]);
     change('enforceSkopiLeaveAnchors','distributeSkopiSequential',[
       ['if(db.assign[k]&&(db.assignmentMeta?.[k]?.manual||db.manualDutyOverrides?.[k]))','if(db.assign[k]&&window.rpysScheduler398.manualAssignmentCell(k))']
@@ -317,68 +313,24 @@
     }
     if(plan.length)invalidate();return plan;
   }
-  // Complete a greedy equal plan using bounded augmenting chains. An accepted
-  // chain fills an extra cell; every displaced duty is re-homed before commit.
-  // Manual/locked/pre-existing preserve-mode cells and other units never move.
-  function fillAcilGaps(unit,ids,slots,hours,count,unitHours,unitCount){
-    if(!run||equalUnit!==unit||unit!=='ACİL RÖNTGEN')return null;
-    ids=ids.map(Number);const selected=new Set(ids),records=[];
+  // Read-only coverage diagnostics shared by the background equal planner.
+  function* equalCompletionSteps(unit,ids,added=0){
+    const slots=unitSlots(unit).filter(s=>!isShiftBlockedForMonth(s.type,s.col,ym())),records=[];
     for(let day=1;day<=daysInMonth();day++)for(const slot of slots)if(isDutyCellApplicable(slot.type,slot.col,day)){
       const key=keyFor(slot.type,day,slot.col.key),meta=db.assignmentMeta?.[key]||{};
       records.push({day,key,type:slot.type,col:{...slot.col,...(meta.shift?{shift:meta.shift}:{}),...(meta.hours!=null?{hours:Number(meta.hours)}:{})}});
     }
-    const initial={...db.assign},started=Date.now(),deadline=started+250,maxNodes=1800;let nodes=0,limited=false;
-    const partners=rec=>records.filter(x=>x.day===rec.day).map(x=>({type:x.type,col:x.col}));
-    const summary=()=>{
-      const before=records.filter(x=>initial[x.key]).length,filled=records.filter(x=>db.assign[x.key]).length;
-      const unfilled=records.filter(x=>!db.assign[x.key]).map(rec=>({day:rec.day,key:rec.key,shift:rec.col.shift||rec.col.key,locked:protectedCell(rec.key),people:ids.map(id=>({id,name:getPersonById(id)?.name||String(id),reason:acilBlockReason(id,rec,unit,ids,partners(rec))}))}));
-      return {added:filled-before,beforeFilled:before,filled,total:records.length,unfilled,nodes,limited,elapsed:Date.now()-started};
-    };
-    if(!records.some(x=>!db.assign[x.key]&&!protectedCell(x.key)))return summary();
-    const eligible=window.canTakeShiftV2414||window.canTakeShift,undo=[];
-    const write=(key,id)=>{undo.push({key,had:own(db.assign,key),id:db.assign[key]});if(id)db.assign[key]=id;else delete db.assign[key];invalidate()};
-    const rollback=mark=>{while(undo.length>mark){const x=undo.pop();if(x.had)db.assign[x.key]=x.id;else delete db.assign[x.key]}invalidate()};
-    const budget=()=>{if(++nodes>maxNodes||Date.now()>deadline){limited=true;return false}return true};
-    const options=rec=>ids.map(id=>({id,group:spousePlacements(id,rec.day,rec,unit,ids,partners(rec))})).filter(x=>x.group.length);
-    const loads=()=>{const n=new Map(ids.map(id=>[id,{hours:0,count:0}]));for(const rec of records){const x=n.get(Number(db.assign[rec.key]));if(x){x.hours+=Number(rec.col.hours||0);x.count++}}return n};
-    const order=()=>{const n=loads();return ids.slice().sort((a,b)=>n.get(a).count-n.get(b).count||n.get(a).hours-n.get(b).hours||a-b)};
-    const issueKey=x=>x.id+'|'+x.day;
-    const beforeSpouses=new Set(spouseDayViolations(ym()).map(x=>x.key)),beforeReturns=new Set(returnWorkdayViolations(ids).map(issueKey));
-    const mustRemain=[];if(window.rpysRules421?.enabled(unit,'preLeaveThursday')!==false&&typeof isMandatoryPreLeaveThursday==='function')for(const id of ids)for(let d=1;d<=daysInMonth();d++)if(isMandatoryPreLeaveThursday(id,d)&&spouseWorkingOnDay(id,d))mustRemain.push({id,day:d});
-    const gapScore=()=>gapViolations(ids,unit).reduce((n,x)=>n+Math.max(0,x.blank-x.maxBlank),0);let allowedGap=gapScore();
-    const valid=()=>{
-      if(spouseDayViolations(ym()).some(x=>!beforeSpouses.has(x.key))||returnWorkdayViolations(ids).some(x=>!beforeReturns.has(issueKey(x)))||mustRemain.some(x=>!spouseWorkingOnDay(x.id,x.day)))return false;
-      const affected=new Set(records.filter(x=>Number(initial[x.key]||0)!==Number(db.assign[x.key]||0)).flatMap(x=>[Number(initial[x.key]),Number(db.assign[x.key])]).filter(Boolean));
-      for(const rec of records){const id=Number(db.assign[rec.key]);if(!affected.has(id)||!selected.has(id))continue;const saved=db.assign[rec.key];delete db.assign[rec.key];invalidate();let ok;
-        try{ok=eligible(id,rec.day,rec.col,unit)}finally{db.assign[rec.key]=saved;invalidate()}
-        if(!ok&&!(Number(run.before.assign?.[rec.key])===id&&protectedCell(rec.key)))return false;
-      }
-      return gapScore()<=allowedGap;
-    };
-    function search(pending,depth,visited){
-      if(!budget())return false;pending=pending.filter(x=>!db.assign[x.key]);if(!pending.length)return valid();
-      const rec=pending[0],rest=pending.slice(1),rank=order();
-      for(const id of rank){if(!budget())return false;const mark=undo.length,group=spousePlacements(id,rec.day,rec,unit,ids,partners(rec));
-        if(group.length){for(const x of group)write(x.key,x.id);if(search(rest,depth,visited))return true;rollback(mark)}
-      }
-      if(depth<=0)return false;
-      const cfg=typeof ruleCfg==='function'?ruleCfg():{},span=Math.max(4,Number(cfg.minGap||2));
-      for(const id of rank){const spouse=typeof spouseOf==='function'?Number(spouseOf(id)||0):0;
-        const blockers=records.filter(x=>db.assign[x.key]&&selected.has(Number(db.assign[x.key]))&&!protectedCell(x.key)&&!visited.has(x.key)&&Math.abs(x.day-rec.day)<=span&&(Number(db.assign[x.key])===id||spouse&&x.day===rec.day||Number(db.assign[x.key])===spouse)).sort((a,b)=>Math.abs(a.day-rec.day)-Math.abs(b.day-rec.day));
-        for(const blocker of blockers){if(!budget())return false;const mark=undo.length;write(blocker.key,0);const group=spousePlacements(id,rec.day,rec,unit,ids,partners(rec));
-          if(group.length){for(const x of group)write(x.key,x.id);const next=new Set(visited);next.add(rec.key);next.add(blocker.key);if(search([blocker,...rest],depth-1,next))return true}rollback(mark);
-        }
-      }return false;
+    const filled=records.filter(x=>db.assign[x.key]).length;
+    const unfilled=[];
+    for(const rec of records.filter(x=>!db.assign[x.key])){
+      const locked=protectedCell(rec.key),partners=records.filter(x=>x.day===rec.day).map(x=>({type:x.type,col:x.col})),people=[];
+      if(!locked)for(const id of ids){people.push({id,name:getPersonById(id)?.name||String(id),reason:acilBlockReason(id,rec,unit,ids,partners)});yield;}
+      unfilled.push({day:rec.day,key:rec.key,shift:rec.col.shift||rec.col.key,locked,people});
     }
-    let progress=true;
-    while(progress&&!limited){progress=false;const empty=records.filter(x=>!db.assign[x.key]&&!protectedCell(x.key)).map(x=>({rec:x,n:options(x).length})).sort((a,b)=>a.n-b.n||a.rec.day-b.rec.day);
-      for(const {rec} of empty){if(db.assign[rec.key])continue;const mark=undo.length;if(search([rec],3,new Set([rec.key]))){undo.length=0;allowedGap=gapScore();progress=true}else rollback(mark);if(limited)break;}
-    }
-    // Reconcile the existing engine's counters only after validated chains.
-    for(const rec of records){const old=Number(initial[rec.key]||0),next=Number(db.assign[rec.key]||0);if(old===next)continue;
-      for(const [id,sign] of [[old,-1],[next,1]])if(selected.has(id)){const h=Number(rec.col.hours||0)*sign;for(const map of [hours,unitHours])if(map)map[id]=Number(map[id]||0)+h;for(const map of [count,unitCount])if(map)map[id]=Number(map[id]||0)+sign;}
-    }
-    return summary();
+    return {engine:'csp-worker',added,beforeFilled:filled-added,filled,total:records.length,unfilled,gaps:gapViolations(ids,unit).length};
+  }
+  function equalCompletion(unit,ids,added=0){
+    const steps=equalCompletionSteps(unit,ids,added);let step;do{step=steps.next()}while(!step.done);return step.value;
   }
   function acilBlockReason(id,rec,unit,ids,slots){
     const person=getPersonById(id),date=dateStr(rec.day),on=key=>window.rpysRules421?.enabled(unit,key)!==false;
@@ -398,14 +350,14 @@
     if(eligible(id,rec.day,rec.col,unit)){if(!spousePlacements(id,rec.day,rec,unit,ids,slots).length)return 'Eş kuralı için aynı gün ikinci uygun hücre / seçili eş yok';return 'Yerel uygunluk var; tüm listeyi koruyan yer değiştirme tamamlanamadı';}
     return 'Etkin takvim veya personel kuralı; hücrenin uygun personel listesinden incelenebilir';
   }
-  function renderAcilCompletion(unit){
-    const report=db.v251PlanAudit?.[ym()+'|'+unit]?.completion;if(!report||typeof document.createElement!=='function')return;
+  function renderAcilCompletion(unit,report=db.v251PlanAudit?.[ym()+'|'+unit]?.completion){
+    if(!report||typeof document.createElement!=='function')return;
     document.getElementById('rpysAcilCompletion425')?.remove();const host=document.getElementById('distResult');if(!host)return;
     const available=report.total-report.unfilled.filter(x=>x.locked).length;
     // The old engine's gap note was computed before the completion pass and
     // used its earlier calendar definition. Display only the current result.
     const ids=Array.from(document.getElementById('autoPeople')?.selectedOptions||[],o=>Number(o.value));
-    const gaps=gapViolations(ids,unit).length;
+    const gaps=report.gaps??gapViolations(ids,unit).length;
     host.textContent=host.textContent.replace(/ Not: 5 günlük aralık kontrolünde \d+ sapma/g,'').replace(/, \d+ hücre uygun kişi kalmadığı için boş/g,', '+report.unfilled.filter(x=>!x.locked).length+' hücre boş kaldı');
     host.textContent+='\nGörev hücreleri: '+report.filled+' / '+available+'.'+(report.unfilled.some(x=>x.locked)?' Kilitli boş hücreler dağıtım dışında.':'')+(gaps?' 5 günlük aralık: '+gaps+' sapma.':'')+(report.limited?' Yer değiştirme sınırına ulaşıldı; kalanların imkânsız olduğu kanıtlanmış değildir.':'');
     if(!report.unfilled.length)return;
@@ -452,9 +404,8 @@
     const fn=function(){
       if(run)return base.apply(this,arguments);
       const targetUnit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
-      const equal=name==='autoDistribute'&&equalUnit===targetUnit&&targetUnit==='ACİL RÖNTGEN';
-      if(!equal&&targetUnit&&window.rpysTargets399?.prepareAutomatic&&!window.rpysTargets399.enabledFor(targetUnit)&&window.rpysRules421?.enabled(targetUnit,'maxGapEnabled'))return window.rpysTargets399.prepareAutomatic(targetUnit,()=>fn.apply(this,arguments));
-      if(!equal&&window.rpysTargets399?.enabledFor(targetUnit)&&!window.rpysTargets399.hasPrepared(targetUnit))return window.rpysTargets399.prepare(targetUnit,()=>fn.apply(this,arguments));
+      if(targetUnit&&window.rpysTargets399?.prepareAutomatic&&!window.rpysTargets399.enabledFor(targetUnit)&&window.rpysRules421?.enabled(targetUnit,'maxGapEnabled'))return window.rpysTargets399.prepareAutomatic(targetUnit,()=>fn.apply(this,arguments));
+      if(window.rpysTargets399?.enabledFor(targetUnit)&&!window.rpysTargets399.hasPrepared(targetUnit))return window.rpysTargets399.prepare(targetUnit,()=>fn.apply(this,arguments));
       if(isMonthLocked()){alert('Bu ay kilitli. Liste değiştirilmedi.');return false}
       const before=clone(db),month=ym(),rebuild=!!document.getElementById('rebuildSelectedUnitV246')?.checked;
       const unit=name==='runPolRotation2'?'POLİKLİNİK RÖNTGEN':name==='distributeSkopiSequential'?'PORTABL + SKOPİ':document.getElementById('autoUnit')?.value;
@@ -508,12 +459,12 @@
         window[name]=function(){const k=JSON.stringify(Array.from(arguments));if(!cache.has(k))cache.set(k,baseQuery.apply(this,arguments));return cache.get(k)};
       }
       for(const key of ['save','saveNowV245','flushSave'])if(typeof window[key]==='function'){saved[key]=window[key];window[key]=(...args)=>{pending.push(args);return null}}
-        const targetIds=equal?Array.from(document.getElementById('autoPeople')?.selectedOptions||[],o=>Number(o.value)).filter(id=>getPersonById(id)):window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.model(unit).ids:null;
+        const targetIds=window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.model(unit).ids:null;
         if(targetIds)run.targetIds=new Set(targetIds);
         const restCheck=()=>targetIds&&window.rpysRest16V397.allViolationsForMonth?window.rpysRest16V397.allViolationsForMonth(targetIds,month):window.rpysRest16V397.allViolations();
         const beforeRest=restCheck();
         const beforeSpouses=new Set(spouseDayViolations(month).map(x=>x.key));run.beforeSpouses=beforeSpouses;
-        value=window.rpysRest16V397.runIndexed(()=>!equal&&window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
+        value=window.rpysRest16V397.runIndexed(()=>window.rpysTargets399?.enabledFor(unit)?window.rpysTargets399.distribute(unit):base.apply(this,arguments));
         if(value&&typeof value.then==='function')throw Error('Beklenmeyen asenkron motor; liste korunarak işlem durduruldu.');
         for(const key of restCheck().keys())if(window.rpysRules421?.enabled(unit,'noPostDuty')!==false&&!beforeRest.has(key))throw Error('16 saat ve üzeri çalışma sonrası ertesi gün dinlenme kuralı ihlali engellendi.');
         const newSpouseIssues=spouseDayViolations(month).filter(x=>!beforeSpouses.has(x.key));
@@ -531,7 +482,7 @@
       finally{for(const [key,original] of Object.entries(saved))window[key]=original;for(const [key,original] of Object.entries(staticQueries))window[key]=original;window.dutyColumnByKey=lookup;if(allMonths)window.allAssignmentsAllMonths=allMonths;if(overlap)window.personHasOverlap=overlap;run=null}
       if(error){try{renderAll()}catch(_){}console.error('RPYS398 motor koruması',error,error.cellKey||'');window.rpysTargets399?.reportError?.(error.message||String(error));alert('İşlem tamamlanamadı; önceki liste aynen korundu.\n\n'+(error.message||error));return false}
       if(pending.length){const saveFn=saved.saveNowV245||saved.save;saveFn?.({allowAssignDrop:rebuild,label:'6.1.1 güvenli liste dağıtımı'});}
-      invalidate();if(equal&&pending.length)renderAcilCompletion(unit);return value;
+      invalidate();return value;
     };fn.__rpys398=true;window[name]=fn;if(name==='autoDistribute')targetRunner=fn;
   }
   function install(){
@@ -546,15 +497,15 @@
     return targetRunner();
   }
   function runEqual(){
-    if(run||equalUnit||window.rpysTargets399?.isBusy?.())return false;
+    if(run||window.rpysTargets399?.isBusy?.())return false;
     const unit=document.getElementById('autoUnit')?.value;
-    // Keep other units' current engines unchanged. ACİL uses its original
-    // quotas, equalisation and repair passes inside the same safe transaction.
     if(unit!=='ACİL RÖNTGEN')return window.autoDistribute();
-    window.rpysTargets399?.clearFeedback?.();
-    equalUnit=unit;try{return window.autoDistribute()}finally{equalUnit=null}
+    // Keep manual targets intact. This scoped automatic mode builds a detached
+    // plan, yields during eligibility checks and searches only in a real Worker.
+    if(!window.rpysTargets399?.prepareAutomatic){alert('Arka plan dağıtım motoru henüz yüklenmedi. Liste değiştirilmedi.');return false}
+    return window.rpysTargets399.prepareAutomatic(unit,()=>runTargets());
   }
-  window.rpysScheduler398={runTargets,runEqual,repair,repairCache,install,fillAcilGaps,validateReturnsFor:ids=>{if(run)run.returnIds=ids},preservedCell:(key,id)=>!!run&&Number(run.before.assign?.[key])===Number(id)&&protectedCell(key),protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
+  window.rpysScheduler398={runTargets,runEqual,repair,repairCache,install,equalCompletion,equalCompletionSteps,renderAcilCompletion,validateReturnsFor:ids=>{if(run)run.returnIds=ids},preservedCell:(key,id)=>!!run&&Number(run.before.assign?.[key])===Number(id)&&protectedCell(key),protectedCell,manualAssignmentCell,sayHoursOnly,manualBadgeHtml,mayClear,gapCalendar,gapViolations,reservedOn,returnWorkdays,returnWorkdayViolations,reserveReturnWorkdays,spousePlacements,placeSpouseGroup,alignSpouseDays,preserveSpousePairs,spouseUnavailable,spouseWorkingOnDay,absentStatus,spouseDayViolations,currentUnit:()=>run?.unit||'',running:()=>!!run};
   install();
   window.addEventListener('rpys-direct-core-ready',()=>[50,400,2800].forEach(ms=>setTimeout(install,ms)));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);

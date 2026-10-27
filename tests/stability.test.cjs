@@ -97,3 +97,15 @@ test('unrelated encoded data and executable payloads remain byte-for-byte unchan
 test('the second embedded F20 unit-total writer delegates cleanup instead of recreating summary rows',()=>{
  const f=fixture('<table class="say"><tbody><tr><td>FARK</td><td>45</td></tr></tbody></table>');try{const source='// rpysF20UnitTotal\nfunction totalsRows(){throw Error("old writer")}';f.w.eval(f.api.repairEmbedded(source));f.w.totalsRows();assert.equal(f.w.document.querySelectorAll('table tr').length,1)}finally{f.dom.window.close()}
 });
+
+
+test('embedded print maintenance does not rewrite unchanged labels on every DOM mutation',()=>{
+ const f=fixture('<button id="print">🖨 Listeyi Yazdır</button>');try{
+  const original="function rename(){const el=document.getElementById('print');if(el.tagName==='INPUT')el.value='Listeyi Yazdır';else el.textContent='🖨 Listeyi Yazdır';}";
+  const encoded=Buffer.from(original+'/*'+'x'.repeat(250)+'*/').toString('base64');
+  const repaired=f.api.repair('window.printPatch="'+encoded+'";');f.w.eval(repaired);f.w.eval(new TextDecoder().decode(Uint8Array.from(f.w.atob(f.w.printPatch),c=>c.charCodeAt(0))));
+  const obs=new f.w.MutationObserver(()=>{});obs.observe(f.w.document.body,{subtree:true,childList:true});
+  for(let n=0;n<25;n++)f.w.rename();assert.equal(obs.takeRecords().length,0);
+  f.w.document.getElementById('print').textContent='Old label';obs.takeRecords();f.w.rename();assert.equal(f.w.document.getElementById('print').textContent,'🖨 Listeyi Yazdır');obs.disconnect();
+ }finally{f.dom.window.close()}
+});
