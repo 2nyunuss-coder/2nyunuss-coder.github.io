@@ -1,0 +1,17 @@
+(()=>{
+if(window.__RPYS372_V4__)return;window.__RPYS372_V4__=1;
+const F=window.fetch.bind(window), API='https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-web';
+let lastToken='', appliedRev=0, applying=false;
+function urlOf(input){try{return typeof input==='string'?input:(input&&input.url)||String(input)}catch(_){return ''}}
+function authOf(input,init){try{let h=new Headers(init&&init.headers||((input&&input.headers)||{}));let a=h.get('authorization')||'';return a.startsWith('Bearer ')?a.slice(7):''}catch(_){return ''}}
+function token(){try{return localStorage.getItem('rpys_cloud_session')||sessionStorage.getItem('rpys_cloud_session')||lastToken||''}catch(_){return lastToken||''}}
+function setRev(r){r=Number(r||0);for(const n of ['_serverRevision','_cloudRevision','_storageRevision','_lastServerRevision']){try{window[n]=r}catch(_){}}}
+function clearRealCaches(){try{_assignCache={}}catch(_){}try{_allAssignCache=null}catch(_){}try{_calcCache={}}catch(_){}try{_peopleCache=null}catch(_){}try{window._assignCache={};window._allAssignCache=null;window._calcCache={};window._peopleCache=null}catch(_){}}
+function applyCloud(j){try{if(!j||!j.data||!Array.isArray(j.data.staff)||typeof j.data.assign!=='object')return;let r=Number(j.revision||j.seq||0);if(r&&appliedRev>0&&r<=appliedRev)return;applying=true;appliedRev=Math.max(appliedRev,r);window.db=j.data;try{db=j.data}catch(_){}setRev(r);clearRealCaches();try{if(typeof renderCurrentPage==='function')renderCurrentPage();else if(typeof renderAll==='function')renderAll()}catch(_){}setTimeout(()=>{clearRealCaches();try{if(document.getElementById('saymanlik')?.classList.contains('active')&&typeof renderCurrentPage==='function')renderCurrentPage()}catch(_){}},120);document.documentElement.dataset.rpysCloudRevision=String(r||'');setTimeout(()=>{applying=false},240)}catch(e){applying=false;console.error('RPYS372V4 apply',e)}}
+async function pull(t){t=t||token();if(!t)return;lastToken=t;try{let r=await F(API+'/api/state?force372v4='+Date.now(),{headers:{Authorization:'Bearer '+t},cache:'no-store'});if(!r.ok)return;let j=await r.json();applyCloud(j)}catch(e){console.error('RPYS372V4 pull',e)}}
+window.fetch=async function(input,init){const u=urlOf(input),m=String((init&&init.method)||((input&&input.method)||'GET')).toUpperCase();if(u.includes('/rpys-web/api/state')&&m==='POST'&&applying){return new Response(JSON.stringify({error:'BULUT_YUKLENIRKEN_KAYIT_ENGELLENDI'}),{status:409,headers:{'Content-Type':'application/json'}})}let r=await F(input,init);if(u.includes('/rpys-web/api/login')&&m==='POST'&&r.ok){try{r.clone().json().then(j=>{if(j&&j.token){lastToken=j.token;setTimeout(()=>pull(j.token),50)}})}catch(_){}}if(u.includes('/rpys-web/api/state')&&m==='GET'&&r.ok){try{let t=authOf(input,init);if(t)lastToken=t;r.clone().json().then(j=>{if(j&&j.data)setTimeout(()=>applyCloud(j),30)})}catch(_){}}return r};
+function boot(){let t=token();if(t){lastToken=t;setTimeout(()=>pull(t),100);setTimeout(()=>pull(t),1400)}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.addEventListener('pageshow',()=>setTimeout(()=>pull(token()),120));
+window.addEventListener('focus',()=>setTimeout(()=>pull(token()),120));
+})();

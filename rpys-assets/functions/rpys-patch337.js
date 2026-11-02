@@ -1,0 +1,53 @@
+(()=>{
+if(window.__RPYS_PATCH337__)return;window.__RPYS_PATCH337__=1;
+const Q=(s,r=document)=>r.querySelector(s),QA=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const N=s=>String(s??'').replace(/\s+/g,' ').trim();
+const U=s=>N(s).toLocaleUpperCase('tr-TR');
+const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function ymSafe(){try{return typeof ym==='function'?ym():String(db?.ui?.lastMonth||'')}catch(_){return String(db?.ui?.lastMonth||'')}}
+function ctx(){try{return window.dutyContextCellV2413||(typeof dutyContextCellV2413!=='undefined'?dutyContextCellV2413:null)}catch(_){return null}}
+function colInfo(cell){try{return dutyColumnByKey(cell.dataset.type,cell.dataset.col)}catch(_){return null}}
+function metric(cell){const c=colInfo(cell),u=String(c?.unit||''),k=String(c?.key||'');
+ if(u==='RUTİN PORTABL')return {key:'portable',label:'Portable',match:a=>a?.col?.unit==='RUTİN PORTABL'};
+ if(u==='PORTABL + SKOPİ')return k==='sk1'?{key:'skopiDay',label:'Skopi Gündüz',match:a=>a?.col?.unit==='PORTABL + SKOPİ'&&a?.col?.key==='sk1'}:{key:'skopiNobet',label:'Skopi Nöbet',match:a=>a?.col?.unit==='PORTABL + SKOPİ'&&a?.col?.key==='sk2'};
+ if(u==='POLİKLİNİK RÖNTGEN')return {key:'pol',label:'Poliklinik Röntgen',match:a=>a?.col?.unit==='POLİKLİNİK RÖNTGEN'};
+ if(u==='MAMOGRAFİ')return {key:'mammo',label:'Mamografi',match:a=>a?.col?.unit==='MAMOGRAFİ'};
+ if(u==='KEMİK ÖLÇÜMÜ')return {key:'bone',label:'Kemik Ölçümü',match:a=>a?.col?.unit==='KEMİK ÖLÇÜMÜ'};
+ if(u==='ACİL RÖNTGEN')return {key:'acil',label:'Acil Röntgen',match:a=>a?.col?.unit==='ACİL RÖNTGEN'};
+ if(u==='BİLGİSAYARLI TOMOGRAFİ')return {key:'bt',label:'BT',match:a=>a?.col?.unit==='BİLGİSAYARLI TOMOGRAFİ'};
+ if(u==='BİRİM SORUMLUSU')return {key:'manager',label:'Birim Sorumlusu',match:a=>a?.col?.unit==='BİRİM SORUMLUSU'};
+ if(u==='SEKRETERLİK')return {key:'secretary',label:'Sekreterlik',match:a=>a?.col?.unit==='SEKRETERLİK'};
+ return {key:null,label:u||'Birim',match:a=>String(a?.col?.unit||'')===u};}
+function monthAssignments(){try{return typeof assignmentsMonth==='function'?assignmentsMonth():[]}catch(_){return []}}
+function allAssignments(){try{return typeof allAssignmentsAllMonths==='function'?allAssignmentsAllMonths():monthAssignments()}catch(_){return monthAssignments()}}
+function target(mi,pid){try{const n=Number(db?.netStatManual?.[mi.key+'|'+Number(pid)]?.obligation);return Number.isFinite(n)&&n>0?n:null}catch(_){return null}}
+function done(mi,pid){try{return monthAssignments().filter(a=>Number(a?.person?.id)===Number(pid)&&mi.match(a)).length}catch(_){return 0}}
+function idle(mi,pid,ds){try{const dates=allAssignments().filter(a=>Number(a?.person?.id)===Number(pid)&&mi.match(a)&&String(a?.date||'')<ds).map(a=>String(a.date)).sort();const last=dates.at(-1);if(!last)return {days:999,txt:'Bu birimde daha önce hiç çalışmadı'};const d=Math.max(0,Math.round((new Date(ds+'T12:00:00')-new Date(last+'T12:00:00'))/86400000)-1);return {days:d,txt:d+' gündür bu birimde çalışmadı'}}catch(_){return {days:999,txt:'Bu birimde daha önce hiç çalışmadı'}}}
+function dateForDay(d){try{return dateStr(d)}catch(_){return ymSafe()+'-'+String(d).padStart(2,'0')}}
+function render337(){const box=Q('#dutySuitableListV2413'),cell=ctx();if(!box)return;if(!cell){box.innerHTML='<div class="suitableNoneV2413">Hücre seçilmedi.</div>';box.style.display='block';return}
+ try{const d=Number(cell.dataset.day),col=colInfo(cell),mi=metric(cell),ds=dateForDay(d);if(!col)throw new Error('Vardiya bulunamadı');const people=(typeof currentPeople==='function'?currentPeople():[]).filter(Boolean),items=[];
+  for(const p of people){let ok=false;try{ok=typeof canTakeShiftV2414==='function'?!!canTakeShiftV2414(p.id,d,col,col.unit):!!canTakeShift(p.id,d,col,col.unit)}catch(_){ok=false}if(!ok)continue;const t=target(mi,p.id),cur=done(mi,p.id),id=idle(mi,p.id,ds),missing=t===null?null:Math.max(0,t-cur);let spouse=false;try{spouse=!!spouseAssignedOnDay(p.id,d)}catch(_){}items.push({p,t,cur,id,missing,spouse})}
+  items.sort((a,b)=>{const am=a.missing===null?-1:a.missing,bm=b.missing===null?-1:b.missing;if(am!==bm)return bm-am;if(a.id.days!==b.id.days)return b.id.days-a.id.days;return String(a.p.name||'').localeCompare(String(b.p.name||''),'tr',{sensitivity:'base'})||Number(a.p.id)-Number(b.p.id)});
+  window.__RPYS_SUITABLE_FROZEN337__=false;
+  box.innerHTML='<div class="suitableHeadV2413">'+d+'. gün • '+E(col.unit)+'<br><small>'+E(col.shift)+' • '+E(mi.label)+'</small></div>'+(items.length?items.map(x=>{const ratio='Yapılan/Hedef: '+x.cur+'/'+(x.t===null?'—':x.t);const txt=ratio+' • '+x.id.txt+(x.spouse?' • ♥ Eşi bugün nöbette':'');return '<button class="suitablePersonV2413 rpys337row" data-person-id="'+Number(x.p.id)+'" onclick="assignSuitableDutyV2413('+Number(x.p.id)+')" style="'+(typeof personColorStyle==='function'?personColorStyle(x.p.id,false):'')+'"><b>'+E(x.p.name)+'</b><span>'+E(txt)+'</span></button>'}).join(''):'<div class="suitableNoneV2413">Bu hücre için kurallara uygun personel yok.</div>');
+  window.__RPYS_SUITABLE_FROZEN337__=true;box.style.display='block';box.style.visibility='visible';
+ }catch(e){console.error('RPYS337 suitable',e);box.innerHTML='<div class="suitableNoneV2413">Uygun personel listesi açılamadı.</div>';box.style.display='block'}}
+// Eski yamaların mevcut satırları sonradan tekrar sıralamasını engelle.
+if(!window.__RPYS_APPEND_GUARD337__){window.__RPYS_APPEND_GUARD337__=1;const old=Node.prototype.appendChild;Node.prototype.appendChild=function(ch){try{if(window.__RPYS_SUITABLE_FROZEN337__&&this?.id==='dutySuitableListV2413'&&ch?.matches?.('button.suitablePersonV2413')&&ch.parentNode===this)return ch}catch(_){}return old.call(this,ch)}}
+function bindSuitable(){try{window.renderSuitableDutyPeopleV2413=render337}catch(_){}const old=Q('#dutyContextMenu .dutySuitableWrapV2413');if(!old)return false;if(old.dataset.rpys337==='1')return true;const w=old.cloneNode(true);w.dataset.rpys337='1';w.dataset.rpys332='1';w.dataset.rpys333='1';w.dataset.rpys336='1';w.removeAttribute('onmouseenter');const b=Q('button.ctxBtn',w);if(b){b.removeAttribute('onclick');b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();render337()},true);b.addEventListener('pointerup',e=>{if(e.pointerType==='touch'||e.pointerType==='pen'){e.preventDefault();e.stopPropagation();render337()}},true)}w.addEventListener('mouseenter',()=>render337(),true);old.replaceWith(w);return true}
+function peopleNow(){try{return (typeof currentPeople==='function'?currentPeople():(db?.staff||[])).filter(p=>p&&p.active!==false&&U(p.status||'AKTİF')!=='PASİF')}catch(_){return []}}
+function selectedIds(){const s=Q('#autoPeople');return s?Array.from(s.options).filter(o=>o.selected).map(o=>Number(o.value)):[]}
+function syncChecks(host){const s=Q('#autoPeople');if(!s||!host)return;const ids=new Set(selectedIds());QA('input[type=checkbox][data-pid]',host).forEach(c=>c.checked=ids.has(Number(c.dataset.pid)))}
+function renderPeopleChecks(){const s=Q('#autoPeople');if(!s)return false;let host=Q('#rpys337PeopleChecks');if(!host){host=document.createElement('div');host.id='rpys337PeopleChecks';s.insertAdjacentElement('afterend',host)}const ids=new Set(selectedIds());const arr=peopleNow();host.innerHTML='<div class="rpys337PeopleBar"><b>'+arr.length+' aktif personel</b><span><button type="button" data-act="all">Tümünü Seç</button><button type="button" data-act="none">Temizle</button></span></div><div class="rpys337PeopleGrid">'+arr.map(p=>'<label><input type="checkbox" data-pid="'+Number(p.id)+'" '+(ids.has(Number(p.id))?'checked':'')+'><span>'+E(p.name)+'</span></label>').join('')+'</div>';s.style.position='absolute';s.style.opacity='0';s.style.pointerEvents='none';s.style.width='1px';s.style.height='1px';
+ host.onchange=e=>{const c=e.target.closest('input[data-pid]');if(!c)return;const o=Array.from(s.options).find(x=>Number(x.value)===Number(c.dataset.pid));if(o)o.selected=c.checked};host.onclick=e=>{const b=e.target.closest('button[data-act]');if(!b)return;e.preventDefault();const on=b.dataset.act==='all';Array.from(s.options).forEach(o=>o.selected=on);syncChecks(host)};return true}
+function wrapAuto(){try{const old=window.renderAutoPanel;if(typeof old==='function'&&!old.__p337){const f=function(){const r=old.apply(this,arguments);setTimeout(renderPeopleChecks,0);return r};f.__p337=1;window.renderAutoPanel=f}}catch(_){}renderPeopleChecks()}
+function hideDuplicates(){
+ const roots=QA('section,div');
+ for(const el of roots){const h=Q(':scope>h1,:scope>h2,:scope>h3,:scope>h4',el);const t=N(h?.textContent||'');if(/^Gündüz Toplam Görev Takibi$/i.test(t)){el.style.display='none';el.dataset.rpys337dup='1'}}
+ const net=Q('#netistat');if(net){QA('section,div',net).forEach(el=>{const h=Q(':scope>h1,:scope>h2,:scope>h3,:scope>h4',el);if(/^Poliklinik Takibi$/i.test(N(h?.textContent||''))){el.style.display='none';el.dataset.rpys337dup='1'}});if(!Q('#rpys337NetNote',net)){const n=document.createElement('div');n.id='rpys337NetNote';n.className='notice';n.innerHTML='<b>Poliklinik Takibi tek kaynaktan çalışır:</b> Birimler → Poliklinik Takibi ekranını kullan.';(Q('#netMetricTabs',net)||net).prepend(n)}}
+}
+const st=document.createElement('style');st.id='rpys337style';st.textContent='#dutySuitableListV2413{transition:none!important}#dutySuitableListV2413 .rpys337row{transition:none!important;animation:none!important}#dutySuitableListV2413 .rpys337row>span{display:block;white-space:normal;line-height:1.25}.rpys337PeopleBar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}.rpys337PeopleBar button{margin-left:6px;padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff}.rpys337PeopleGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;max-height:280px;overflow:auto;padding:8px;border:1px solid #dbe5ef;border-radius:10px;background:#fff}.rpys337PeopleGrid label{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-weight:700}.rpys337PeopleGrid input{width:18px;height:18px}';document.head.appendChild(st);
+function tick(){bindSuitable();wrapAuto();hideDuplicates()}
+[0,100,400,1000,2500,5000].forEach(t=>setTimeout(tick,t));let tm=0;const mo=new MutationObserver(()=>{clearTimeout(tm);tm=setTimeout(tick,120)});try{mo.observe(document.documentElement,{childList:true,subtree:true})}catch(_){}
+console.log('RPYS PATCH337 tek takip + görünür yeni ay personeli + sabit uygunluk aktif');
+})();

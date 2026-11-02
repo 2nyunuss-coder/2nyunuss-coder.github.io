@@ -1,0 +1,15 @@
+(()=>{
+if(window.__RPYS352__)return;window.__RPYS352__=1;
+const U=s=>String(s??'').toLocaleUpperCase('tr-TR').replace(/\s+/g,' ').trim();
+let lastCell=null;
+function key(c){try{return keyFor(c.dataset.type,+c.dataset.day,c.dataset.col)}catch(_){return null}}
+function selected(){let a=[...document.querySelectorAll('.dropDutyCell.dutySelected,.dropDutyCell.selected,.dropDutyCell[aria-selected="true"]')];if(lastCell&&!a.includes(lastCell))a=[lastCell];return a.length?a:(lastCell?[lastCell]:[])}
+function keys(){return [...new Set(selected().map(key).filter(Boolean))]}
+function isLocked(k){return !!(db?.lockedDutyCells?.[k]||db?.lockedDutyCells322?.[k])}
+function setLock(k,on){db.lockedDutyCells=db.lockedDutyCells||{};db.lockedDutyCells322=db.lockedDutyCells322||{};if(on){let v=Object.prototype.hasOwnProperty.call(db.assign||{},k)?db.assign[k]:null;db.lockedDutyCells[k]={value:v,meta:db.assignmentMeta?.[k]?JSON.parse(JSON.stringify(db.assignmentMeta[k])):null,at:new Date().toISOString()};db.lockedDutyCells322[k]=true;if(db.assignmentMeta?.[k])db.assignmentMeta[k].locked=true}else{delete db.lockedDutyCells[k];delete db.lockedDutyCells322[k];if(db.assignmentMeta?.[k])db.assignmentMeta[k].locked=false}}
+function cleanup(menu){if(!menu)return;let bs=[...menu.querySelectorAll('button,.ctxBtn,[role="menuitem"]')];let swapSeen=false;for(const b of bs){let t=U(b.textContent),isSwap=t.includes('SEÇİLİ')&&(t.includes(' 2 ')||t.includes(' İKİ '))&&(t.includes('HÜCREYİ DEĞİŞTİR')||t.includes('ÇALIŞMAYI DEĞİŞTİR'));if(t.includes('UYGUN KİŞİLER')){b.remove();continue}if(isSwap){if(swapSeen)b.remove();else swapSeen=true;continue}if(t.includes('KİLİTLE')||t.includes('KİLİDİ AÇ')||t.includes('KİLİTLE / AÇ')||t.includes('KİLİTLE / KİLİDİ AÇ')){if(t.includes('NÖBET + SAYMANLIK'))continue;b.remove()}}}
+function addLock(menu){if(!menu||menu.querySelector('#rpysLock352'))return;let ks=keys();if(!ks.length)return;let allLocked=ks.every(isLocked),btn=document.createElement('button');btn.id='rpysLock352';btn.className='ctxBtn';btn.textContent=allLocked?'🔓 Seçili Hücrelerin Kilidini Aç':'🔒 Seçili Hücreleri Kilitle';btn.onclick=e=>{e.preventDefault();e.stopPropagation();let now=keys(),unlock=now.length&&now.every(isLocked);for(const k of now)setLock(k,!unlock);try{save()}catch(_){}try{renderCurrentPage()}catch(_){try{renderAll()}catch(__){}};menu.style.display='none'};let del=[...menu.querySelectorAll('button,.ctxBtn,[role="menuitem"]')].find(b=>U(b.textContent).includes('NÖBET + SAYMANLIK KAYDINI SİL'));if(del)menu.insertBefore(btn,del);else menu.appendChild(btn)}
+function fix(){for(const m of document.querySelectorAll('#dutyContextMenu,#cellContextMenu')){cleanup(m);addLock(m)}}
+document.addEventListener('contextmenu',e=>{let c=e.target.closest('.dropDutyCell');if(c){lastCell=c;window.dutyContextCellV2413=c;setTimeout(fix,0);setTimeout(fix,40)}},true);
+new MutationObserver(()=>{clearTimeout(window.__r352);window.__r352=setTimeout(fix,25)}).observe(document.body,{childList:true,subtree:true});setTimeout(fix,200);
+})();
