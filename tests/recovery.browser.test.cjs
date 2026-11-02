@@ -31,6 +31,7 @@ test('bundled RPYS opens without the old cloud, signs in against the new API and
   const opened=await page.evaluate(()=>({staff:db.staff.length,assign:Object.keys(db.assign).length,user:currentUser?.username,password:db.users[0]?.password,api:RPYS_CLOUD_API}));assert.equal(opened.staff,2);assert.equal(opened.assign,1);assert.equal(opened.user,'recovery-test');assert.equal(opened.password,undefined);assert.match(opened.api,/kdfablwkqtjaflxomxlr/);assert.equal(writes.length,0,'opening the existing calendar must not seed or reset the server');
   await page.evaluate(async()=>{db.assign['2026-11|acil|2|ar2']=2;saveNowV245({label:'Synthetic recovery save'});await _storageWriteChain;await _v24SaveChain});await page.waitForFunction(()=>_v300CloudRevision===3007);
   assert.equal(writes.length,1);assert.equal(writes[0].expectedRevision,3006);assert.equal(Object.keys(writes[0].data.assign).length,2);assert.equal(writes[0].data.staff.length,2);assert.ok(assets.size>=20,'legacy add-ons must be served locally');assert.deepEqual(oldRequests,[]);assert.deepEqual(errors,[]);
+  revision++;await page.evaluate(()=>v24RefreshServerStatus());assert.equal(await page.evaluate(()=>_v300CloudRevision),3007,'a remote status update must not authorize a stale calendar to overwrite the newer master');
   console.log('Recovery browser:',JSON.stringify({localAddOns:assets.size,oldCloudRequests:oldRequests.length,staff:opened.staff,assignments:opened.assign,saveCount:writes.length}));
  }finally{await browser.close()}
 });

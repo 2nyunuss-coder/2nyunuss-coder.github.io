@@ -97,6 +97,8 @@
    app=app.replaceAll("https://wiflnajancyomgdtheyr.supabase.co/functions/v1/rpys-web/api","https://kdfablwkqtjaflxomxlr.supabase.co/functions/v1/rpys-web/api");
    app=app.replaceAll("https://wiflnajancyomgdtheyr.supabase.co/storage/v1/object/public/rpys-web/index.html",location.origin+"/");
    app=app.replace("JSON.stringify({id:Number(id)})","JSON.stringify({id:Number(id),expectedRevision:_v300CloudRevision})");
+   // A status poll must not advance the revision of an unsaved local draft.
+   app=app.replace("_v251CloudInfo=r.cloud||null;_v300CloudRevision=Number(r.revision??r.seq??_v300CloudRevision);v24RenderMasterBadge", "_v251CloudInfo=r.cloud||null;v24RenderMasterBadge");
    app=window.rpysStability420.repair(app);
    // Saymanlık yazdırma düzeltmesinin canlı pakette eski 383.3 sürümüne dönmesini engelle.
    app=replaceOnce(app,'["383.3","rpys-patch383","3833"]','["383.11","rpys-patch383","38311"]');
