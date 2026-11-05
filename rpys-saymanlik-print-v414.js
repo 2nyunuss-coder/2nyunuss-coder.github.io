@@ -19,6 +19,9 @@ table.rpysSay414Table .rpysSay414GrandLabel,table.rpysSay414Table .rpysSay414Gra
 .rpysSay414Note{display:block!important;position:static!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;margin:1.5mm 0!important;padding:1.5mm 2mm!important;border:1px solid #94a3b8!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;break-inside:avoid!important;text-align:left!important}
 .rpysSay414Note b{display:block!important;font:700 6.5pt Arial,sans-serif!important;margin-bottom:.5mm!important}
 .rpysSay414Note div{display:block!important;min-height:7mm!important;font:6.5pt Arial,sans-serif!important;line-height:1.2!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;border-bottom:1px dotted #94a3b8!important}
+.sheet[data-doc] table.rpysSay414Table.stableSay tbody tr.rpysSay414MultiRow td,table.rpysSay414Table tr.rpysSay414MultiRow td{height:auto!important;min-height:5mm!important}
+table.rpysSay414Table td.rpysSay414Multi{height:auto!important;max-height:none!important;overflow:visible!important;white-space:normal!important;text-overflow:clip!important;vertical-align:middle!important;padding:.2mm .1mm!important}
+table.rpysSay414Table td.rpysSay414Multi .rpysSay414Shift{display:block!important;position:static!important;height:auto!important;max-height:none!important;overflow:visible!important;white-space:nowrap!important;font:700 4.5pt/1.2 Arial,sans-serif!important}
 @media print{.rpysSay414Table,.rpysSay414Note{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `;
 function note(m){
@@ -50,6 +53,13 @@ function unitTotals(){
  }}finally{reading=false}
  return sum;
 }
+function shiftLines(text){
+ const raw=String(text||'');const matches=[...raw.matchAll(/\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}/g)];
+ if(matches.length<2)return null;
+ const lines=[];let start=0;
+ for(let i=1;i<matches.length;i++){const at=matches[i].index;lines.push(raw.slice(start,at).replace(/[\s/]+$/g,'').trim());start=at;}
+ lines.push(raw.slice(start).trim());return lines;
+}
 function prepare(html,opts={}){
  const d=new DOMParser().parseFromString(String(html||''),'text/html');
  const tables=[...d.querySelectorAll('table.stableSay,table.rpys393saytable,table.say')].filter(t=>[...t.rows].some(r=>label(r.cells[0]?.textContent)==='MUKELLEF'));
@@ -67,6 +77,15 @@ function prepare(html,opts={}){
    th.classList.add('rpysSay414Head');th.replaceChildren(span);
   });
   for(const r of [...t.rows])if(r.matches('.rpys393grand,.rpys393grand2,.rpysSay414Grand,.rpys319GrandRow,.rpysF20UnitTotal')||/^(?:TUM )?BIRIM TOPLAM/.test(label(r.cells[0]?.textContent))||/^TOPLAM (MUKELLEF|FAZLA)/.test(label(r.cells[0]?.textContent)))r.remove();
+  // Keep every shift visible in narrow printed day cells. No source data is changed.
+  for(const row of [...t.rows]){
+   if(!/^\s*\d{1,2}[/.]\d{1,2}/.test(row.cells[0]?.textContent||''))continue;
+   for(const cell of [...row.cells].slice(1)){
+    const lines=shiftLines(cell.textContent);if(!lines)continue;
+    cell.classList.add('rpysSay414Multi');row.classList.add('rpysSay414MultiRow');
+    cell.replaceChildren(...lines.map(text=>{const span=d.createElement('span');span.className='rpysSay414Shift';span.textContent=text;return span}));
+   }
+  }
   // Embed each page's note before its signatures, inside the document body.
   const page=t.closest('.stableSayPage,.rpys393saywrap')||t.parentElement;
   page.querySelectorAll('.rpysSay414Note,.rpys383Note,.printNote').forEach(x=>x.remove());
@@ -97,7 +116,7 @@ function repairQuickFrame(){
  const repair=()=>{try{const d=f.contentDocument;if(!d?.querySelector('table.rpysSay414Table'))return;d.body.innerHTML=prepare(d.body.innerHTML,{snapshot:true});f.__rpys414=true}catch(e){console.warn('Saymanlık çıktı düzeltmesi',e)}};
  f.addEventListener('load',repair,{once:true});repair();
 }
-window.rpysSaymanlik414={prepare,unitTotals,install};
+window.rpysSaymanlik414={prepare,unitTotals,install,shiftLines};
 install();window.addEventListener('rpys-direct-core-ready',install);
 document.addEventListener('DOMContentLoaded',install);
 const observer=new MutationObserver(()=>{install();repairQuickFrame()});observer.observe(document.documentElement,{childList:true,subtree:true});

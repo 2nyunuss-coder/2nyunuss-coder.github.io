@@ -96,3 +96,20 @@ test('leading print styles and colors survive repeated document preparation',()=
   assert.equal(d.querySelectorAll('.rpysSay414Name').length,16);
  }finally{dom.window.close()}
 });
+
+test('multiple shifts print on separate unclipped lines and survive repeated preparation',()=>{
+ const {dom,w,api}=fixture();
+ try{
+  const before=JSON.stringify(w.db);
+  const html='<div class="stableSayPage"><table class="stableSay"><tbody><tr><td>11/10 Paz</td><td>Pazar 09:00-16:00 / 16:00-07:00</td><td>08:00-15:00</td></tr><tr><td>MÜKELLEF</td><td>145</td><td>145</td></tr></tbody></table></div>';
+  let output=api.prepare(html,{snapshot:true});
+  for(let pass=0;pass<2;pass++){
+   const d=parse(w,output),cell=d.querySelector('td.rpysSay414Multi');
+   assert.deepEqual([...cell.querySelectorAll('.rpysSay414Shift')].map(n=>n.textContent),['Pazar 09:00-16:00','16:00-07:00']);
+   assert.equal(d.querySelectorAll('.rpysSay414MultiRow').length,1);
+   assert.match(d.querySelector('style#rpys-saymanlik-print-style-v414').textContent,/overflow:visible!important/);
+   output=api.prepare(output,{snapshot:true});
+  }
+  assert.equal(JSON.stringify(w.db),before);
+ }finally{dom.window.close()}
+});
