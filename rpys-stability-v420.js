@@ -8,6 +8,13 @@
   element.innerHTML=html;htmlByElement.set(element,html);
  }
  function repairPatch(js,slug){
+  // Temporary pause requested by the owner: preserve stored locks, disable cell enforcement only.
+  if(slug==='rpys-patch352')return "(()=>{const s=document.createElement('style');s.textContent='#r319dl,#r319sl,#rpys322LockBtn,#rpysLock352{display:none!important}.r319lock,.rpys322locked,.rpysLockedCell319{outline:none!important;box-shadow:none!important}.r319lock:after,.rpys322locked:after,.rpysLockedCell319:after{display:none!important}';document.head.append(s)})();";
+  if(slug==='rpys-patch319fixed')js=js.replace('const locked=k=>!!db.lockedDutyCells[k];','const locked=k=>false;').replace('function restore(){','function restore(){return;').replace('function toggleLock(){','function toggleLock(){return;');
+  if(slug==='rpys-patch322')js=js.replace('function lockStore322(){','function lockStore322(){return {};').replace('function restoreLocks322(){','function restoreLocks322(){return;').replace('window.rpys322ToggleLock=function(){','window.rpys322ToggleLock=function(){return;');
+  if(slug==='rpys-patch353')js=js.replace('const locked=k=>!!db?.lockedDutyCells?.[k];','const locked=k=>false;');
+  if(slug==='rpys-patch321')js=js.replace('if(safe(()=>db.lockedDutyCells?.[x.k],false))','if(false)');
+
   if(slug==='rpys-patch371')js=js.replace('function scanSayButtons(){','function scanSayButtons(){if(window.rpysTargets399?.isBusy?.())return;');
   if(slug==='rpys-patch383')js=js.replace('function rename(){','function rename(){if(window.rpysTargets399?.isBusy?.())return;');
   if(slug==='rpys-patch319fixed')js=js.replace("if(!m||$('#'+id))continue;", "if(!m||$('#'+id)||window.rpysStability420.hasEquivalent(m,lab))continue;");

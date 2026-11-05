@@ -20,7 +20,7 @@
 </div>
 <script src="/rpys-recovery-v427.js?v=20261102-restore-27"></script>
 <script src="/rpys-scheduler-v398.js?v=20261027-acil-worker-26"></script>
-<script src="/rpys-stability-v420.js?v=20261027-acil-worker-26"></script>
+<script src="/rpys-stability-v420.js?v=20261105-cell-locks-paused"></script>
 <script>
 (async()=>{
  const APP_SOURCE='/rpys-app.html';
@@ -107,7 +107,7 @@
    // Canli revizyon takibi zaten rpys-live-sync-v319 + v400 kayit korumasi ile yapiliyor;
    // eski bulut cekme eklentisini yukleme listesinden tamamen cikar.
    app=replaceOnce(app,'["372.4","rpys-patch372","3724"],','');
-   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261027-acil-worker-26"><'+'/script><script src="/rpys-rules-v421.js?v=20261022-gap-17"><'+'/script>');
+   app=app.replace(/<head\b[^>]*>/i,head=>head+'<script src="/rpys-stability-v420.js?v=20261105-cell-locks-paused"><'+'/script><script src="/rpys-rules-v421.js?v=20261022-gap-17"><'+'/script>');
    // Only one revision watcher owns this page. Remote changes require an explicit refresh.
    app=app.replace(/<script\b[^>]*id=["']rpys-live-sync-v319["'][^>]*>[\s\S]*?<\/script>/i,
      '<script id="rpys-live-sync-v419" src="/rpys-live-sync-v419.js?v=20261019-1"><'+'/script>');
@@ -293,7 +293,7 @@
    for(const file of ['rpys-rules-v421','rpys-saymanlik-print-v414'])app=app.replace(new RegExp('/'+file+'\\.js(?:\\?v=[^\"\'<> ]*)?','g'),'/'+file+'.js?v=20261022-gap-17');
    app=app.replace('for(const r of (db.customTextRules||[]).filter(r=>r.active!==false&&r.kind!=="config")){','for(const r of (window.rpysRules421?.textRules(unit)||(db.customTextRules||[])).filter(r=>r.active!==false&&r.kind!=="config")){');
    app=app.replace(/\/rpys-rules-runtime-v421\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-rules-runtime-v421.js?v=20261102-restore-27');
-   app=app.replace(/\/rpys-stability-v420\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-stability-v420.js?v=20261027-acil-worker-26').replace(/\/rpys-sds-compare-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-sds-compare-v1.js?v=20261027-acil-worker-26');
+   app=app.replace(/\/rpys-stability-v420\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-stability-v420.js?v=20261105-cell-locks-paused').replace(/\/rpys-sds-compare-v1\.js(?:\?v=[^"'<> ]*)?/g,'/rpys-sds-compare-v1.js?v=20261027-acil-worker-26');
    app=window.rpysScheduler398.repair(app);
    app=app.replaceAll('v3.0.0-TAM-BULUT','v3.0.3-MOBILE-SECURE').replaceAll('v3.0.0 TAM BULUT','v3.0.3 MOBILE SECURE');
    return app;
