@@ -9,7 +9,7 @@
  }
  function repairPatch(js,slug){
   // Temporary pause requested by the owner: preserve stored locks, disable cell enforcement only.
-  if(slug==='rpys-patch352')return "(()=>{const s=document.createElement('style');s.textContent='#r319dl,#r319sl,#rpys322LockBtn,#rpysLock352{display:none!important}.r319lock,.rpys322locked,.rpysLockedCell319{outline:none!important;box-shadow:none!important}.r319lock:after,.rpys322locked:after,.rpysLockedCell319:after{display:none!important}';document.head.append(s)})();";
+  if(slug==='rpys-patch352')return "(()=>{const s=document.createElement('style');s.textContent='#rpys319DutyLock,#rpys319SayLock,#rpysF20LockDuty,#rpysF20LockSay,#r319dl,#r319sl,#rpys322LockBtn,#rpysLock352{display:none!important}.rpysF20Locked,.r319lock,.rpys322locked,.rpysLockedCell319{outline:none!important;box-shadow:none!important}.rpysF20Locked:after,.r319lock:after,.rpys322locked:after,.rpysLockedCell319:after{display:none!important}';document.head.append(s)})();";
   if(slug==='rpys-patch319fixed')js=js.replace('const locked=k=>!!db.lockedDutyCells[k];','const locked=k=>false;').replace('function restore(){','function restore(){return;').replace('function toggleLock(){','function toggleLock(){return;');
   if(slug==='rpys-patch322')js=js.replace('function lockStore322(){','function lockStore322(){return {};').replace('function restoreLocks322(){','function restoreLocks322(){return;').replace('window.rpys322ToggleLock=function(){','window.rpys322ToggleLock=function(){return;');
   if(slug==='rpys-patch353')js=js.replace('const locked=k=>!!db?.lockedDutyCells?.[k];','const locked=k=>false;');
@@ -50,6 +50,18 @@
   return js;
  }
  function repairEmbedded(js){
+  // Embedded legacy lock engines must also pause; external patch changes alone are insufficient.
+  if(js.includes('__RPYS_FIXPACK_319__'))js=js
+   .replace('function isLocked(k){return !!(k&&db.lockedDutyCells?.[k])}','function isLocked(k){return false}')
+   .replace('function restoreLocks(){','function restoreLocks(){return;')
+   .replace('function lockOne(k){','function lockOne(k){return;')
+   .replace('function toggleLocks(cells){','function toggleLocks(cells){return;');
+  if(js.includes('function store(){db.rpysCellLocks='))js=js
+   .replace('const locked=k=>!!store()[k];','const locked=k=>false;')
+   .replace('function restore(){for(const[k,x]of Object.entries(store()))','function restore(){return;for(const[k,x]of Object.entries(store()))')
+   .replace('function lock(k){if(!k||locked(k))return;','function lock(k){return;if(!k||locked(k))return;')
+   .replace('function toggle(cell){','function toggle(cell){return;');
+
   if(js.includes('rpys383print'))js=js.replace('function rename(){','function rename(){if(window.rpysTargets399?.isBusy?.())return;');
   js=js.replace('function scanSayButtons(){','function scanSayButtons(){if(window.rpysTargets399?.isBusy?.())return;');
   // The print patch is also embedded in the core, not only fetched remotely.
