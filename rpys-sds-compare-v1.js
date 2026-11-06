@@ -219,6 +219,18 @@
     if(fileButton)fileButton.insertAdjacentElement("afterend",b);else card.append(b);
   }
   const start=()=>{
+    const sidebar=document.querySelector(".sidebar");
+    if(sidebar&&!document.getElementById("rpysSds2Nav")){
+      const link=document.createElement("a");
+      link.id="rpysSds2Nav";
+      link.className="nav";
+      link.style.display="block";
+      link.href="/rpys-sds2.html";
+      link.target="_blank";
+      link.rel="noopener";
+      link.textContent="SDS 2 Görüntüleme";
+      sidebar.append(link);
+    }
     mount();let timer=0;const pending=new Set();
     new MutationObserver(changes=>{
       if(!document?.body||document.getElementById('rpysSdsCompareOpen'))return;

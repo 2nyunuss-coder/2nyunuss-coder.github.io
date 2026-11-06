@@ -9,6 +9,34 @@ const tell = message => { el("status").textContent = message; };
 const action = fn => async e => { try { await fn(e); } catch (error) { tell(error.message); } };
 const num = value => /^\d+$/.test(value.trim()) ? Number(value) : NaN;
 
+function requestRows(book) {
+  const normalize = value => String(value ?? "").trim().toLocaleUpperCase("tr").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const result = [];
+  for (const name of book.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,raw:true});
+    const headerIndex = rows.findIndex(row => normalize(row[0]) === "BRANS" && normalize(row[1]) === "DOKTOR");
+    if (headerIndex < 0) continue;
+    const header = rows[headerIndex].map(normalize);
+    for (const type of ["MR","BT","USG"]) {
+      for (const [group,prefix] of ["POLIKLINIKTEN","ACIL SERVISTEN","KLINIKLERDEN"].entries()) {
+        const col = header.findIndex(label => label.startsWith(prefix) && label.split(/\s+/).includes(type));
+        if (col < 0) continue;
+        let total = 0;
+        for (const row of rows.slice(headerIndex+1)) {
+          const branch = normalize(row[0]), doctor = normalize(row[1]);
+          if (!branch || !doctor || /TOPLAM/.test(branch) || /TOPLAM|DOKTOR SEC/.test(doctor)) continue;
+          const value = row[col] == null || row[col] === "" ? 0 : num(String(row[col]));
+          if (!Number.isSafeInteger(value)) throw Error(name + " sayfasında geçersiz istem sayısı.");
+          total += value;
+        }
+        if (result.some(item => item.group === group && item.type === type)) throw Error("Aynı tetkik sütunu birden fazla sayfada bulundu.");
+        result.push({group,type,total});
+      }
+    }
+  }
+  return result;
+}
+
 async function start() {
   const response = await fetch("rpys-assets/sds2.docx");
   if (!response.ok) throw Error("Word şablonu yüklenemedi.");
@@ -97,7 +125,22 @@ async function start() {
     const book = XLSX.read(await file.arrayBuffer(),{type:"array"});
     const sheet = book.Sheets.SDS2 || book.Sheets[book.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet,{header:1,raw:false});
-    if (rows[0]?.[0] !== "Alan kodu" || rows[0]?.[3] !== "Değer") throw Error("SDS 2 Excel şablonunun sütunlarını kullan.");
+    if (rows[0]?.[0] !== "Alan kodu" || rows[0]?.[3] !== "Değer") {
+      const totals = requestRows(book);
+      if (!totals.length) throw Error("MR, BT veya USG istem sütunları bulunamadı.");
+      const month = prompt("Bu dosya hangi dönem sütununa aktarılsın? 1, 2 veya 3 gir.", "3");
+      if (month === null) return;
+      if (!/^[123]$/.test(month)) throw Error("Ay sütunu 1, 2 veya 3 olmalı.");
+      const updates = totals.map(({group,type,total}) => {
+        const field = fields.find(f => f.section.startsWith("2."+(group+1)+" ") && f.label === month+". ay · "+type);
+        if (!field) throw Error("Word şablonunda ay sütunu bulunamadı.");
+        return [field,total];
+      });
+      if (!confirm(month+". aya "+updates.length+" istem toplamı aktarılacak. Devam edilsin mi?")) return;
+      for (const [field,total] of updates) field.input.value = total;
+      tell(updates.length+" MR, BT ve USG istem toplamı aktarıldı.");
+      return;
+    }
     const updates = new Map();
     for (const [id,,,value] of rows.slice(1)) {
       const field = fields.find(f => f.id === id);
