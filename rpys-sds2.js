@@ -205,6 +205,96 @@ async function start() {
     reportBody.rows[row].cells[col].append(input);
   }));
 
+  const emergency = block("4.5");
+  const emergencyTable = 117;
+  const emergencyFields = (row,col) => fields.find(f => f.table === emergencyTable && f.row === row && f.column === col);
+  const emergencyHeaders = ["Tetkik","İncelenen sayı","Süre birimi","Ortalama sonuç / rapor süresi","Hedef süre"];
+  const emergencyTargets = {};
+  hide(f => f.table === emergencyTable);
+  emergency.append(make("p","Ortalama ve hedef süreyi aynı birimde gir. Örneğin dakika seçtiysen iki süreyi de dakika olarak yaz."));
+  const emergencyBody = screenTable(emergency,emergencyHeaders,modalities.map(type => [type,"","","",""]));
+  modalities.forEach((type,row) => {
+    [1,2,3].forEach(col => {
+      const input = emergencyFields(row,col).input;
+      if (col !== 2) {
+        input.type = "number";
+        input.min = "0";
+        input.step = col === 1 ? "1" : "any";
+      } else input.placeholder = "Dakika / saat / gün";
+      input.setAttribute("aria-label",type+" "+emergencyHeaders[col]);
+      emergencyBody.rows[row].cells[col].append(input);
+    });
+    const target = make("input");
+    target.type = "number"; target.min = "0"; target.step = "any";
+    target.setAttribute("aria-label",type+" hedef süre");
+    target.value = savedDraft.emergencyTargets?.[type] ?? "";
+    emergencyTargets[type] = target;
+    emergencyBody.rows[row].cells[4].append(target);
+  });
+
+  const tracking = block("Kurum içi süre aşımı takibi");
+  hide(f => f.table === 130);
+  const cohorts = [
+    ["Poliklinik BT","72 saat"],["Acil BT","1 saat"],["Acil MR","4 saat"],
+    ["Yatan hasta MR","4 saat"],["Rutin MR","72 saat"],["Yatan hasta BT","24 saat"]
+  ];
+  const trackingHeaders = ["Hasta grubu / tetkik","Süre sınırı","Toplam çekim","Süre içinde","Süreyi geçen","Aşmayan / toplam","Aşan / toplam","Aşan / aşmayan"];
+  tracking.append(make("p","Her grup için toplam çekim sayısını, süre içinde çekilen ve süreyi geçen hasta sayılarını gir. Tam sınırda yapılan çekimleri süre içinde say."));
+  const trackingBody = screenTable(tracking,trackingHeaders,cohorts.map(([name,limit]) => [name,limit,"","","","—","—","—"]));
+  const trackingInputs = cohorts.map(([name],row) => [2,3,4].map((col,index) => {
+    const input = make("input");
+    input.type = "number"; input.min = "0"; input.step = "1";
+    input.value = savedDraft.timingCounts?.[row]?.[index] ?? "";
+    input.setAttribute("aria-label",name+" "+trackingHeaders[col]);
+    trackingBody.rows[row].cells[col].append(input);
+    return input;
+  }));
+  const trackingStatus = make("p");
+  trackingStatus.setAttribute("role","status");
+  tracking.append(trackingStatus);
+  const timingValues = () => trackingInputs.map(row => row.map(input => input.value));
+  function trackingRatios(values) {
+    if (values.every(v => v === "")) return {rates:["—","—","—"],issue:""};
+    if (values.some(v => v === "")) return {rates:["—","—","—"],issue:"Üç sayı da girilmeli."};
+    const [total,within,over] = values.map(num);
+    if (![total,within,over].every(Number.isSafeInteger)) {
+      return {rates:["—","—","—"],issue:"Sayılar sıfır veya pozitif tam sayı olmalı."};
+    }
+    if (within+over !== total) {
+      return {rates:["—","—","—"],issue:"Süre içinde ve süreyi geçen sayıların toplamı, toplam çekime eşit olmalı."};
+    }
+    const ratio = (a,b) => b ? "%"+(a*100/b).toLocaleString("tr-TR",{maximumFractionDigits:2}) : "—";
+    return {rates:[ratio(within,total),ratio(over,total),ratio(over,within)],issue:""};
+  }
+  function updateTracking() {
+    const issues = [];
+    const rows = timingValues().map((values,index) => {
+      const {rates,issue} = trackingRatios(values);
+      if (issue) issues.push(cohorts[index][0]+" · "+issue);
+      rates.forEach((rate,i) => { trackingBody.rows[index].cells[i+5].textContent = rate; });
+      return [...cohorts[index],...values,...rates];
+    });
+    trackingStatus.textContent = issues.join(" ");
+    return {rows,issues};
+  }
+  tracking.addEventListener("input",updateTracking);
+  updateTracking();
+
+  const committeeTables = block("Komite kararları ve imzalar");
+  for (const [index,title,headers,labels] of [
+    [134,"Kararlar",["Karar / faaliyet","Sorumlu","Termin","İzlem durumu"],["","","",""]],
+    [136,"Ekler",["Ek no","Döküm / grafik / kanıt adı"],["","","","",""]],
+    [138,"İmzalar",["Görev","Ad soyad","İmza"],["Başhekim","Başhekim yardımcısı","Radyoloji sorumlu hekimi","Sağlık tesisi değerlendirme sorumlusu","Kalite birimi temsilcisi","Radyoloji birim sorumlusu","MR sorumlusu"]]
+  ]) {
+    hide(f => f.table === index);
+    committeeTables.append(make("h3",title));
+    const body = screenTable(committeeTables,headers,labels.map(label => [label,...headers.slice(1).map(() => "")]));
+    for (const f of fields.filter(field => field.table === index)) {
+      f.input.setAttribute("aria-label",f.label);
+      body.rows[f.row].cells[f.column].append(f.input);
+    }
+  }
+
   const expert = block("2.6");
   hide(f => inSection(f,"2.6") && f.table === 91);
   const expertHeads = ["Raporlayan uzman","Kurum / hizmet alımı",...modalities];
@@ -294,7 +384,15 @@ async function start() {
     });
   }
   renderComparisons();
-  el("save").onclick = action(() => { localStorage.setItem(key,JSON.stringify({...snapshot(),importedMonths,mhrsSample:checked.checked,appointments:Object.fromEntries(Object.entries(appointments).map(([type,input]) => [type,input.value])),experts:expertValues()})); tell("Taslak kaydedildi."); });
+  el("save").onclick = action(() => {
+    const inputValues = inputs => Object.fromEntries(Object.entries(inputs).map(([name,input]) => [name,input.value]));
+    localStorage.setItem(key,JSON.stringify({
+      ...snapshot(),importedMonths,mhrsSample:checked.checked,
+      appointments:inputValues(appointments),experts:expertValues(),
+      emergencyTargets:inputValues(emergencyTargets),timingCounts:timingValues()
+    }));
+    tell("Taslak kaydedildi.");
+  });
   el("sample").onclick = action(() => {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Alan kodu","Bölüm","Alan","Değer"],...fields.map(f => [f.id,f.section,f.label,""])]),"SDS2");
@@ -432,8 +530,11 @@ async function start() {
   el("word").onclick = action(async () => {
     const data = snapshot();
     const specialistRows = expertValues();
+    const trackingReport = updateTracking();
+    if (trackingReport.issues.length) throw Error(trackingReport.issues[0]);
     if (specialistRows.some(row => !row[0])) throw Error("2.6 bölümünde sayı girilen her satıra hekim adı yaz.");
     for (const field of fields) {
+      if (field.table === 130) continue;
       const type = ["Kapatılma oranı","MHRS oranı","Aşım (%)","İlk ve son ay"].find(label => field.label.startsWith(label));
       if (!type) continue;
       const [denominator,numerator] = type === "Aşım (%)" ? [3,4] : type === "İlk ve son ay" ? [1,3] : [0,1];
@@ -475,7 +576,7 @@ async function start() {
       const table = word("tbl"), props = word("tblPr"), grid = word("tblGrid");
       props.append(word("tblStyle",{val:"TableGrid"}),word("tblW",{w:5000,type:"pct"}));
       const widths = headers.length === 5 ? [1800,2200,1900,1900,1900] :
-        headers.length === 4 ? [3000,2200,2200,2300] : headers.length === 3 ? [3200,3200,3300] : [4800,4900];
+        headers.length === 4 ? [3000,2200,2200,2300] : headers.length === 3 ? [3200,3200,3300] : headers.length === 8 ? [1800,1000,1100,1100,1100,1200,1200,1200] : [4800,4900];
       widths.forEach(w => grid.append(word("gridCol",{w})));
       table.append(props,grid);
       [headers,...rows].forEach((values,index) => {
@@ -510,6 +611,9 @@ async function start() {
     anchors[91].replaceWith(wordTable(expertHeads,specialistRows));
     anchors[102].replaceWith(wordTable(["Tetkik","İncelenen sayı","Ortalama sonuç / rapor süresi (gün)"],
       modalities.map((type,row) => [type,reportFields(row,1).input.value,reportFields(row,2).input.value])));
+    anchors[117].replaceWith(wordTable(emergencyHeaders,modalities.map((type,row) =>
+      [type,...[1,2,3].map(col => emergencyFields(row,col).input.value),emergencyTargets[type].value])));
+    anchors[130].replaceWith(wordTable(trackingHeaders,trackingReport.rows));
     const result = await JSZip.loadAsync(template);
     result.file("word/document.xml",new XMLSerializer().serializeToString(output));
     const blob = await result.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
