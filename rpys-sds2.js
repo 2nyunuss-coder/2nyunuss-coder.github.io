@@ -140,7 +140,14 @@ async function start() {
   committee.input.value = "STD Komitesi - Görüntüleme Hizmetleri";
   committee.input.readOnly = true;
 
-  const sectionGrid = code => [...el("form").children].find(d => d.firstElementChild.textContent.startsWith(code+" ")).lastElementChild;
+  function sectionGrid(code) {
+    const section = [...el("form").children].find(details => {
+      const title = details.firstElementChild.textContent.trim();
+      return title === code || title.startsWith(code+" ");
+    });
+    if (!section) throw Error("Form bölümü bulunamadı: "+code);
+    return section.lastElementChild;
+  }
   const hide = predicate => fields.filter(predicate).forEach(f => { f.input.parentElement.hidden = true; });
   const inSection = (f,code) => f.section.startsWith(code+" ");
   function make(tag, value) {
