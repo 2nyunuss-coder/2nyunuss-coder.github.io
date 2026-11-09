@@ -30,9 +30,10 @@ input[aria-label$="Toplam çekim"],input[aria-label$="Süre içinde"],input[aria
 <label>HBYS istem Excel’i, SDS 2 şablonu veya CSV yükle<input type="file" id="file" disabled></label>
 <label>HBYS istem dosyasının ayı<select id="import-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3" selected>3. ay</option></select></label>
 <button type="button" id="apply-import" disabled>Forma aktar</button>
+<label>Hekim sıralamasında bu ay<select id="current-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3">3. ay</option></select></label>
 <button type="button" id="analyze">Üç aylık analiz metnini oluştur</button>
 <p id="status" role="status"></p><div id="form"></div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="rpys-sds2.js?v=20261109-form-start"></script>
+<script src="rpys-sds2.js?v=20261109-mr-dif"></script>
 </html>

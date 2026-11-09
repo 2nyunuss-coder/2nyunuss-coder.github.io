@@ -14,7 +14,7 @@ function requestRows(book) {
   const result = [];
   for (const name of book.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,raw:true});
-    const headerIndex = rows.findIndex(row => normalize(row[0]) === "BRANS" && normalize(row[1]) === "DOKTOR");
+    const headerIndex = rows.findIndex(row => normalize(row[0]) === "BRANS" && ["DOKTOR","HEKIM"].includes(normalize(row[1])));
     if (headerIndex < 0) continue;
     const header = rows[headerIndex].map(normalize);
     for (const type of ["MR","BT","USG"]) {
@@ -37,6 +37,13 @@ function requestRows(book) {
           total += value;
           addCount(branches,branch,String(row[0]).trim(),value);
           addCount(doctors,branch+" / "+doctor,String(row[1]).trim(),value,String(row[0]).trim());
+        }
+        const grandTotal = rows.slice(headerIndex+1).find(row =>
+          normalize(row[0]) === "GENEL TOPLAM" || normalize(row[1]) === "GENEL TOPLAM");
+        const declared = num(grandTotal?.[col]);
+        if (Number.isSafeInteger(declared) && declared !== total) {
+          throw Error(name+" · "+header[col]+": Excel genel toplamı ("+declared+
+            ") hekim satırlarının toplamıyla ("+total+") uyuşmuyor.");
         }
         if (result.some(item => item.group === group && item.type === type)) throw Error("Aynı tetkik sütunu birden fazla sayfada bulundu.");
         const leaders = map => {
@@ -243,18 +250,26 @@ async function start() {
   const tracking = block("Kurum içi süre aşımı takibi");
   hide(f => f.table === 130);
   const cohorts = [
-    ["Poliklinik BT","72 saat"],["Acil BT","1 saat"],["Acil MR","24 saat"],
-    ["Yatan hasta MR","24 saat"],["Rutin MR","72 saat"],["Yatan hasta BT","24 saat"]
+    ["Poliklinik BT","72 saat"],["Acil BT","1 saat"],["Acil ve yatan hasta MR","4 saat"],
+    ["Rutin MR","72 saat"],["Yatan hasta BT","24 saat"]
   ];
   const trackingHeaders = ["Hasta grubu / tetkik","Süre sınırı","Toplam çekim","Süreyi geçen","Süreyi geçmeyen","Geçen / toplam","Geçmeyen / toplam","Geçen / geçmeyen"];
   tracking.append(make("p","Her grup için toplam çekim sayısını, süre içinde çekilen ve süreyi geçen hasta sayılarını gir. Tam sınırda yapılan çekimleri süre içinde say."));
   const trackingBody = screenTable(tracking,trackingHeaders,cohorts.map(([name,limit]) => [name,limit,"","","","—","—","—"]));
+  function savedTiming(row,index) {
+    const prior = savedDraft.timingCounts || [];
+    if (savedDraft.combinedMrTiming) return prior[row]?.[index] ?? "";
+    if (row !== 2) return prior[[0,1,2,4,5][row]]?.[index] ?? "";
+    const limits = savedDraft.timingLimits || ["72 saat","1 saat","4 saat","4 saat","72 saat","24 saat"];
+    if (![2,3].every(i => limits[i] === "4 saat" && prior[i]?.length === 3 &&
+      prior[i].every(value => Number.isSafeInteger(num(value))) &&
+      num(prior[i][0]) === num(prior[i][1])+num(prior[i][2]))) return "";
+    return String(num(prior[2][index])+num(prior[3][index]));
+  }
   const trackingInputs = cohorts.map(([name],row) => [2,4,3].map((col,index) => {
     const input = make("input");
     input.type = "number"; input.min = "0"; input.step = "1";
-    const limit = cohorts[row][1];
-    const oldLimit = savedDraft.timingLimits?.[row] ?? ([2,3].includes(row) ? "4 saat" : limit);
-    input.value = oldLimit === limit ? savedDraft.timingCounts?.[row]?.[index] ?? "" : "";
+    input.value = savedTiming(row,index);
     input.setAttribute("aria-label",name+" "+trackingHeaders[col]);
     trackingBody.rows[row].cells[col].append(input);
     return input;
@@ -294,13 +309,13 @@ async function start() {
       rows.push([...cohorts[index],String(total),String(over),String(within),...rates]);
       if (total) chartRows.push({label:cohorts[index].join(" · "),total,over,rates});
     });
-    const combined = ["72 saat","1 saat","24 saat"].flatMap(limit => {
+    const combined = ["72 saat","1 saat","4 saat","24 saat"].flatMap(limit => {
       const group = rows.filter(row => row[1] === limit);
       if (group.length < 2) return [];
       const [total,over,within] = [2,3,4].map(col => group.reduce((sum,row) => sum+Number(row[col]),0));
       return [["TOPLAM",limit,String(total),String(over),String(within),...trackingRatios([total,within,over].map(String)).rates]];
     });
-    const reportRows = ["72 saat","1 saat","24 saat"].flatMap(limit => [
+    const reportRows = ["72 saat","1 saat","4 saat","24 saat"].flatMap(limit => [
       ...rows.filter(row => row[1] === limit),...combined.filter(row => row[1] === limit)
     ]);
     trackingStatus.textContent = issues.join(" ");
@@ -344,6 +359,32 @@ async function start() {
     }
   }
 
+  const difHeaders = ["DİF no","DİF başlangıç tarihi","DİF bitiş tarihi","Açık DİF","Kapanan DİF","Devam eden DİF"];
+  const difSection = make("div");
+  difSection.append(make("h3","DİF takip tablosu"));
+  const difBody = screenTable(difSection,[...difHeaders,""],[]);
+  const addDif = make("button","DİF satırı ekle");
+  addDif.type = "button";
+  difSection.append(addDif);
+  committeeTables.insertBefore(difSection,[...committeeTables.children].find(node => node.textContent === "İmzalar"));
+  function addDifRow(values = []) {
+    const row = difBody.insertRow();
+    difHeaders.forEach((heading,index) => {
+      const input = make("input");
+      input.type = index >= 3 ? "number" : index ? "date" : "text";
+      if (index >= 3) { input.min = "0"; input.step = "1"; }
+      input.setAttribute("aria-label",heading);
+      input.value = values[index] ?? "";
+      row.insertCell().append(input);
+    });
+    const remove = make("button","Kaldır");
+    remove.type = "button";
+    remove.onclick = () => row.remove();
+    row.insertCell().append(remove);
+  }
+  (savedDraft.difRows?.length ? savedDraft.difRows : [[]]).forEach(addDifRow);
+  addDif.onclick = () => addDifRow();
+  const difValues = () => [...difBody.rows].map(row => [...row.querySelectorAll("input")].map(input => input.value.trim())).filter(row => row.some(Boolean));
   const expert = block("2.6");
   hide(f => inSection(f,"2.6") && f.table === 91);
   const expertHeads = ["Raporlayan uzman","Kurum / hizmet alımı",...modalities];
@@ -379,6 +420,12 @@ async function start() {
     return block(code);
   });
   const periods = () => [1,2,3].map(month => fields.find(f => f.section === "Toplantı bilgileri" && f.label === month+". ay")?.input.value.trim() || month+". ay");
+  const currentMonth = el("current-month");
+  currentMonth.value = savedDraft.currentMonth || "1";
+  function comparisonMonths() {
+    const current = Number(currentMonth.value)-1;
+    return [current,...(current === 2 ? [1,0] : current === 1 ? [0,2] : [1,2])];
+  }
   function comparison(group, kind) {
     const entries = new Map();
     const available = new Set();
@@ -400,16 +447,22 @@ async function start() {
       const labels = kind === "doctorRows" ? [item.branch,item.label] : [item.label];
       return labels.concat(modalities.map((_,ti) => {
         const values = [0,1,2].map(mi => available.has(mi*3+ti) ? item.counts[mi*3+ti] : null);
-        const [first,,last] = values;
+        const [latest,,oldest] = comparisonMonths();
+        const first = values[oldest], last = values[latest];
         const change = first === null || last === null ? "" : first ? " ("+fmt.format((last-first)*100/first)+"%)" : last ? " (yeni)" : "";
         return values.map(v => v === null ? "—" : fmt.format(v)).join(" → ")+change;
       }));
     });
-    const top = kind === "doctorRows" ? ordered.map(item => {
-      const byType = modalities.map((_,ti) => item.counts[ti]+item.counts[ti+3]+item.counts[ti+6]);
-      return {...item,byType,total:byType.reduce((a,b) => a+b,0)};
-    }).filter(item => item.total > 0).sort((a,b) => b.total-a.total || a.label.localeCompare(b.label,"tr")).slice(0,10)
-      .map((item,i) => (i+1)+". "+item.label+" ("+item.branch+") · "+fmt.format(item.total)+" istem (MR "+fmt.format(item.byType[0])+", BT "+fmt.format(item.byType[1])+", USG "+fmt.format(item.byType[2])+").") : [];
+    const top = kind === "doctorRows" ? modalities.map((type,ti) => {
+      const months = comparisonMonths();
+      const current = months[0]*3+ti;
+      const labels = periods();
+      const ranked = ordered.filter(item => available.has(current) && item.counts[current] > 0)
+        .sort((a,b) => b.counts[current]-a.counts[current] || a.label.localeCompare(b.label,"tr")).slice(0,10);
+      const lines = ranked.map((item,index) => (index+1)+". "+item.label+" ("+item.branch+") · "+
+        months.map(mi => labels[mi]+": "+(available.has(mi*3+ti) ? fmt.format(item.counts[mi*3+ti]) : "veri yok")).join(" · "));
+      return {title:type+" · Bu ay en çok istem yapan hekimler",lines};
+    }).filter(entry => entry.lines.length) : [];
     return {headers,rows,top};
   }
   function renderComparisons() {
@@ -421,10 +474,10 @@ async function start() {
         node.append(make("p","Branş ve hekim tabloları için ayların HBYS Excel dosyalarını yükle."));
         return;
       }
-      node.append(make("p",periods().join(" → ")+" · Parantez içinde ilk ve son ay arasındaki değişim"));
-      if (doctors.top.length) {
-        node.append(make("h3","En çok istem yapan hekimler"));
-        for (const line of doctors.top) node.append(make("strong",line));
+      node.append(make("p",periods().join(" → ")+" · Parantez içinde en eski aydan bu aya değişim"));
+      for (const {title,lines} of doctors.top) {
+        node.append(make("h3",title));
+        for (const line of lines) node.append(make("strong",line));
       }
       node.append(make("h3","Branşlara göre üç aylık istemler"));
       screenTable(node,branches.headers,branches.rows);
@@ -433,12 +486,16 @@ async function start() {
     });
   }
   renderComparisons();
+  const refreshMonths = () => { updateAnalysis(); renderComparisons(); };
+  currentMonth.onchange = refreshMonths;
+  fields.filter(f => f.section === "Toplantı bilgileri" && /^[123]\. ay$/.test(f.label))
+    .forEach(f => { f.input.onchange = refreshMonths; });
   el("save").onclick = action(() => {
     const inputValues = inputs => Object.fromEntries(Object.entries(inputs).map(([name,input]) => [name,input.value]));
     localStorage.setItem(key,JSON.stringify({
       ...snapshot(),importedMonths,mhrsSample:checked.checked,
       appointments:inputValues(appointments),experts:expertValues(),
-      emergencyTargets:inputValues(emergencyTargets),timingCounts:timingValues(),timingLimits:cohorts.map(([,limit]) => limit)
+      emergencyTargets:inputValues(emergencyTargets),timingCounts:timingValues(),combinedMrTiming:true,currentMonth:currentMonth.value,difRows:difValues()
     }));
     tell("Taslak kaydedildi.");
   });
@@ -454,8 +511,8 @@ async function start() {
       : "%" + countText(Math.round(Math.abs((last-first)*100/first)*100)/100) +
         (last > first ? " artış" : last < first ? " azalış" : " değişim");
     const leaderText = list => list.map(({label,count}) => label + " · " + countText(count)).join(", ");
-    const months = [1,2,3];
-    const names = months.map(month => fields.find(f => f.section === "Toplantı bilgileri" && f.label === month+". ay")?.input.value.trim() || month+". ay");
+    const months = comparisonMonths().reverse().map(index => index+1);
+    const names = months.map(month => periods()[month-1]);
     for (const group of [0,1,2]) {
       const section = fields.filter(f => f.section.startsWith("2."+(group+1)+" "));
       const field = label => section.find(f => f.label === label);
@@ -469,7 +526,7 @@ async function start() {
           set("İlk ve son ay değişimi (%) · "+type,first === 0 ? "Hesaplanamaz" : countText(Math.round((last-first)*10000/first)/100) + " %");
         }
         const reports = months.map(month => importedMonths[month]?.find(item => item.group === group && item.type === type));
-        const latest = reports[2];
+        const latest = reports.at(-1);
         if (latest) {
           const branches = leaderText(latest.branches), doctors = leaderText(latest.doctors);
           set(type+" · Branş",branches || "İstem yok");
@@ -586,7 +643,8 @@ async function start() {
       if (field.table === 130) continue;
       const type = ["Kapatılma oranı","MHRS oranı","Aşım (%)","İlk ve son ay"].find(label => field.label.startsWith(label));
       if (!type) continue;
-      const [denominator,numerator] = type === "Aşım (%)" ? [3,4] : type === "İlk ve son ay" ? [1,3] : [0,1];
+      const [latest,,oldest] = comparisonMonths();
+      const [denominator,numerator] = type === "Aşım (%)" ? [3,4] : type === "İlk ve son ay" ? [oldest+1,latest+1] : [0,1];
       const at = column => fields.find(f => f.table === field.table && f.row === field.row && f.column === column);
       const total = num(data[at(denominator)?.id] || "");
       const part = num(data[at(numerator)?.id] || "");
@@ -625,7 +683,7 @@ async function start() {
       const table = word("tbl"), props = word("tblPr"), grid = word("tblGrid");
       props.append(word("tblStyle",{val:"TableGrid"}),word("tblW",{w:5000,type:"pct"}));
       const widths = headers.length === 5 ? [1800,2200,1900,1900,1900] :
-        headers.length === 4 ? [3000,2200,2200,2300] : headers.length === 3 ? [3200,3200,3300] : headers.length === 8 ? [1800,1000,1100,1100,1100,1200,1200,1200] : [4800,4900];
+        headers.length === 6 ? [1200,1850,1850,1600,1600,1600] : headers.length === 4 ? [3000,2200,2200,2300] : headers.length === 3 ? [3200,3200,3300] : headers.length === 8 ? [1800,1000,1100,1100,1100,1200,1200,1200] : [4800,4900];
       widths.forEach(w => grid.append(word("gridCol",{w})));
       table.append(props,grid);
       [headers,...rows].forEach((values,index) => {
@@ -648,9 +706,9 @@ async function start() {
     for (const [group,index] of [16,34,49].entries()) {
       const doctors = comparison(group,"doctorRows"), branches = comparison(group,"branchRows");
       if (!doctors.rows.length && !branches.rows.length) continue;
-      const nodes = [paragraph(periods().join(" → ")+" · İlk ve son ay arasındaki değişim parantez içindedir.")];
-      if (doctors.top.length) {
-        nodes.push(paragraph("En çok istem yapan hekimler",true),...doctors.top.map(line => paragraph(line,true)));
+      const nodes = [paragraph(periods().join(" → ")+" · En eski aydan bu aya değişim parantez içindedir.")];
+      for (const {title,lines} of doctors.top) {
+        nodes.push(paragraph(title,true),...lines.map(line => paragraph(line,true)));
       }
       nodes.push(paragraph("Branşlara göre üç aylık istemler",true),wordTable(branches.headers,branches.rows),
         paragraph("Hekimlere göre üç aylık istemler",true),wordTable(doctors.headers,doctors.rows));
@@ -710,6 +768,28 @@ async function start() {
         if (cells.length && !cells.some(f => String(data[f.id]).trim())) row.remove();
       });
       if (children(table,"tr").length < 2) table.remove();
+    }
+    const difReport = difValues();
+    if (difReport.length) {
+      const totals = [3,4,5].map(col => {
+        const filled = difReport.map(row => row[col]).filter(Boolean);
+        if (filled.some(value => !Number.isSafeInteger(num(value)))) throw Error("DİF sayıları sıfır veya pozitif tam sayı olmalı.");
+        return filled.length ? String(filled.reduce((sum,value) => sum+num(value),0)) : "";
+      });
+      const dateText = value => value ? value.split("-").reverse().join(".") : "";
+      anchors[137].before(paragraph("DİF takip tablosu",true),wordTable(difHeaders,[
+        ...difReport.map(([id,start,end,...counts]) => [id,dateText(start),dateText(end),...counts]),
+        ["TOPLAM","","",...totals]
+      ]));
+    }
+    for (const br of [...body.getElementsByTagNameNS(ns,"br")]) {
+      if (br.getAttributeNS(ns,"type") === "page") br.remove();
+    }
+    for (const name of ["pageBreakBefore","lastRenderedPageBreak"]) {
+      for (const node of [...body.getElementsByTagNameNS(ns,name)]) node.remove();
+    }
+    for (const node of children(body,"p")) {
+      if (!text(node).trim() && !["drawing","pict","sectPr","fldSimple"].some(name => node.getElementsByTagNameNS(ns,name).length)) node.remove();
     }
     const result = await JSZip.loadAsync(template);
     result.file("word/document.xml",new XMLSerializer().serializeToString(output));
