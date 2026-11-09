@@ -41,16 +41,15 @@ function requestRows(book) {
         const grandTotal = rows.slice(headerIndex+1).find(row =>
           normalize(row[0]) === "GENEL TOPLAM" || normalize(row[1]) === "GENEL TOPLAM");
         const declared = num(grandTotal?.[col]);
-        if (Number.isSafeInteger(declared) && declared !== total) {
-          throw Error(name+" · "+header[col]+": Excel genel toplamı ("+declared+
-            ") hekim satırlarının toplamıyla ("+total+") uyuşmuyor.");
-        }
+        const sourceTotal = Number.isSafeInteger(declared) ? declared : total;
+        const discrepancy = sourceTotal === total ? "" : header[col]+": Excel genel toplamı "+sourceTotal+
+          ", hekim satırlarının toplamı "+total+".";
         if (result.some(item => item.group === group && item.type === type)) throw Error("Aynı tetkik sütunu birden fazla sayfada bulundu.");
         const leaders = map => {
           const ordered = [...map.values()].filter(item => item.count > 0).sort((a,b) => b.count-a.count);
           return ordered.filter(item => item.count === ordered[0].count);
         };
-        result.push({group,type,total,branches:leaders(branches),doctors:leaders(doctors).map(item => ({...item,label:item.label+" ("+item.branch+")"})),branchRows:[...branches.values()],doctorRows:[...doctors.values()]});
+        result.push({group,type,total:sourceTotal,discrepancy,branches:leaders(branches),doctors:leaders(doctors).map(item => ({...item,label:item.label+" ("+item.branch+")"})),branchRows:[...branches.values()],doctorRows:[...doctors.values()]});
       }
     }
   }
@@ -547,6 +546,7 @@ async function start() {
             names[0]+" → "+names[2]+": "+changeText(first,last)+".";
         }
         for (const [index,report] of reports.entries()) {
+          if (report?.discrepancy) line += " "+names[index]+" · "+report.discrepancy;
           if (!report?.branches.length || !report.doctors.length) continue;
           line += " "+names[index]+" en çok isteyen branş: "+leaderText(report.branches)+
             ". En çok isteyen hekim: "+leaderText(report.doctors)+".";
@@ -601,8 +601,10 @@ async function start() {
     if (rows[0]?.[0] !== "Alan kodu" || rows[0]?.[3] !== "Değer") {
       const totals = requestRows(book);
       if (!totals.length) throw Error("MR, BT veya USG istem sütunları bulunamadı.");
-      pending = {totals};
-      tell(file.name + " okundu. " + totals.length + " istem toplamı bulundu. Ayı seçip Forma aktar’a dokun.");
+      const warnings = totals.map(item => item.discrepancy).filter(Boolean);
+      pending = {totals,warnings};
+      tell(file.name + " okundu. " + totals.length + " istem toplamı bulundu. Ayı seçip Forma aktar’a dokun."+
+        (warnings.length ? " Toplam farkı: "+warnings.join(" ") : ""));
     } else {
       const updates = new Map();
       for (const [id,,,value] of rows.slice(1)) {
@@ -630,12 +632,13 @@ async function start() {
       updateAnalysis();
       renderComparisons();
     }
+    const warnings = pending.warnings || [];
     pending = null;
     applyImport.disabled = true;
     fileInput.value = "";
     const affected = new Set(updates.map(([field]) => field.input.closest("details")));
     for (const details of affected) if (details) details.open = true;
-    tell(month + updates.length + " alan aktarıldı.");
+    tell(month + updates.length + " alan aktarıldı."+(warnings.length ? " Toplam farkı: "+warnings.join(" ") : ""));
   });
   el("word").onclick = action(async () => {
     const data = snapshot();
