@@ -109,49 +109,84 @@ async function start() {
     }
   });
   const snapshot = () => Object.fromEntries(fields.map(f => [f.id,f.input.value]));
-  const saved = JSON.parse(localStorage.getItem(key) || "{}");
-  fields.forEach(f => { f.input.value = saved[f.id] || ""; });
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || "{}");
+    fields.forEach(f => { f.input.value = saved?.[f.id] || ""; });
+  } catch {
+    tell("Tarayıcı taslak kaydına erişemedi. Excel aktarımı ve Word indirme kullanılabilir.");
+  }
   el("save").onclick = action(() => { localStorage.setItem(key,JSON.stringify(snapshot())); tell("Taslak kaydedildi."); });
   el("sample").onclick = action(() => {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Alan kodu","Bölüm","Alan","Değer"],...fields.map(f => [f.id,f.section,f.label,""])]),"SDS2");
     XLSX.writeFile(book,"RPYS_SDS2_Veri_Sablonu.xlsx");
   });
-  el("file").onchange = action(async event => {
-    const file = event.target.files[0];
-    event.target.value = "";
-    if (!file) return;
-    if (file.size > 25*1024*1024) throw Error("En fazla 25 MB dosya yüklenebilir.");
-    const book = XLSX.read(await file.arrayBuffer(),{type:"array"});
-    const sheet = book.Sheets.SDS2 || book.Sheets[book.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet,{header:1,raw:false});
-    if (rows[0]?.[0] !== "Alan kodu" || rows[0]?.[3] !== "Değer") {
-      const totals = requestRows(book);
-      if (!totals.length) throw Error("MR, BT veya USG istem sütunları bulunamadı.");
-      const month = prompt("Bu dosya hangi dönem sütununa aktarılsın? 1, 2 veya 3 gir.", "3");
-      if (month === null) return;
-      if (!/^[123]$/.test(month)) throw Error("Ay sütunu 1, 2 veya 3 olmalı.");
-      const updates = totals.map(({group,type,total}) => {
+  const fileInput = el("file");
+  const applyImport = el("apply-import");
+  const monthInput = el("import-month");
+  let pending = null;
+  let selection = 0;
+
+  function getUpdates() {
+    if (!pending) return [];
+    if (pending.totals) {
+      const totals = pending.totals;
+      const month = monthInput.value;
+      return totals.map(({group,type,total}) => {
         const field = fields.find(f => f.section.startsWith("2."+(group+1)+" ") && f.label === month+". ay · "+type);
         if (!field) throw Error("Word şablonunda ay sütunu bulunamadı.");
         return [field,total];
       });
-      if (!confirm(month+". aya "+updates.length+" istem toplamı aktarılacak. Devam edilsin mi?")) return;
-      for (const [field,total] of updates) field.input.value = total;
-      tell(updates.length+" MR, BT ve USG istem toplamı aktarıldı.");
-      return;
     }
-    const updates = new Map();
-    for (const [id,,,value] of rows.slice(1)) {
-      const field = fields.find(f => f.id === id);
-      if (!field || value == null || value === "") continue;
-      if (updates.has(field)) throw Error("Yinelenen alan kodu " + id);
-      updates.set(field,value);
+    return pending.entries;
+  }
+
+  fileInput.disabled = false;
+  fileInput.onchange = action(async () => {
+    const currentSelection = ++selection;
+    const file = fileInput.files[0];
+    pending = null;
+    applyImport.disabled = true;
+    if (!file) return;
+    if (file.size > 25*1024*1024) throw Error("En fazla 25 MB dosya yüklenebilir.");
+    tell(file.name + " okunuyor…");
+    const bytes = await file.arrayBuffer();
+    if (currentSelection !== selection) return;
+    if (!window.XLSX) throw Error("Excel okuyucu yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
+    const book = XLSX.read(bytes,{type:"array"});
+    const sheet = book.Sheets.SDS2 || book.Sheets[book.SheetNames[0]];
+    if (!sheet) throw Error("Excel dosyasında okunabilir sayfa bulunamadı.");
+    const rows = XLSX.utils.sheet_to_json(sheet,{header:1,raw:false});
+    if (rows[0]?.[0] !== "Alan kodu" || rows[0]?.[3] !== "Değer") {
+      const totals = requestRows(book);
+      if (!totals.length) throw Error("MR, BT veya USG istem sütunları bulunamadı.");
+      pending = {totals};
+      tell(file.name + " okundu. " + totals.length + " istem toplamı bulundu. Ayı seçip Forma aktar’a dokun.");
+    } else {
+      const updates = new Map();
+      for (const [id,,,value] of rows.slice(1)) {
+        const field = fields.find(f => f.id === id);
+        if (!field || value == null || value === "") continue;
+        if (updates.has(field)) throw Error("Yinelenen alan kodu " + id);
+        updates.set(field,value);
+      }
+      if (!updates.size) throw Error("Doldurulmuş eşleşen alan bulunamadı.");
+      pending = {entries:[...updates]};
+      tell(file.name + " okundu. " + updates.size + " alan bulundu. Forma aktar’a dokun.");
     }
-    if (!updates.size) throw Error("Doldurulmuş eşleşen alan bulunamadı.");
-    if (!confirm(updates.size + " alan güncellenecek. Devam edilsin mi?")) return;
-    updates.forEach((value,field) => { field.input.value = value; });
-    tell(updates.size + " alan aktarıldı.");
+    applyImport.disabled = false;
+  });
+  applyImport.onclick = action(() => {
+    const updates = getUpdates();
+    if (!updates.length) return;
+    for (const [field,value] of updates) field.input.value = value;
+    const month = pending.totals ? monthInput.value + ". aya " : "";
+    pending = null;
+    applyImport.disabled = true;
+    fileInput.value = "";
+    const affected = new Set(updates.map(([field]) => field.input.closest("details")));
+    for (const details of affected) if (details) details.open = true;
+    tell(month + updates.length + " alan aktarıldı.");
   });
   el("word").onclick = action(async () => {
     const data = snapshot();

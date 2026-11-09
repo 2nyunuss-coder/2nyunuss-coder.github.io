@@ -11,9 +11,11 @@ label{display:grid;gap:4px}input,button,textarea{font:inherit;padding:6px}button
 <h1>SDS 2 Görüntüleme Hizmetleri</h1>
 <p>Alanları elle gir veya Excel şablonundaki Değer sütununu doldurup yükle. Üç aya ait istem sayılarını ayrı sütunlara gir. Taslak yalnızca bu tarayıcıda tutulur.</p>
 <button id="sample">Excel şablonu indir</button><button id="save">Taslağı kaydet</button><button id="word">Logolu Word indir</button>
-<label>Excel veya CSV yükle<input type="file" id="file" accept=".xlsx,.xls,.csv"></label>
+<label>HBYS istem Excel’i, SDS 2 şablonu veya CSV yükle<input type="file" id="file" disabled></label>
+<label>HBYS istem dosyasının ayı<select id="import-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3" selected>3. ay</option></select></label>
+<button type="button" id="apply-import" disabled>Forma aktar</button>
 <p id="status" role="status"></p><div id="form"></div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="rpys-sds2.js"></script>
+<script src="rpys-sds2.js?v=20261109-import"></script>
 </html>
