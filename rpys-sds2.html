@@ -19,6 +19,9 @@ td input{width:100%;min-width:88px;box-sizing:border-box}
 .check-label{display:flex;align-items:center;gap:8px;font-weight:600}
 .fields label:has(textarea){grid-column:1/-1}
 input[aria-label$="Toplam çekim"],input[aria-label$="Süre içinde"],input[aria-label$="Süreyi geçen"]{min-width:70px}
+.timing-chart p{margin:10px 0 3px}
+.timing-bar{height:14px;background:#e4eaf0;border:1px solid #a6b5c3;display:flex;justify-content:flex-end;margin-bottom:6px}
+.timing-bar span{height:100%;background:repeating-linear-gradient(135deg,#274158,#274158 3px,#71879b 3px,#71879b 6px)}
 </style>
 <a href="./">RPYS ana ekranı</a>
 <h1>SDS 2 Görüntüleme Hizmetleri</h1>
@@ -31,5 +34,5 @@ input[aria-label$="Toplam çekim"],input[aria-label$="Süre içinde"],input[aria
 <p id="status" role="status"></p><div id="form"></div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="rpys-sds2.js?v=20261109-timing-tables"></script>
+<script src="rpys-sds2.js?v=20261109-threshold-chart"></script>
 </html>

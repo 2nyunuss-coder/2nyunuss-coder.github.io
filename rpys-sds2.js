@@ -119,6 +119,7 @@ async function start() {
         nodes[0].setAttributeNS("http://www.w3.org/XML/1998/namespace","xml:space","preserve");
         nodes.slice(1).forEach(t => { t.textContent = ""; });
       });
+      fields.at(-1).paragraphIndex = index;
     }
   });
   const snapshot = () => Object.fromEntries(fields.map(f => [f.id,f.input.value]));
@@ -235,16 +236,18 @@ async function start() {
   const tracking = block("Kurum içi süre aşımı takibi");
   hide(f => f.table === 130);
   const cohorts = [
-    ["Poliklinik BT","72 saat"],["Acil BT","1 saat"],["Acil MR","4 saat"],
-    ["Yatan hasta MR","4 saat"],["Rutin MR","72 saat"],["Yatan hasta BT","24 saat"]
+    ["Poliklinik BT","72 saat"],["Acil BT","1 saat"],["Acil MR","24 saat"],
+    ["Yatan hasta MR","24 saat"],["Rutin MR","72 saat"],["Yatan hasta BT","24 saat"]
   ];
-  const trackingHeaders = ["Hasta grubu / tetkik","Süre sınırı","Toplam çekim","Süre içinde","Süreyi geçen","Aşmayan / toplam","Aşan / toplam","Aşan / aşmayan"];
+  const trackingHeaders = ["Hasta grubu / tetkik","Süre sınırı","Toplam çekim","Süreyi geçen","Süreyi geçmeyen","Geçen / toplam","Geçmeyen / toplam","Geçen / geçmeyen"];
   tracking.append(make("p","Her grup için toplam çekim sayısını, süre içinde çekilen ve süreyi geçen hasta sayılarını gir. Tam sınırda yapılan çekimleri süre içinde say."));
   const trackingBody = screenTable(tracking,trackingHeaders,cohorts.map(([name,limit]) => [name,limit,"","","","—","—","—"]));
-  const trackingInputs = cohorts.map(([name],row) => [2,3,4].map((col,index) => {
+  const trackingInputs = cohorts.map(([name],row) => [2,4,3].map((col,index) => {
     const input = make("input");
     input.type = "number"; input.min = "0"; input.step = "1";
-    input.value = savedDraft.timingCounts?.[row]?.[index] ?? "";
+    const limit = cohorts[row][1];
+    const oldLimit = savedDraft.timingLimits?.[row] ?? ([2,3].includes(row) ? "4 saat" : limit);
+    input.value = oldLimit === limit ? savedDraft.timingCounts?.[row]?.[index] ?? "" : "";
     input.setAttribute("aria-label",name+" "+trackingHeaders[col]);
     trackingBody.rows[row].cells[col].append(input);
     return input;
@@ -252,6 +255,11 @@ async function start() {
   const trackingStatus = make("p");
   trackingStatus.setAttribute("role","status");
   tracking.append(trackingStatus);
+  const trackingSummary = make("div");
+  const trackingChart = make("div");
+  trackingChart.className = "timing-chart";
+  tracking.append(trackingSummary,trackingChart);
+  const trackingNote = "Geçen / geçmeyen oranı, süre sınırını geçen çekim sayısının süreyi geçmeyen çekim sayısına bölünmesiyle hesaplanır.";
   const timingValues = () => trackingInputs.map(row => row.map(input => input.value));
   function trackingRatios(values) {
     if (values.every(v => v === "")) return {rates:["—","—","—"],issue:""};
@@ -264,18 +272,52 @@ async function start() {
       return {rates:["—","—","—"],issue:"Süre içinde ve süreyi geçen sayıların toplamı, toplam çekime eşit olmalı."};
     }
     const ratio = (a,b) => b ? "%"+(a*100/b).toLocaleString("tr-TR",{maximumFractionDigits:2}) : "—";
-    return {rates:[ratio(within,total),ratio(over,total),ratio(over,within)],issue:""};
+    return {rates:[ratio(over,total),ratio(within,total),ratio(over,within)],issue:""};
   }
   function updateTracking() {
     const issues = [];
-    const rows = timingValues().map((values,index) => {
+    const rows = [];
+    const chartRows = [];
+    timingValues().forEach((values,index) => {
       const {rates,issue} = trackingRatios(values);
       if (issue) issues.push(cohorts[index][0]+" · "+issue);
       rates.forEach((rate,i) => { trackingBody.rows[index].cells[i+5].textContent = rate; });
-      return [...cohorts[index],...values,...rates];
+      if (issue || values.every(v => v === "")) return;
+      const [total,within,over] = values.map(num);
+      rows.push([...cohorts[index],String(total),String(over),String(within),...rates]);
+      if (total) chartRows.push({label:cohorts[index].join(" · "),total,over,rates});
     });
+    const combined = ["72 saat","1 saat","24 saat"].flatMap(limit => {
+      const group = rows.filter(row => row[1] === limit);
+      if (group.length < 2) return [];
+      const [total,over,within] = [2,3,4].map(col => group.reduce((sum,row) => sum+Number(row[col]),0));
+      return [["TOPLAM",limit,String(total),String(over),String(within),...trackingRatios([total,within,over].map(String)).rates]];
+    });
+    const reportRows = ["72 saat","1 saat","24 saat"].flatMap(limit => [
+      ...rows.filter(row => row[1] === limit),...combined.filter(row => row[1] === limit)
+    ]);
     trackingStatus.textContent = issues.join(" ");
-    return {rows,issues};
+    trackingSummary.replaceChildren();
+    if (combined.length) {
+      trackingSummary.append(make("h3","Aynı süre sınırına göre toplamlar"));
+      screenTable(trackingSummary,trackingHeaders,combined);
+    }
+    trackingChart.replaceChildren();
+    if (chartRows.length) {
+      trackingChart.append(make("h3","Çekimlerin süre sınırına göre dağılımı"));
+      for (const {label,total,over,rates} of chartRows) {
+        const caption = make("p",label+" · Geçmeyen "+rates[1]+" · Geçen "+rates[0]);
+        const bar = make("div");
+        bar.className = "timing-bar";
+        bar.setAttribute("aria-hidden","true");
+        const segment = make("span");
+        segment.style.width = over*100/total+"%";
+        bar.append(segment);
+        trackingChart.append(caption,bar);
+      }
+      trackingChart.append(make("small",trackingNote));
+    }
+    return {rows:reportRows,chartRows,issues};
   }
   tracking.addEventListener("input",updateTracking);
   updateTracking();
@@ -389,7 +431,7 @@ async function start() {
     localStorage.setItem(key,JSON.stringify({
       ...snapshot(),importedMonths,mhrsSample:checked.checked,
       appointments:inputValues(appointments),experts:expertValues(),
-      emergencyTargets:inputValues(emergencyTargets),timingCounts:timingValues()
+      emergencyTargets:inputValues(emergencyTargets),timingCounts:timingValues(),timingLimits:cohorts.map(([,limit]) => limit)
     }));
     tell("Taslak kaydedildi.");
   });
@@ -552,7 +594,7 @@ async function start() {
     const body = documentBody(output);
     for (const field of [...fields].reverse()) {
       const value = String(data[field.id]).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"");
-      if (value) field.write(body,value);
+      if (value || field.paragraphIndex !== undefined) field.write(body,value);
     }
     const anchors = [...body.children];
     const word = (tag,attributes = {}) => {
@@ -586,7 +628,10 @@ async function start() {
         values.forEach((value,ci) => {
           const cell = word("tc"), tcPr = word("tcPr");
           tcPr.append(word("tcW",{w:widths[ci],type:"dxa"}));
-          cell.append(tcPr,paragraph(value,index === 0));
+          if (headers === trackingHeaders && (index === 0 || values[0] === "TOPLAM")) {
+            tcPr.append(word("shd",{fill:index === 0 ? "D9EAF5" : "E5F1EA"}));
+          }
+          cell.append(tcPr,paragraph(value,index === 0 || (headers === trackingHeaders && values[0] === "TOPLAM")));
           row.append(cell);
         });
         table.append(row);
@@ -604,16 +649,61 @@ async function start() {
         paragraph("Hekimlere göre üç aylık istemler",true),wordTable(doctors.headers,doctors.rows));
       anchors[index].replaceWith(...nodes);
     }
-    const mhrsParagraph = paragraph(checked.checked ? mhrsText : "Örnek inceleme yapıldı mı? ☐");
-    anchors[67].replaceWith(mhrsParagraph);
+    if (checked.checked) anchors[67].replaceWith(paragraph(mhrsText));
+    else anchors[67].remove();
     for (const index of [68,69,70,71,72,73,74]) anchors[index].remove();
-    anchors[76].replaceWith(wordTable(["Tetkik","Randevu verme süresi (gün)"],appointmentTypes.map(type => [type,appointments[type].value])));
-    anchors[91].replaceWith(wordTable(expertHeads,specialistRows));
-    anchors[102].replaceWith(wordTable(["Tetkik","İncelenen sayı","Ortalama sonuç / rapor süresi (gün)"],
-      modalities.map((type,row) => [type,reportFields(row,1).input.value,reportFields(row,2).input.value])));
-    anchors[117].replaceWith(wordTable(emergencyHeaders,modalities.map((type,row) =>
-      [type,...[1,2,3].map(col => emergencyFields(row,col).input.value),emergencyTargets[type].value])));
-    anchors[130].replaceWith(wordTable(trackingHeaders,trackingReport.rows));
+    function replaceInputTable(index,headers,rows) {
+      if (rows.length) anchors[index].replaceWith(wordTable(headers,rows));
+      else anchors[index].remove();
+    }
+    replaceInputTable(76,["Tetkik","Randevu verme süresi (gün)"],
+      appointmentTypes.map(type => [type,appointments[type].value]).filter(row => row[1] !== ""));
+    replaceInputTable(91,expertHeads,specialistRows);
+    replaceInputTable(102,["Tetkik","İncelenen sayı","Ortalama sonuç / rapor süresi (gün)"],
+      modalities.map((type,row) => [type,reportFields(row,1).input.value,reportFields(row,2).input.value])
+        .filter(row => row.slice(1).some(Boolean)));
+    replaceInputTable(117,emergencyHeaders,modalities.map((type,row) =>
+      [type,...[1,2,3].map(col => emergencyFields(row,col).input.value),emergencyTargets[type].value])
+      .filter(row => row.slice(1).some(Boolean)));
+    replaceInputTable(130,trackingHeaders,trackingReport.rows);
+    if (trackingReport.rows.length) anchors[129].replaceWith(paragraph(trackingNote));
+    if (trackingReport.chartRows.length) {
+      const chart = [paragraph("Çekimlerin süre sınırına göre dağılımı",true)];
+      for (const {label,total,over,rates} of trackingReport.chartRows) {
+        chart.push(paragraph(label+" · Geçmeyen "+rates[1]+" · Geçen "+rates[0]));
+        const bar = word("tbl"), props = word("tblPr"), grid = word("tblGrid"), row = word("tr");
+        props.append(word("tblW",{w:5000,type:"pct"}),word("tblLayout",{type:"fixed"}));
+        bar.append(props,grid,row);
+        for (const [count,fill] of [[total-over,"DCE5EC"],[over,"405C73"]]) {
+          if (!count) continue;
+          const width = Math.max(1,Math.round(count*9700/total));
+          grid.append(word("gridCol",{w:width}));
+          const cell = word("tc"), cellProps = word("tcPr");
+          cellProps.append(word("tcW",{w:width,type:"dxa"}),word("shd",{fill}));
+          cell.append(cellProps,paragraph(""));
+          row.append(cell);
+        }
+        chart.push(bar);
+      }
+      anchors[131].before(...chart);
+    }
+    if (!trackingReport.rows.length) {
+      anchors[129].remove();
+      if (!fields.some(f => [131,132].includes(f.paragraphIndex) && String(data[f.id]).trim())) anchors[128].remove();
+    }
+    for (const index of new Set(fields.map(f => f.paragraphIndex).filter(index => index !== undefined))) {
+      if (!fields.some(f => f.paragraphIndex === index && String(data[f.id]).trim())) anchors[index].remove();
+    }
+    for (const index of new Set(fields.map(f => f.table).filter(index => index !== undefined))) {
+      const table = anchors[index];
+      if (!table.parentNode) continue;
+      const rows = children(table,"tr");
+      rows.slice(1).forEach((row,i) => {
+        const cells = fields.filter(f => f.table === index && f.row === i);
+        if (cells.length && !cells.some(f => String(data[f.id]).trim())) row.remove();
+      });
+      if (children(table,"tr").length < 2) table.remove();
+    }
     const result = await JSZip.loadAsync(template);
     result.file("word/document.xml",new XMLSerializer().serializeToString(output));
     const blob = await result.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
