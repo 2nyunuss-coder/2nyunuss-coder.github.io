@@ -7,7 +7,7 @@ const textNodes = node => [...node.getElementsByTagNameNS(ns, "t")];
 const text = node => textNodes(node).map(t => t.textContent).join("");
 const tell = message => { el("status").textContent = message; };
 const action = fn => async e => { try { await fn(e); } catch (error) { tell(error.message); } };
-const num = value => /^\d+$/.test(value.trim()) ? Number(value) : NaN;
+const num = value => /^\d+$/.test(String(value).trim()) ? Number(value) : NaN;
 
 function requestRows(book) {
   const normalize = value => String(value ?? "").trim().toLocaleUpperCase("tr").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -22,15 +22,28 @@ function requestRows(book) {
         const col = header.findIndex(label => label.startsWith(prefix) && label.split(/\s+/).includes(type));
         if (col < 0) continue;
         let total = 0;
+        const branches = new Map();
+        const doctors = new Map();
+        const addCount = (map, key, label, value) => {
+          const entry = map.get(key) || {label,count:0};
+          entry.count += value;
+          map.set(key,entry);
+        };
         for (const row of rows.slice(headerIndex+1)) {
           const branch = normalize(row[0]), doctor = normalize(row[1]);
           if (!branch || !doctor || /TOPLAM/.test(branch) || /TOPLAM|DOKTOR SEC/.test(doctor)) continue;
           const value = row[col] == null || row[col] === "" ? 0 : num(String(row[col]));
           if (!Number.isSafeInteger(value)) throw Error(name + " sayfasında geçersiz istem sayısı.");
           total += value;
+          addCount(branches,branch,String(row[0]).trim(),value);
+          addCount(doctors,branch+" / "+doctor,String(row[1]).trim()+" ("+String(row[0]).trim()+")",value);
         }
         if (result.some(item => item.group === group && item.type === type)) throw Error("Aynı tetkik sütunu birden fazla sayfada bulundu.");
-        result.push({group,type,total});
+        const leaders = map => {
+          const ordered = [...map.values()].filter(item => item.count > 0).sort((a,b) => b.count-a.count);
+          return ordered.filter(item => item.count === ordered[0].count);
+        };
+        result.push({group,type,total,branches:leaders(branches),doctors:leaders(doctors)});
       }
     }
   }
@@ -63,7 +76,7 @@ async function start() {
       activeSection = section;
     }
     const wrapper = document.createElement("label");
-    const input = document.createElement("input");
+    const input = document.createElement(label === "Analiz bulguları ve önceki aya göre değişim" ? "textarea" : "input");
     wrapper.textContent = label;
     wrapper.append(input);
     grid.append(wrapper);
@@ -109,17 +122,72 @@ async function start() {
     }
   });
   const snapshot = () => Object.fromEntries(fields.map(f => [f.id,f.input.value]));
+  let importedMonths = {};
   try {
     const saved = JSON.parse(localStorage.getItem(key) || "{}");
     fields.forEach(f => { f.input.value = saved?.[f.id] || ""; });
+    importedMonths = saved?.importedMonths || {};
   } catch {
     tell("Tarayıcı taslak kaydına erişemedi. Excel aktarımı ve Word indirme kullanılabilir.");
   }
-  el("save").onclick = action(() => { localStorage.setItem(key,JSON.stringify(snapshot())); tell("Taslak kaydedildi."); });
+  el("save").onclick = action(() => { localStorage.setItem(key,JSON.stringify({...snapshot(),importedMonths})); tell("Taslak kaydedildi."); });
   el("sample").onclick = action(() => {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["Alan kodu","Bölüm","Alan","Değer"],...fields.map(f => [f.id,f.section,f.label,""])]),"SDS2");
     XLSX.writeFile(book,"RPYS_SDS2_Veri_Sablonu.xlsx");
+  });
+  function updateAnalysis() {
+    const countText = value => value.toLocaleString("tr-TR");
+    const changeText = (first,last) => first === 0
+      ? (last === 0 ? "değişim yok (0 istem)" : "0’dan " + countText(last) + " isteme çıktı (yüzde hesaplanamaz)")
+      : "%" + countText(Math.round(Math.abs((last-first)*100/first)*100)/100) +
+        (last > first ? " artış" : last < first ? " azalış" : " değişim");
+    const leaderText = list => list.map(({label,count}) => label + " · " + countText(count)).join(", ");
+    const months = [1,2,3];
+    const names = months.map(month => fields.find(f => f.section === "Toplantı bilgileri" && f.label === month+". ay")?.input.value.trim() || month+". ay");
+    for (const group of [0,1,2]) {
+      const section = fields.filter(f => f.section.startsWith("2."+(group+1)+" "));
+      const field = label => section.find(f => f.label === label);
+      const set = (label,value) => { const f = field(label); if (f) f.input.value = value; };
+      const lines = [];
+      for (const type of ["MR","BT","USG"]) {
+        const values = months.map(month => num(field(month+". ay · "+type)?.input.value || ""));
+        const [first,second,last] = values;
+        const all = values.every(Number.isFinite);
+        if (Number.isFinite(first) && Number.isFinite(last)) {
+          set("İlk ve son ay değişimi (%) · "+type,first === 0 ? "Hesaplanamaz" : countText(Math.round((last-first)*10000/first)/100) + " %");
+        }
+        const reports = months.map(month => importedMonths[month]?.find(item => item.group === group && item.type === type));
+        const latest = reports[2];
+        if (latest) {
+          const branches = leaderText(latest.branches), doctors = leaderText(latest.doctors);
+          set(type+" · Branş",branches || "İstem yok");
+          set(type+" · Hekim",doctors || "İstem yok");
+          set("Son ayın en çok isteyen branşı ve hekimi · "+type,branches && doctors ? branches + " / " + doctors : "İstem yok");
+        }
+        if (!values.some(Number.isFinite)) continue;
+        const totals = values.map((value,index) => names[index]+": "+(Number.isFinite(value) ? countText(value) : "veri girilmedi"));
+        let line = type+" istemleri ("+totals.join(", ")+").";
+        if (all) {
+          line += " Üç aylık toplam "+countText(first+second+last)+" istem. "+
+            names[0]+" → "+names[1]+": "+changeText(first,second)+". "+
+            names[1]+" → "+names[2]+": "+changeText(second,last)+". "+
+            names[0]+" → "+names[2]+": "+changeText(first,last)+".";
+        }
+        for (const [index,report] of reports.entries()) {
+          if (!report?.branches.length || !report.doctors.length) continue;
+          line += " "+names[index]+" en çok isteyen branş: "+leaderText(report.branches)+
+            ". En çok isteyen hekim: "+leaderText(report.doctors)+".";
+        }
+        lines.push(line);
+      }
+      if (lines.length) set("Analiz bulguları ve önceki aya göre değişim",lines.join(" "));
+    }
+  }
+
+  el("analyze").onclick = action(() => {
+    updateAnalysis();
+    tell("Üç aylık istem istatistikleri ve analiz metni güncellendi.");
   });
   const fileInput = el("file");
   const applyImport = el("apply-import");
@@ -181,6 +249,13 @@ async function start() {
     if (!updates.length) return;
     for (const [field,value] of updates) field.input.value = value;
     const month = pending.totals ? monthInput.value + ". aya " : "";
+    if (pending.totals) {
+      const selectedMonth = monthInput.value;
+      const previous = importedMonths[selectedMonth] || [];
+      importedMonths[selectedMonth] = previous.filter(item =>
+        !pending.totals.some(total => total.group === item.group && total.type === item.type)).concat(pending.totals);
+      updateAnalysis();
+    }
     pending = null;
     applyImport.disabled = true;
     fileInput.value = "";

@@ -5,7 +5,7 @@
 body{font:15px system-ui;background:#f3f6fa;color:#17365d;max-width:1100px;margin:auto;padding:20px}
 details{background:white;border:1px solid #cad5e2;padding:15px;margin:10px 0}summary{cursor:pointer;font-weight:bold}
 .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
-label{display:grid;gap:4px}input,button,textarea{font:inherit;padding:6px}button{cursor:pointer;margin:4px}
+label{display:grid;gap:4px}textarea{min-height:110px;resize:vertical}input,button,textarea{font:inherit;padding:6px}button{cursor:pointer;margin:4px}
 </style>
 <a href="./">RPYS ana ekranı</a>
 <h1>SDS 2 Görüntüleme Hizmetleri</h1>
@@ -14,8 +14,9 @@ label{display:grid;gap:4px}input,button,textarea{font:inherit;padding:6px}button
 <label>HBYS istem Excel’i, SDS 2 şablonu veya CSV yükle<input type="file" id="file" disabled></label>
 <label>HBYS istem dosyasının ayı<select id="import-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3" selected>3. ay</option></select></label>
 <button type="button" id="apply-import" disabled>Forma aktar</button>
+<button type="button" id="analyze">Üç aylık analiz metnini oluştur</button>
 <p id="status" role="status"></p><div id="form"></div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="rpys-sds2.js?v=20261109-import"></script>
+<script src="rpys-sds2.js?v=20261109-analysis"></script>
 </html>
