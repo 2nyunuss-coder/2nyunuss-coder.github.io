@@ -22,18 +22,39 @@ input[aria-label$="Toplam çekim"],input[aria-label$="Süre içinde"],input[aria
 .timing-chart p{margin:10px 0 3px}
 .timing-bar{height:14px;background:#e4eaf0;border:1px solid #a6b5c3;display:flex;justify-content:flex-end;margin-bottom:6px}
 .timing-bar span{height:100%;background:repeating-linear-gradient(135deg,#274158,#274158 3px,#71879b 3px,#71879b 6px)}
+#report-preview{width:min(96vw,920px);max-height:90dvh;box-sizing:border-box;border:1px solid #aab8c6;border-radius:10px;padding:0;color:#182633}
+#report-preview::backdrop{background:#14263899}
+.preview-toolbar{position:sticky;top:0;background:#edf3f8;z-index:1;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.preview-toolbar form{margin-left:auto}
+#preview-content{padding:clamp(14px,4vw,44px);background:white;line-height:1.4;color:#17212c}
+#preview-content p{margin:6px 0;white-space:pre-wrap}
+#preview-content .preview-heading{font-weight:700;font-size:1.12rem;margin:16px 0 8px}
+#preview-content td p,#preview-content th p{margin:0}
+#preview-content th{position:static}
+.preview-table{overflow-x:auto;margin:8px 0 14px}
+.preview-logo{display:block;max-height:72px;max-width:100%;margin:0 auto 12px}
+#preview-status{margin:0 16px}
 </style>
 <a href="./">RPYS ana ekranı</a>
 <h1>SDS 2 Görüntüleme Hizmetleri</h1>
 <p>Toplantı bilgilerine ay adlarını yaz ve her ayın HBYS Excel’ini ilgili ayı seçerek yükle. 2.1–2.3 bölümlerinde her ay ve tetkik için ayrı hekim sıralaması oluşur. Ardından 2.4–2.7 bölümlerini doldur. Taslak bu tarayıcıya kaydedilir.</p>
-<button id="sample">Excel şablonu indir</button><button id="save">Taslağı kaydet</button><button id="word">Logolu Word indir</button>
+<button id="sample">Excel şablonu indir</button><button id="save">Taslağı kaydet</button><button id="preview" type="button" disabled>Word önizleme</button><button id="word">Logolu Word indir</button>
 <label>HBYS istem Excel’i, SDS 2 şablonu veya CSV yükle<input type="file" id="file" disabled></label>
 <label>HBYS istem dosyasının ayı<select id="import-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3" selected>3. ay</option></select></label>
 <button type="button" id="apply-import" disabled>Forma aktar</button>
 <label>Yüzde değişimi hesabında en güncel ay<select id="current-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3">3. ay</option></select></label>
 <button type="button" id="analyze">Üç aylık analiz metnini oluştur</button>
 <p id="status" role="status"></p><div id="form"></div>
+<dialog id="report-preview" aria-labelledby="preview-title">
+  <div class="preview-toolbar">
+    <strong id="preview-title">Word evrakı önizleme</strong>
+    <button id="preview-download" type="button">Logolu Word indir</button>
+    <form method="dialog"><button type="submit">Kapat</button></form>
+  </div>
+  <p id="preview-status" role="status"></p>
+  <article id="preview-content"></article>
+</dialog>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="rpys-sds2.js?v=20261109-import-warning"></script>
+<script src="rpys-sds2.js?v=20261109-word-preview"></script>
 </html>

@@ -425,6 +425,7 @@ async function start() {
     const current = Number(currentMonth.value)-1;
     return [current,...(current === 2 ? [1,0] : current === 1 ? [0,2] : [1,2])];
   }
+  const serviceNames = ["2.1 Poliklinik","2.2 Acil Servis","2.3 Klinik"];
   function comparison(group, kind) {
     const entries = new Map();
     const available = new Set();
@@ -482,9 +483,9 @@ async function start() {
         node.append(make("h3",title));
         for (const line of lines) node.append(make("strong",line));
       }
-      node.append(make("h3","Branşlara göre üç aylık istemler"));
+      node.append(make("h3",serviceNames[group]+" · Branşlara göre üç aylık istemler"));
       screenTable(node,branches.headers,branches.rows);
-      node.append(make("h3","Hekimlere göre üç aylık istemler"));
+      node.append(make("h3",serviceNames[group]+" · Hekimlere göre üç aylık istemler"));
       screenTable(node,doctors.headers,doctors.rows);
     });
   }
@@ -640,7 +641,7 @@ async function start() {
     for (const details of affected) if (details) details.open = true;
     tell(month + updates.length + " alan aktarıldı."+(warnings.length ? " Toplam farkı: "+warnings.join(" ") : ""));
   });
-  el("word").onclick = action(async () => {
+  function buildReport() {
     const data = snapshot();
     const specialistRows = expertValues();
     const trackingReport = updateTracking();
@@ -717,8 +718,8 @@ async function start() {
       for (const {title,lines} of doctors.top) {
         nodes.push(paragraph(title,true),...lines.map(line => paragraph(line,true)));
       }
-      nodes.push(paragraph("Branşlara göre üç aylık istemler",true),wordTable(branches.headers,branches.rows),
-        paragraph("Hekimlere göre üç aylık istemler",true),wordTable(doctors.headers,doctors.rows));
+      nodes.push(paragraph(serviceNames[group]+" · Branşlara göre üç aylık istemler",true),wordTable(branches.headers,branches.rows),
+        paragraph(serviceNames[group]+" · Hekimlere göre üç aylık istemler",true),wordTable(doctors.headers,doctors.rows));
       anchors[index].replaceWith(...nodes);
     }
     if (checked.checked) anchors[67].replaceWith(paragraph(mhrsText));
@@ -798,6 +799,93 @@ async function start() {
     for (const node of children(body,"p")) {
       if (!text(node).trim() && !["drawing","pict","sectPr","fldSimple"].some(name => node.getElementsByTagNameNS(ns,name).length)) node.remove();
     }
+    return output;
+  }
+
+  function previewParagraph(source) {
+    const p = make("p");
+    const style = source.getElementsByTagNameNS(ns,"pStyle")[0]?.getAttributeNS(ns,"val") || "";
+    if (style.startsWith("Heading") || style === "Title") p.className = "preview-heading";
+    for (const run of source.getElementsByTagNameNS(ns,"r")) {
+      const bold = run.getElementsByTagNameNS(ns,"b")[0];
+      const emphasis = bold && !["0","false","off"].includes(bold.getAttributeNS(ns,"val"));
+      const segment = make(emphasis ? "strong" : "span",text(run));
+      p.append(segment);
+    }
+    return p;
+  }
+
+  function previewTable(source) {
+    const table = make("table");
+    const grid = children(source,"tblGrid")[0];
+    if (grid) {
+      const cols = children(grid,"gridCol");
+      const widths = cols.map(col => Number(col.getAttributeNS(ns,"w")));
+      const total = widths.reduce((a,b) => a+b,0);
+      if (total > 0) {
+        const colgroup = make("colgroup");
+        widths.forEach(width => {
+          const col = make("col");
+          col.style.width = width*100/total+"%";
+          colgroup.append(col);
+        });
+        table.append(colgroup);
+      }
+    }
+    const tbody = make("tbody");
+    for (const row of children(source,"tr")) {
+      const tr = make("tr");
+      const header = row.getElementsByTagNameNS(ns,"tblHeader").length > 0;
+      for (const sourceCell of children(row,"tc")) {
+        const cell = make(header ? "th" : "td");
+        const span = Number(sourceCell.getElementsByTagNameNS(ns,"gridSpan")[0]?.getAttributeNS(ns,"val"));
+        if (span > 1) cell.colSpan = span;
+        const fill = sourceCell.getElementsByTagNameNS(ns,"shd")[0]?.getAttributeNS(ns,"fill");
+        if (/^[0-9a-f]{6}$/i.test(fill || "")) cell.style.backgroundColor = "#"+fill;
+        cell.append(...children(sourceCell,"p").map(previewParagraph));
+        tr.append(cell);
+      }
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    const wrapper = make("div");
+    wrapper.className = "preview-table";
+    wrapper.append(table);
+    return wrapper;
+  }
+
+  const previewDialog = el("report-preview");
+  const previewStatus = el("preview-status");
+  const previewAction = el("preview");
+  previewAction.disabled = false;
+  previewAction.onclick = action(async () => {
+    const output = buildReport();
+    const content = el("preview-content");
+    previewStatus.textContent = "";
+    previewAction.disabled = true;
+    try {
+      const parts = [];
+      const logoFile = zip.file("word/media/image1.jpg");
+      if (logoFile) {
+        const logo = make("img");
+        logo.className = "preview-logo";
+        logo.alt = "Kurum logosu";
+        logo.src = "data:image/jpeg;base64,"+await logoFile.async("base64");
+        parts.push(logo);
+      }
+      for (const node of documentBody(output).children) {
+        if (node.localName === "p") parts.push(previewParagraph(node));
+        if (node.localName === "tbl") parts.push(previewTable(node));
+      }
+      content.replaceChildren(...parts);
+      previewDialog.showModal();
+    } finally {
+      previewAction.disabled = false;
+    }
+  });
+
+  const downloadWord = async () => {
+    const output = buildReport();
     const result = await JSZip.loadAsync(template);
     result.file("word/document.xml",new XMLSerializer().serializeToString(output));
     const blob = await result.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
@@ -808,6 +896,16 @@ async function start() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url),1000);
     tell("Word evrakı hazırlandı.");
-  });
+  };
+  el("word").onclick = action(downloadWord);
+  el("preview-download").onclick = async () => {
+    try {
+      previewStatus.textContent = "";
+      await downloadWord();
+      previewStatus.textContent = "Word evrakı hazırlandı.";
+    } catch (error) {
+      previewStatus.textContent = error.message;
+    }
+  };
 }
 start().catch(error => tell(error.message));
