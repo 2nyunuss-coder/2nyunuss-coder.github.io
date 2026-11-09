@@ -6,10 +6,22 @@ body{font:15px system-ui;background:#f3f6fa;color:#17365d;max-width:1100px;margi
 details{background:white;border:1px solid #cad5e2;padding:15px;margin:10px 0}summary{cursor:pointer;font-weight:bold}
 .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
 label{display:grid;gap:4px}textarea{min-height:110px;resize:vertical}input,button,textarea{font:inherit;padding:6px}button{cursor:pointer;margin:4px}
+
+[hidden]{display:none!important}
+.report-block{grid-column:1/-1;background:#f8fafc;border:1px solid #dbe4ed;border-radius:8px;padding:12px;min-width:0}
+.report-block strong{display:block;font-size:1rem;margin:4px 0}
+.report-block h3{margin:12px 0 6px;font-size:1rem}
+.table-scroll{overflow:auto;max-height:420px;margin:8px 0 14px}
+table{border-collapse:collapse;width:100%;background:#fff}
+th,td{padding:8px;border:1px solid #d5dfe9;text-align:left}
+th{background:#eaf1f8;position:sticky;top:0}
+td input{width:100%;min-width:88px;box-sizing:border-box}
+.check-label{display:flex;align-items:center;gap:8px;font-weight:600}
+.fields label:has(textarea){grid-column:1/-1}
 </style>
 <a href="./">RPYS ana ekranı</a>
 <h1>SDS 2 Görüntüleme Hizmetleri</h1>
-<p>Alanları elle gir veya Excel şablonundaki Değer sütununu doldurup yükle. Üç aya ait istem sayılarını ayrı sütunlara gir. Taslak yalnızca bu tarayıcıda tutulur.</p>
+<p>Her ayın HBYS Excel’ini ilgili ayı seçerek yükle. Branş ve hekim tabloları 2.1–2.3 altında oluşur. Ardından 2.4–2.7 bölümlerini doldur. Taslak bu tarayıcıya kaydedilir.</p>
 <button id="sample">Excel şablonu indir</button><button id="save">Taslağı kaydet</button><button id="word">Logolu Word indir</button>
 <label>HBYS istem Excel’i, SDS 2 şablonu veya CSV yükle<input type="file" id="file" disabled></label>
 <label>HBYS istem dosyasının ayı<select id="import-month"><option value="1">1. ay</option><option value="2">2. ay</option><option value="3" selected>3. ay</option></select></label>
@@ -18,5 +30,5 @@ label{display:grid;gap:4px}textarea{min-height:110px;resize:vertical}input,butto
 <p id="status" role="status"></p><div id="form"></div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="rpys-sds2.js?v=20261109-analysis"></script>
+<script src="rpys-sds2.js?v=20261109-report-layout"></script>
 </html>
