@@ -453,16 +453,20 @@ async function start() {
         return values.map(v => v === null ? "—" : fmt.format(v)).join(" → ")+change;
       }));
     });
-    const top = kind === "doctorRows" ? modalities.map((type,ti) => {
-      const months = comparisonMonths();
-      const current = months[0]*3+ti;
-      const labels = periods();
-      const ranked = ordered.filter(item => available.has(current) && item.counts[current] > 0)
-        .sort((a,b) => b.counts[current]-a.counts[current] || a.label.localeCompare(b.label,"tr")).slice(0,10);
-      const lines = ranked.map((item,index) => (index+1)+". "+item.label+" ("+item.branch+") · "+
-        months.map(mi => labels[mi]+": "+(available.has(mi*3+ti) ? fmt.format(item.counts[mi*3+ti]) : "veri yok")).join(" · "));
-      return {title:type+" · Bu ay en çok istem yapan hekimler",lines};
-    }).filter(entry => entry.lines.length) : [];
+    const labels = periods();
+    const groupName = ["Poliklinik / rutin","Acil","Klinik / yatan"][group];
+    const top = kind === "doctorRows" ? labels.flatMap((month,mi) =>
+      ["USG","MR","BT"].flatMap(type => {
+        const column = mi*3+modalities.indexOf(type);
+        if (!available.has(column)) return [];
+        const ranked = ordered.filter(item => item.counts[column] > 0)
+          .sort((a,b) => b.counts[column]-a.counts[column] || a.label.localeCompare(b.label,"tr"))
+          .slice(0,10);
+        const lines = ranked.map((item,index) =>
+          (index+1)+". "+item.label+" ("+item.branch+") · "+fmt.format(item.counts[column])+" istem");
+        return [{title:groupName+" · "+month+" · "+type+" en çok istem yapan "+(ranked.length === 10 ? "10 hekim" : "hekimler"),
+          lines:lines.length ? lines : ["Bu ay istem kaydı yok."]}];
+      })) : [];
     return {headers,rows,top};
   }
   function renderComparisons() {
