@@ -216,6 +216,7 @@
     const ok=visit(0);return {ok,plan:plan.slice(),nodes,timedOut,lastFailure};
   }
   function requirementsFor(m){
+    m.boundaryWarnings=[];
     const rows=assignmentsMonth(),requirements=[],rules=unitRulesV251(m.u);
     for(const id of m.ids){
       const fixedDays=new Set(rows.filter(a=>Number(a.person.id)===id&&a.col.unit===m.u).map(a=>Number(a.day)));
@@ -261,6 +262,14 @@
         for(const side of ['before','after']){
           if(record[side]===null)continue;
           const valid=day=>side==='before'?blankRun(id,record.before,day)<=gap:blankRun(id,day,record.after)<=gap;
+          const edgeDay=side==='before'?1:daysInMonth();
+          // If the gap already exceeds the limit outside this editable month,
+          // even a duty on the nearest month edge cannot repair that history.
+          if(!valid(edgeDay)){
+            const date=new Date(origin+(record[side]-1)*86400000).toISOString().slice(0,10);
+            m.boundaryWarnings.push({id,side,date,reason:getPersonById(id).name+': '+date+' tarihindeki '+(side==='before'?'önceki':'sonraki')+' ay göreviyle '+gap+' boş gün sınırı, seçili ayın dışında aşılmış. Bu ayın görevleriyle giderilemeyen aralık ayrıca raporlandı.'});
+            continue;
+          }
           if(record.fixed.some(valid))continue;
           const days=new Set(Array.from({length:daysInMonth()},(_,index)=>index+1).filter(valid));
           requirements.push({id,days,reason:(side==='before'?'Önceki':'Sonraki')+' ay göreviyle '+gap+' boş gün sınırı'});
@@ -271,7 +280,11 @@
   }
   function finalRules(m){
     const r=unitRulesV251(m.u),rows=assignmentsMonth();
-    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u);if(gaps.length)return gaps.slice(0,6).map(item=>`${getPersonById(item.id)?.name||item.id}: ${item.leftDate||item.left||item.a} – ${item.rightDate||item.right||item.b} görev aralığı${item.blank!=null?' ('+item.blank+' boş gün)':''}.`).join('\n')}
+    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u).filter(item=>
+      !(m.boundaryWarnings||[]).some(warning=>Number(item.id)===warning.id&&
+        (warning.side==='before'
+          ? item.leftDate===warning.date&&String(item.rightDate||'').slice(0,7)===ym()
+          : item.rightDate===warning.date&&String(item.leftDate||'').slice(0,7)===ym())));if(gaps.length)return gaps.slice(0,6).map(item=>`${getPersonById(item.id)?.name||item.id}: ${item.leftDate||item.left||item.a} – ${item.rightDate||item.right||item.b} görev aralığı${item.blank!=null?' ('+item.blank+' boş gün)':''}.`).join('\n')}
     if(r.spouseSameDay){
       for(const id of m.ids){const sp=spouseOf(id);if(!sp)continue;
         const a=new Set(rows.filter(x=>Number(x.person.id)===id).map(x=>Number(x.day))),b=new Set(rows.filter(x=>Number(x.person.id)===Number(sp)).map(x=>Number(x.day)));
@@ -358,9 +371,9 @@
     clearCache();const actual=model(u,m.ids).actual;
     for(const id of m.ids)for(const t of kinds)if(actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
-    db.manualDistributionResultsV399??={};db.manualDistributionResultsV399[key(u)]={at:new Date().toISOString(),engine:'6.1.1',targets,actual,filled:result.plan.length};
+    db.manualDistributionResultsV399??={};db.manualDistributionResultsV399[key(u)]={at:new Date().toISOString(),engine:'6.1.1',targets,actual,filled:result.plan.length,boundaryWarnings:m.boundaryWarnings||[]};
     saveNowV245({allowAssignDrop:m.rebuild,label:`${u} elle gündüz/nöbet hedeflerine göre dağıtım`});
-    renderAll();render();const box=document.getElementById('distResult');if(box)box.textContent=`${u}: ${result.plan.length} görev yerleştirildi. Seçili ${m.ids.length} personelin gündüz ve nöbet hedefleri tam karşılandı. Manuel/kilitli kayıtlar korundu.`;
+    renderAll();render();const box=document.getElementById('distResult');if(box)box.textContent=`${u}: ${result.plan.length} görev yerleştirildi. Seçili ${m.ids.length} personelin gündüz ve nöbet hedefleri tam karşılandı. Manuel/kilitli kayıtlar korundu.${m.boundaryWarnings?.length?'\n'+m.boundaryWarnings.map(item=>item.reason).join('\n'):''}`;
     return result;
   }
   function totals(m){

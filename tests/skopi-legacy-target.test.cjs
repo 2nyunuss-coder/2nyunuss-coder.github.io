@@ -41,7 +41,8 @@ function boundaryRequirements(assign,leaves=[]){
   nonLeaveSegmentsV2414:()=>[[1,31]]
  };
  const compile=vm.runInNewContext('('+source.slice(source.indexOf('  function requirementsFor('),source.indexOf('  function finalRules(')).trim()+')',scope);
- return compile({u:unit,ids:[1]});
+ const model={u:unit,ids:[1]};
+ const result=compile(model);result.warnings=model.boundaryWarnings;return result;
 }
 test('Skopi compiles previous and next month gap obligations before search',()=>{
  const requirements=boundaryRequirements({'2026-11|acil|30|sk2':1,'2027-01|acil|2|sk2':1});
@@ -54,9 +55,11 @@ test('a fixed first-month duty satisfies the previous-month boundary',()=>{
  const requirements=boundaryRequirements({'2026-11|acil|30|sk2':1,'2026-12|acil|2|sk2':1});
  assert(!requirements.some(rule=>rule.reason.startsWith('Önceki')));
 });
-test('leave resets cross-month blank runs and impossible boundary windows stay explicit',()=>{
+test('leave resets cross-month blank runs and pre-existing historical gaps become warnings',()=>{
  const impossible=boundaryRequirements({'2026-11|acil|20|sk2':1});
- assert.equal(impossible.find(rule=>rule.reason.startsWith('Önceki')).days.size,0);
+ assert(!impossible.some(rule=>rule.reason.startsWith('Önceki')));
+ assert.equal(impossible.warnings.length,1);
+ assert.equal(impossible.warnings[0].date,'2026-11-20');
  const reset=boundaryRequirements({'2026-11|acil|25|sk2':1},[{personId:1,start:'2026-11-26',end:'2026-12-04'}]);
  assert(reset.find(rule=>rule.reason.startsWith('Önceki')).days.has(10));
  assert(!reset.find(rule=>rule.reason.startsWith('Önceki')).days.has(11));
@@ -74,4 +77,17 @@ test('quota matching rejects jointly impossible targets without mutating assignm
  assert.equal(selected.size,0);
  assert.equal(remaining[1].day,2);
  assert.equal(remaining[2].day,1);
+});
+
+test('historical exemption ignores only its existing external boundary, not current-month gaps',()=>{
+ let violations=[];
+ const scope={ym:()=> '2026-12',assignmentsMonth:()=>[],unitRulesV251:()=>({maxGapEnabled:true}),v251GapViolations:()=>violations,getPersonById:id=>({name:'Person '+id})};
+ const check=vm.runInNewContext('('+source.slice(source.indexOf('  function finalRules('),source.indexOf('  function searchAdapter(')).trim()+')',scope);
+ const model={u:'PORTABL + SKOPİ',ids:[1],boundaryWarnings:[{id:1,side:'before',date:'2026-11-20'}]};
+ violations=[{id:1,leftDate:'2026-11-20',rightDate:'2026-12-01',blank:10}];
+ assert.equal(check(model),true);
+ violations.push({id:1,left:3,right:12,blank:8});
+ assert.notEqual(check(model),true);
+ violations=[{id:2,leftDate:'2026-11-20',rightDate:'2026-12-01',blank:10}];
+ assert.notEqual(check(model),true);
 });
