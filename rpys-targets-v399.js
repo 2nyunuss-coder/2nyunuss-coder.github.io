@@ -82,6 +82,98 @@
         }
       }finally{remove(id,slots[a])}
     }
+    if(calendarSearch){
+      const original=Object.fromEntries(ids.map(id=>[id,{...remaining[id]}]));
+      const cells=slots.slice();
+      const rules=requirements.map(rule=>({...rule,values:cells.flatMap((slot,index)=>
+        rule.days.has(slot.day)&&slot.allowed.includes(rule.id)?[{index,id:rule.id}]:[])}));
+      const initial=cells.map(slot=>slot.allowed.slice());
+      const choices=new Map();
+      function matching(domains,left,kind){
+        const owners=new Map();
+        function augment(index,seen){
+          for(const id of domains[index]){
+            if(seen.has(id))continue;seen.add(id);
+            const occupied=owners.get(id)||[];
+            if(occupied.length<left[id][kind]){occupied.push(index);owners.set(id,occupied);return true}
+            for(let n=0;n<occupied.length;n++)if(augment(occupied[n],seen)){occupied[n]=index;return true}
+          }
+          return false;
+        }
+        for(let index=0;index<cells.length;index++){
+          if(cells[index].kind===kind&&domains[index]!==null&&!augment(index,new Set()))return false;
+        }
+        return true;
+      }
+      function search(domains,left){
+        if(++nodes>maxNodes||Date.now()-start>timeLimit){timedOut=true;return null}
+        domains=domains.map((options,index)=>options===null?null:options.filter(id=>
+          left[id][cells[index].kind]>0&&canPlace(id,cells[index])));
+        // Propagate target capacities and mandatory calendar windows together.
+        let changed=true;
+        while(changed){
+          changed=false;
+          if(domains.some(options=>options!==null&&!options.length))return null;
+          const force=(index,id)=>{
+            const options=domains[index];
+            if(!options||!options.includes(id))return false;
+            if(options.length>1){domains[index]=[id];changed=true}
+            return true;
+          };
+          for(const id of ids)for(const kind of kinds){
+            const available=cells.flatMap((slot,index)=>slot.kind===kind&&domains[index]?.includes(id)?[index]:[]);
+            if(available.length<left[id][kind]){
+              lastFailure=(getName(id))+': kalan '+left[id][kind]+' '+labelsFor(kind)+' için '+available.length+' uygun hücre kaldı.';
+              return null;
+            }
+            if(left[id][kind]&&available.length===left[id][kind])for(const index of available)if(!force(index,id))return null;
+          }
+          for(const rule of rules){
+            if([...choices].some(([index,id])=>id===rule.id&&rule.days.has(cells[index].day)))continue;
+            const options=rule.values.filter(value=>domains[value.index]?.includes(value.id));
+            if(!options.length){lastFailure=getName(rule.id)+': '+rule.reason+' için '+[...rule.days].join(', ')+'. günlerde uygun görev kalmadı.';return null}
+            if(options.length===1&&!force(options[0].index,options[0].id))return null;
+          }
+        }
+        if(choices.size===cells.length){
+          const verdict=finalCheck();
+          if(verdict===true)return [...choices].map(([index,id])=>({id,slot:cells[index]}));
+          lastFailure=String(verdict||'Son kural denetimi başarısız.');return null;
+        }
+        if(!matching(domains,left,'day')||!matching(domains,left,'night'))return null;
+        let index=-1;
+        for(let n=0;n<cells.length;n++)if(domains[n]!==null&&
+          (index<0||domains[n].length<domains[index].length||
+          domains[n].length===domains[index].length&&cells[n].day<cells[index].day))index=n;
+        const slot=cells[index];
+        const costs=new Map(domains[index].map(id=>{
+          const blocked=conflicts.get(token(slot,id));let cost=0;
+          for(let n=0;n<domains.length;n++)if(n!==index&&domains[n]){
+            cost+=domains[n].filter(other=>blocked.has(token(cells[n],other))).length/domains[n].length;
+          }
+          return [id,cost];
+        }));
+        const candidates=domains[index].slice().sort((a,b)=>costs.get(a)-costs.get(b)||
+          left[b][slot.kind]/Math.max(1,original[b][slot.kind])-left[a][slot.kind]/Math.max(1,original[a][slot.kind])||a-b);
+        for(const id of candidates){
+          const blocked=conflicts.get(token(slot,id));
+          const next=domains.map((options,n)=>options===null?null:options.filter(other=>!blocked.has(token(cells[n],other))));
+          next[index]=null;
+          const nextLeft=Object.fromEntries(ids.map(person=>[person,{...left[person]}]));
+          nextLeft[id][slot.kind]--;
+          place(id,slot);choices.set(index,id);
+          const result=search(next,nextLeft);
+          if(result)return result;
+          choices.delete(index);remove(id,slot);
+          if(timedOut)return null;
+        }
+        return null;
+      }
+      const getName=id=>typeof getPersonById==='function'?(getPersonById(id)?.name||String(id)):String(id);
+      const labelsFor=kind=>kind==='day'?'gündüz':'nöbet';
+      const result=search(initial,original);
+      return {ok:!!result,plan:result||[],nodes,timedOut,lastFailure,elapsed:Date.now()-start};
+    }
     function feasible(i){
       for(const id of ids)for(const t of kinds)if(remaining[id][t]<0)return false;
       const available=new Map(),capacity=Object.fromEntries(ids.map(id=>[id,empty()]));
@@ -139,11 +231,47 @@
         }
       }
     }
+    if(m.u==='PORTABL + SKOPİ'&&rules.maxGapEnabled){
+      const month=ym(),origin=Date.parse(month+'-01T12:00:00Z'),gap=Number(unitMaxGapDaysV251(m.u)||5);
+      const offset=date=>Math.round((Date.parse(date+'T12:00:00Z')-origin)/86400000)+1;
+      const boundary=new Map(m.ids.map(id=>[id,{before:null,after:null,fixed:[]}]));
+      for(const [key,raw] of Object.entries(db.assign||{})){
+        const record=boundary.get(Number(raw));if(!record)continue;
+        const [assignedMonth,type,day,...parts]=key.split('|');
+        if(dutyColumnByKey(type,parts.join('|'))?.unit!==m.u)continue;
+        const date=assignedMonth+'-'+String(Number(day)).padStart(2,'0'),value=offset(date);
+        if(!Number.isFinite(value))continue;
+        if(assignedMonth===month)record.fixed.push(value);
+        else if(value<1&&(record.before===null||value>record.before))record.before=value;
+        else if(value>daysInMonth()&&(record.after===null||value<record.after))record.after=value;
+      }
+      const blankRun=(id,a,b)=>{
+        const leaves=(db.leaves||[]).filter(leave=>Number(leave.personId??leave.idPerson??leave.person?.id)===id&&leave.start&&leave.end)
+          .map(leave=>[offset(leave.start),offset(leave.end)]);
+        let run=0,longest=0;
+        for(let day=a+1;day<b;day++){
+          run=leaves.some(([from,to])=>day>=from&&day<=to)?0:run+1;
+          longest=Math.max(longest,run);
+          if(longest>gap)return longest;
+        }
+        return longest;
+      };
+      for(const id of m.ids){
+        const record=boundary.get(id);
+        for(const side of ['before','after']){
+          if(record[side]===null)continue;
+          const valid=day=>side==='before'?blankRun(id,record.before,day)<=gap:blankRun(id,day,record.after)<=gap;
+          if(record.fixed.some(valid))continue;
+          const days=new Set(Array.from({length:daysInMonth()},(_,index)=>index+1).filter(valid));
+          requirements.push({id,days,reason:(side==='before'?'Önceki':'Sonraki')+' ay göreviyle '+gap+' boş gün sınırı'});
+        }
+      }
+    }
     return requirements;
   }
   function finalRules(m){
     const r=unitRulesV251(m.u),rows=assignmentsMonth();
-    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u);if(gaps.length)return `Görev aralığı kuralı: ${gaps.length} uyuşmazlık.`}
+    if(r.maxGapEnabled){const gaps=v251GapViolations(m.ids,m.u);if(gaps.length)return gaps.slice(0,6).map(item=>`${getPersonById(item.id)?.name||item.id}: ${item.leftDate||item.left||item.a} – ${item.rightDate||item.right||item.b} görev aralığı${item.blank!=null?' ('+item.blank+' boş gün)':''}.`).join('\n')}
     if(r.spouseSameDay){
       for(const id of m.ids){const sp=spouseOf(id);if(!sp)continue;
         const a=new Set(rows.filter(x=>Number(x.person.id)===id).map(x=>Number(x.day))),b=new Set(rows.filter(x=>Number(x.person.id)===Number(sp)).map(x=>Number(x.day)));
@@ -206,10 +334,27 @@
     const canPlace=(id,s)=>!assignmentsMonth().some(a=>Number(a.person.id)===id&&a.day===s.day&&a.col.unit===u)&&canTakeShiftV2414(id,s.day,s.col,u);
     for(const s of m.slots)s.allowed=m.ids.filter(id=>remaining[id][s.kind]>0&&canPlace(id,s));
     const requirements=requirementsFor(m);
-    for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun hücre yok.`);
+    for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${r.days.size?[...r.days].join(', ')+'. günlerde':'bu ayda'} uygun hücre yok.`);
+    if(u==='PORTABL + SKOPİ')for(const id of m.ids){
+      // Minimum points stabbing the required day intervals. All compiled
+      // calendar windows are intervals, including adjacent-month boundaries.
+      const windows=requirements.filter(rule=>rule.id===id).map(rule=>({
+        rule,days:[...new Set(m.slots.filter(slot=>rule.days.has(slot.day)&&slot.allowed.includes(id)).map(slot=>slot.day))].sort((a,b)=>a-b)
+      })).sort((a,b)=>a.days.at(-1)-b.days.at(-1));
+      const selected=[];
+      for(const window of windows){
+        if(!window.days.length)throw Error(getPersonById(id).name+': '+window.rule.reason+' için uygun vardiya yok.');
+        if(!selected.some(day=>window.days.includes(day)))selected.push(window.days.at(-1));
+      }
+      const need=remaining[id].day+remaining[id].night;
+      if(selected.length>need)throw Error(getPersonById(id).name+': izin dönüşü ve görev aralığı kuralları en az '+selected.length+' yeni görev gerektiriyor. Kalan hedef '+need+' ('+remaining[id].day+' gündüz / '+remaining[id].night+' nöbet).');
+    }
     for(const s of m.slots)if(!s.allowed.length)throw Error(`${s.day}. gün ${s.col.shift||s.col.key}: hedefi kalan uygun personel yok (izin, dinlenme, başka görev veya korunan kayıt).`);
     const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,calendarSearch:u==='PORTABL + SKOPİ',...searchAdapter(m)});
-    if(!result.ok)throw Error(result.timedOut?'Hedefler için arama süresi doldu. Bu sonuç hedeflerin imkânsız olduğunu göstermez. Ay, seçili personel, izinler ve diğer birim görevleri birlikte kontrol edilmeli.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
+    if(!result.ok){
+      const detail=result.lastFailure?'\nSon kural denetimi: '+result.lastFailure:'';
+      throw Error((result.timedOut?'Hedefler için arama süresi doldu. '+result.nodes+' plan adımı denetlendi.':'Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi.')+detail);
+    }
     clearCache();const actual=model(u,m.ids).actual;
     for(const id of m.ids)for(const t of kinds)if(actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
