@@ -64,9 +64,24 @@
     return targets;
   }
   // Bounded constraint search: place the most constrained remaining cell first.
-  function solve({slots,ids,remaining,canPlace,place,remove,requirements=[],finalCheck=()=>true,maxNodes=25000,timeLimit=9000}){
+  function solve({slots,ids,remaining,canPlace,place,remove,requirements=[],finalCheck=()=>true,maxNodes=25000,timeLimit=9000,calendarSearch=false}){
     const start=Date.now(),plan=[],unitDays=Object.fromEntries(ids.map(id=>[id,new Set()]));let nodes=0,timedOut=false,lastFailure='';
     slots=slots.slice().sort((a,b)=>a.day-b.day||(a.kind==='night'?-1:1)-(b.kind==='night'?-1:1)||a.key.localeCompare(b.key));
+    // Compile pair conflicts once. Candidate ordering can then avoid choices
+    // that remove scarce options from other dates without replaying the month.
+    const conflicts=new Map(),token=(s,id)=>s.key+'|'+id;
+    for(const slot of slots)for(const id of slot.allowed)conflicts.set(token(slot,id),new Set());
+    if(calendarSearch)for(let a=0;a<slots.length;a++)for(const id of slots[a].allowed){
+      if(Date.now()-start>timeLimit)return {ok:false,plan:[],nodes,timedOut:true,lastFailure};
+      place(id,slots[a]);
+      try{
+        for(let b=a+1;b<slots.length;b++)for(const other of slots[b].allowed){
+          if(canPlace(other,slots[b]))continue;
+          const first=token(slots[a],id),second=token(slots[b],other);
+          conflicts.get(first).add(second);conflicts.get(second).add(first);
+        }
+      }finally{remove(id,slots[a])}
+    }
     function feasible(i){
       for(const id of ids)for(const t of kinds)if(remaining[id][t]<0)return false;
       const available=new Map(),capacity=Object.fromEntries(ids.map(id=>[id,empty()]));
@@ -85,11 +100,18 @@
       if(++nodes>maxNodes||Date.now()-start>timeLimit){timedOut=true;return false}
       const available=feasible(i);if(!available)return false;
       if(i===slots.length){const check=finalCheck();if(check===true)return true;lastFailure=String(check||'Kurallar sağlanamadı.');return false}
-      let best=i;for(let j=i+1;j<slots.length;j++)if(available.get(slots[j]).length<available.get(slots[best]).length||(available.get(slots[j]).length===available.get(slots[best]).length&&slots[j].kind==='night'&&slots[best].kind!=='night'))best=j;
+      let best=i;for(let j=i+1;j<slots.length;j++)if(available.get(slots[j]).length<available.get(slots[best]).length||(available.get(slots[j]).length===available.get(slots[best]).length&&(calendarSearch?slots[j].day<slots[best].day:slots[j].kind==='night'&&slots[best].kind!=='night')))best=j;
       [slots[i],slots[best]]=[slots[best],slots[i]];
       const s=slots[i],candidates=available.get(s);
       const urgency=id=>requirements.reduce((n,r)=>n+(r.id===id&&r.days.has(s.day)&&![...unitDays[id]].some(d=>r.days.has(d))?1/(1+Math.max(...r.days)-s.day):0),0);
-      candidates.sort((a,b)=>urgency(b)-urgency(a)||remaining[b][s.kind]/Math.max(1,available.capacity[b][s.kind])-remaining[a][s.kind]/Math.max(1,available.capacity[a][s.kind])||a-b);
+      const costs=new Map(candidates.map(id=>{
+        const blocked=conflicts.get(token(s,id));let cost=0;
+        for(const [slot,options] of available)if(slot!==s){
+          cost+=options.filter(other=>blocked.has(token(slot,other))).length/options.length;
+        }
+        return [id,cost];
+      }));
+      candidates.sort((a,b)=>urgency(b)-urgency(a)||costs.get(a)-costs.get(b)||remaining[b][s.kind]/Math.max(1,available.capacity[b][s.kind])-remaining[a][s.kind]/Math.max(1,available.capacity[a][s.kind])||a-b);
       for(const id of candidates){
         place(id,s);remaining[id][s.kind]--;unitDays[id].add(s.day);plan.push({id,slot:s});
         if(visit(i+1))return true;
@@ -186,8 +208,8 @@
     const requirements=requirementsFor(m);
     for(const r of requirements)if(!m.slots.some(s=>r.days.has(s.day)&&s.allowed.includes(r.id)))throw Error(`${getPersonById(r.id).name}: ${r.reason} için ${[...r.days].join(', ')}. günlerde uygun hücre yok.`);
     for(const s of m.slots)if(!s.allowed.length)throw Error(`${s.day}. gün ${s.col.shift||s.col.key}: hedefi kalan uygun personel yok (izin, dinlenme, başka görev veya korunan kayıt).`);
-    const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,...searchAdapter(m)});
-    if(!result.ok)throw Error(result.timedOut?'Hedefler için arama süresi doldu; listeye değişiklik uygulanmadı. Korunan kayıtları, izinleri ve hedef sayılarını kontrol et.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
+    const result=solve({slots:m.slots,ids:m.ids,remaining,requirements,calendarSearch:u==='PORTABL + SKOPİ',...searchAdapter(m)});
+    if(!result.ok)throw Error(result.timedOut?'Hedefler için arama süresi doldu. Bu sonuç hedeflerin imkânsız olduğunu göstermez. Ay, seçili personel, izinler ve diğer birim görevleri birlikte kontrol edilmeli.':`Bu hedefler mevcut izin/dinlenme/eş/görev aralığı ve korunan kayıtlarla yerleştirilemedi. ${result.lastFailure}`);
     clearCache();const actual=model(u,m.ids).actual;
     for(const id of m.ids)for(const t of kinds)if(actual[id][t]!==targets[id][t])throw Error('Hedef doğrulaması başarısız; önceki liste korundu.');
     db.unitPools??={};db.unitPools[key(u)]=m.ids.slice();if(u==='PORTABL + SKOPİ')db.skopiEligible=m.ids.slice();
