@@ -8,18 +8,13 @@ function monthDays(m){let [y,n]=m.split('-').map(Number);return new Date(y,n,0).
 function getPeople(){let d=data();let p=Array.isArray(d?.staff)?d.staff:Array.isArray(d?.people)?d.people:Array.isArray(d?.personnel)?d.personnel:[];return p.filter(x=>x&&x.id!=null)}
 function person(id){try{let f=fn('getPersonById');if(f){let p=f(Number(id));if(p)return p.name||p.fullName||String(id)}}catch{}let p=getPeople().find(x=>String(x.id)===String(id));return p?.name||p?.fullName||p?.adSoyad||('Personel '+id)}
 function overtimePreference(p){
- // Read saved staff data; never infer a preference from duty targets.
- const entries=Object.entries(p||{});
- const keys=entries.filter(([key])=>/mesai|fazla|overtime|extra.?hour|tercih|preference/i.test(key));
- const valid=/^(?:0\s*saat|\d+\s*[-–—]\s*\d+\s*saat|\d+\s*\+?\s*saat)$/i;
- for(const [key,value] of keys){
-  if(value==null)continue;
-  if(typeof value==='string'&&valid.test(value.trim()))return value.trim();
-  if(typeof value==='object'&&!Array.isArray(value))for(const v of Object.values(value)){if(typeof v==='string'&&valid.test(v.trim()))return v.trim()}
- }
- // Some RPYS builds store the choice as a numeric band rather than display text.
- // Do not guess the mapping; expose a safe diagnostic instead.
- return '—';
+ // RPYS Personnel page persists overtime preference in staff.mesaiBand (e.g. "30-70").
+ const raw=p?.mesaiBand;
+ if(raw===null||raw===undefined||String(raw).trim()==='')return '—';
+ const v=String(raw).trim();
+ if(/^\d+\s*[-–]\s*\d+$/.test(v))return v.replace(/\s/g,'').replace('–','-')+' saat';
+ if(/^\d+\s*saat$/i.test(v))return v;
+ return v; // Show actual stored preference without guessing a band.
 }
 function getUnits(){let d=data();let pool=Object.keys(d?.unitPools||{}).filter(k=>k.startsWith(selectedMonth+'|')).map(k=>k.slice(8));let el=document.getElementById('autoUnit');let opts=el?[...el.options].map(o=>o.value).filter(Boolean):[];let known=['POLİKLİNİK RÖNTGEN','PORTABL + SKOPİ'];return [...new Set([...opts,...pool,...known])].filter(Boolean)}
 function slots(){let f=fn('unitSlots');if(!f)throw Error('RPYS unitSlots fonksiyonu yüklenmedi.');let units=getUnits();let out=[];for(let u of units){let a;try{a=f(u)}catch{continue}if(!Array.isArray(a))continue;for(let s of a){if(!s?.col?.key)continue;out.push({unit:u,type:s.type,col:s.col,key:s.col.key})}}return out}
@@ -116,18 +111,13 @@ function showEligible(key,x,y){
  popup.innerHTML='<div style="display:flex;justify-content:space-between"><b>Uygun personeller · '+E(info.date||'')+'</b><button id="v2PopupClose" style="padding:2px 8px">✕</button></div>'+(info.error?'<p>'+E(info.error)+'</p>':info.names.length?'<ol>'+info.names.map(n=>'<li>'+E(n)+'</li>').join('')+'</ol>':'<p>Bu kontrollerle uygun personel bulunamadı.</p>')+'<small>İzin, aynı gün çakışması, dinlenme ve girilmiş hedefler dikkate alınır. Saatleri farklı çift görev ve diğer aylar henüz doğrulanmadı.</small>';
  host.appendChild(popup);popup.querySelector('#v2PopupClose').onclick=()=>popup.remove();
 }
-function showOvertimeDiagnostic(members){
- const sample=members.slice(0,3).map(p=>({person:person(p.id),candidateFields:Object.entries(p).filter(([k])=>/mesai|fazla|overtime|extra|tercih|preference/i.test(k)).map(([key,value])=>({key,value:typeof value==='string'||typeof value==='number'?String(value):typeof value}))}));
- const panel=host.querySelector('#v2OvertimeDiagnostic');
- if(panel)panel.textContent=JSON.stringify(sample,null,2);
-}
 function motor(){try{
 const rows=getRecords(),people=getPeople(),existing=host.querySelector('#v2MotorPanel');existing?.remove();
 if(unit==='all')throw Error('Dağıtım için önce tek bir birim seç. Tüm birimler görünümü yalnızca listeleme içindir.');
 const pool=poolFor(unit);if(!pool.length)throw Error('Bu birim için RPYS personel havuzu boş. Önce mevcut RPYS içinde birim personellerini seç.');
 const members=people.filter(p=>pool.includes(String(p.id)));
 const p=document.createElement('section');p.id='v2MotorPanel';p.className='v2box';
-p.innerHTML='<h2>⚙ Nöbet V2 · Yeni Bağımsız Dağıtım Motoru</h2><div class="v2warn">Deneysel motor v0.2: seçilen hedeflere göre tam veya kısmi önizleme üretir. İzin şeması, vardiya saatleri ve özel Skopi kuralları henüz tam doğrulanmadı. Bu sonuçlar canlı kullanıma hazır değildir.</div><p><b>Birim:</b> '+E(unit)+' · <b>Ay:</b> '+E(selectedMonth)+' · <b>Havuz:</b> '+members.length+' personel</p><div class="v2scroll"><table id="v2TargetTable"><thead><tr><th>Seç</th><th>Personel</th><th>Fazla mesai tercihi (RPYS)</th><th>Gündüz hedefi</th><th>Nöbet hedefi</th></tr></thead><tbody>'+members.map(x=>'<tr><td><input type="checkbox" data-select="'+E(x.id)+'" checked></td><td>'+E(person(x.id))+'</td><td>'+E(overtimePreference(x))+'</td><td><input type="number" data-day="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td><td><input type="number" data-night="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td></tr>').join('')+'</tbody></table></div><div class="v2tools" style="margin-top:12px"><label><input type="checkbox" id="v2BeforeLeave" checked> İzin öncesi boşluk</label><label><input type="checkbox" id="v2Rest" checked> 16 saat sonrası dinlenme</label><label><input type="checkbox" id="v2Double"> Saatleri çakışmayan aynı gün çift görev</label></div><div class="v2tools" style="margin-top:12px"><button id="v2InspectOvertime" type="button">Mesai veri alanlarını kontrol et</button><button id="v2Equal">Hedefleri eşit öner</button><button id="v2Solve" class="primary">▶ Yeni motorla dağıt (önizleme)</button></div><pre id="v2OvertimeDiagnostic" style="white-space:pre-wrap;font-size:12px;max-height:160px;overflow:auto"></pre><div id="v2SolveResult" style="margin-top:12px"></div>';
+p.innerHTML='<h2>⚙ Nöbet V2 · Yeni Bağımsız Dağıtım Motoru</h2><div class="v2warn">Deneysel motor v0.2: seçilen hedeflere göre tam veya kısmi önizleme üretir. İzin şeması, vardiya saatleri ve özel Skopi kuralları henüz tam doğrulanmadı. Bu sonuçlar canlı kullanıma hazır değildir.</div><p><b>Birim:</b> '+E(unit)+' · <b>Ay:</b> '+E(selectedMonth)+' · <b>Havuz:</b> '+members.length+' personel</p><div class="v2scroll"><table id="v2TargetTable"><thead><tr><th>Seç</th><th>Personel</th><th>Fazla mesai tercihi (RPYS)</th><th>Gündüz hedefi</th><th>Nöbet hedefi</th></tr></thead><tbody>'+members.map(x=>'<tr><td><input type="checkbox" data-select="'+E(x.id)+'" checked></td><td>'+E(person(x.id))+'</td><td>'+E(overtimePreference(x))+'</td><td><input type="number" data-day="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td><td><input type="number" data-night="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td></tr>').join('')+'</tbody></table></div><div class="v2tools" style="margin-top:12px"><label><input type="checkbox" id="v2BeforeLeave" checked> İzin öncesi boşluk</label><label><input type="checkbox" id="v2Rest" checked> 16 saat sonrası dinlenme</label><label><input type="checkbox" id="v2Double"> Saatleri çakışmayan aynı gün çift görev</label></div><div class="v2tools" style="margin-top:12px"><button id="v2Equal">Hedefleri eşit öner</button><button id="v2Solve" class="primary">▶ Yeni motorla dağıt (önizleme)</button></div><div id="v2SolveResult" style="margin-top:12px"></div>';
 host.querySelector('.v2body').insertBefore(p,host.querySelector('#v2Stats'));
 const kind=r=>Number(r.col.hours||0)>=16?'night':'day';
 const editable=rows.filter(r=>!r.locked&&!r.manual);
@@ -154,7 +144,7 @@ function availabilityFor(ids){
  if(errors.length)throw Error('Personel izin uygunluğu doğrulanamadı: '+errors.slice(0,5).join('; '));
  return result;
 }
-p.querySelector('#v2InspectOvertime').onclick=()=>showOvertimeDiagnostic(members);
+
 p.querySelector('#v2Equal').onclick=()=>{try{
  const ids=members.filter(x=>p.querySelector('[data-select="'+x.id+'"]').checked).map(x=>String(x.id));
  if(!ids.length)throw Error('Personel seç.');
