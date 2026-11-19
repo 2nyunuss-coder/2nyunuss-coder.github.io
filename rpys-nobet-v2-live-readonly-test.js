@@ -62,7 +62,7 @@ p.querySelector('#v2Equal').onclick=()=>{try{
  const byKind={day:editable.filter(r=>kind(r)==='day'),night:editable.filter(r=>kind(r)==='night')};
  const unfilled=[];
  for(const t of ['day','night']){
-  const slots=byKind[t].slice().sort((a,b)=>ids.filter(id=>!eligible[id].has(selectedMonth+'-'+String(a.day).padStart(2,'0')) .length-ids.filter(id=>!eligible[id].has(selectedMonth+'-'+String(b.day).padStart(2,'0')).length);
+  const slots=byKind[t].slice().sort((a,b)=>ids.filter(id=>!eligible[id].has(selectedMonth+'-'+String(a.day).padStart(2,'0'))).length-ids.filter(id=>!eligible[id].has(selectedMonth+'-'+String(b.day).padStart(2,'0'))).length);
   for(const row of slots){
    const date=selectedMonth+'-'+String(row.day).padStart(2,'0');
    const candidates=ids.filter(id=>!eligible[id].has(date)).sort((a,b)=>assigned[a][t]-assigned[b][t]||a.localeCompare(b));
