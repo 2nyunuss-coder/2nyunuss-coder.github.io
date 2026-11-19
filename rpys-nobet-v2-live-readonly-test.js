@@ -30,7 +30,49 @@ host.querySelector('.v2body').insertBefore(p,host.querySelector('#v2Stats'));
 const kind=r=>Number(r.col.hours||0)>=16?'night':'day';
 const editable=rows.filter(r=>!r.locked&&!r.manual);
 const totals={day:editable.filter(r=>kind(r)==='day').length,night:editable.filter(r=>kind(r)==='night').length};
-p.querySelector('#v2Equal').onclick=()=>{let ids=members.filter(x=>p.querySelector('[data-select="'+x.id+'"]').checked).map(x=>String(x.id));if(!ids.length)return alert('Personel seç.');for(let t of ['day','night']){let n=totals[t];ids.forEach((id,i)=>{p.querySelector('[data-'+t+'="'+id+'"]').value=Math.floor(n/ids.length)+(i<n%ids.length?1:0)})}};
+function availabilityFor(ids){
+ const all=data(),month=selectedMonth,statusFn=fn('personStatusAt'),dateFn=fn('dateStr'),people=getPeople(),errors=[],result={};
+ if(!statusFn)throw Error('RPYS personStatusAt uygunluk denetimi bulunamadı; izinli personele görev vermemek için işlem durduruldu.');
+ for(const id of ids){
+  const who=people.find(x=>String(x.id)===String(id)),blocked=new Set();
+  if(!who){errors.push(person(id)+': personel bulunamadı');continue}
+  for(let d=1;d<=monthDays(month);d++){
+   const date=month+'-'+String(d).padStart(2,'0');
+   try{const status=String(statusFn(who,dateFn?dateFn(d):date)||'').trim();if(!status){errors.push(person(id)+': '+date+' durum bilgisi boş');break}if(status.toLocaleLowerCase('tr-TR')!=='aktif')blocked.add(date)}
+   catch(e){errors.push(person(id)+': '+date+' '+e.message);break}
+  }
+  for(const l of all.leaves||[]){
+   if(String(l.personId??l.idPerson??l.person?.id??'')!==String(id))continue;
+   const a=String(l.start||''),b=String(l.end||'');
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(a)||!/^\d{4}-\d{2}-\d{2}$/.test(b))continue; // legacy formats: authoritative personStatusAt remains in force
+   for(let d=1;d<=monthDays(month);d++){const date=month+'-'+String(d).padStart(2,'0');if(date>=a&&date<=b)blocked.add(date)}
+  }
+  result[id]=blocked;
+ }
+ if(errors.length)throw Error('Personel izin uygunluğu doğrulanamadı: '+errors.slice(0,5).join('; '));
+ return result;
+}
+p.querySelector('#v2Equal').onclick=()=>{try{
+ const ids=members.filter(x=>p.querySelector('[data-select="'+x.id+'"]').checked).map(x=>String(x.id));
+ if(!ids.length)throw Error('Personel seç.');
+ const blocked=availabilityFor(ids),before=p.querySelector('#v2BeforeLeave').checked;
+ const next=(date,n)=>{let x=new Date(date+'T12:00:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
+ const eligible={};for(const id of ids){let set=new Set(blocked[id]);if(before)for(const date of blocked[id])set.add(next(date,-1));eligible[id]=set}
+ const assigned=Object.fromEntries(ids.map(id=>[id,{day:0,night:0}]));
+ const byKind={day:editable.filter(r=>kind(r)==='day'),night:editable.filter(r=>kind(r)==='night')};
+ const unfilled=[];
+ for(const t of ['day','night']){
+  const slots=byKind[t].slice().sort((a,b)=>ids.filter(id=>!eligible[id].has(selectedMonth+'-'+String(a.day).padStart(2,'0')) .length-ids.filter(id=>!eligible[id].has(selectedMonth+'-'+String(b.day).padStart(2,'0')).length);
+  for(const row of slots){
+   const date=selectedMonth+'-'+String(row.day).padStart(2,'0');
+   const candidates=ids.filter(id=>!eligible[id].has(date)).sort((a,b)=>assigned[a][t]-assigned[b][t]||a.localeCompare(b));
+   if(!candidates.length){unfilled.push(date+' '+t);continue}
+   assigned[candidates[0]][t]++;
+  }
+ }
+ for(const id of ids)for(const t of ['day','night'])p.querySelector('[data-'+t+'="'+id+'"]').value=assigned[id][t];
+ p.querySelector('#v2SolveResult').textContent='İzin uygunluğuna göre hedef önerildi. '+(unfilled.length?'Uygun personel bulunamayan '+unfilled.length+' hücre var. ':'')+'Bu yalnızca hedef önerisidir; kesin dağıtım ve dinlenme kontrolleri dağıtım sırasında yapılır.';
+}catch(e){p.querySelector('#v2SolveResult').textContent='⚠ '+e.message}};
 p.querySelector('#v2Solve').onclick=()=>{try{
 if(!window.RPYSV2Independent)throw Error('Bağımsız motor dosyası yüklenmedi.');
 const ids=members.filter(x=>p.querySelector('[data-select="'+x.id+'"]').checked).map(x=>String(x.id));if(!ids.length)throw Error('En az bir personel seç.');
@@ -38,26 +80,7 @@ const targets={};for(let id of ids){let day=Number(p.querySelector('[data-day="'
 const all=data(),month=selectedMonth;
 const fixed=rows.filter(r=>r.locked||r.manual).filter(r=>r.pid).map(r=>({key:r.key,id:r.pid,kind:kind(r),date:month+'-'+String(r.day).padStart(2,'0'),selected:true}));
 const other=Object.entries(all.assign||{}).filter(([key,id])=>key.startsWith(month+'|')&&id&&!rows.some(r=>r.key===key)).map(([key,id])=>{let z=key.split('|');return {key,id,date:month+'-'+String(Number(z[2])).padStart(2,'0'),selected:false}});
-const leaves=[],statusFn=fn('personStatusAt'),dateFn=fn('dateStr');
-let unverified=[];
-for(const id of ids){
- const who=people.find(x=>String(x.id)===id),days=new Set();
- if(typeof statusFn==='function'){
-  for(let d=1;d<=monthDays(month);d++){
-   let date=month+'-'+String(d).padStart(2,'0');
-   try{let status=String(statusFn(who,typeof dateFn==='function'?dateFn(d):date)||'');if(status&&status!=='Aktif')days.add(date)}
-   catch(e){unverified.push(person(id)+': '+e.message);break}
-  }
- }else unverified.push(person(id)+': personStatusAt kullanılamıyor');
- for(const l of all.leaves||[]){
-  if(String(l.personId??l.idPerson??l.person?.id??'')!==id)continue;
-  let a=String(l.start||''),b=String(l.end||'');
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(a)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(b)){unverified.push(person(id)+': izin tarih biçimi tanınmadı');continue}
-  for(let d=1;d<=monthDays(month);d++){let date=month+'-'+String(d).padStart(2,'0');if(date>=a&&date<=b)days.add(date)}
- }
- leaves.push({id,days:[...days]});
-}
-if(unverified.length)throw Error('İzin uygunluğu doğrulanamadı; yanlış görevlendirme yapmamak için dağıtım durduruldu. '+unverified.slice(0,5).join('; '));
+const blocked=availabilityFor(ids),leaves=ids.map(id=>({id,days:[...blocked[id]]}));
 const slots=editable.map(r=>({key:r.key,date:month+'-'+String(r.day).padStart(2,'0'),kind:kind(r),hours:Number(r.col.hours||0),allowed:ids}));
 const output=window.RPYSV2Independent.solve({slots,staff:ids.map(id=>({id})),targets,existing:[...fixed,...other],leaves,options:{beforeLeave:p.querySelector('#v2BeforeLeave').checked,rest16:p.querySelector('#v2Rest').checked,noConsecutive:false,allowDifferentHours:p.querySelector('#v2Double').checked}});
 if(!output.ok)throw Error(output.error);
