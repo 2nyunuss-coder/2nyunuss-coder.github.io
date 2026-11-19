@@ -38,7 +38,26 @@ const targets={};for(let id of ids){let day=Number(p.querySelector('[data-day="'
 const all=data(),month=selectedMonth;
 const fixed=rows.filter(r=>r.locked||r.manual).filter(r=>r.pid).map(r=>({key:r.key,id:r.pid,kind:kind(r),date:month+'-'+String(r.day).padStart(2,'0'),selected:true}));
 const other=Object.entries(all.assign||{}).filter(([key,id])=>key.startsWith(month+'|')&&id&&!rows.some(r=>r.key===key)).map(([key,id])=>{let z=key.split('|');return {key,id,date:month+'-'+String(Number(z[2])).padStart(2,'0'),selected:false}});
-const leaves=[];for(let l of all.leaves||[]){let id=String(l.personId??l.idPerson??l.person?.id??''),a=String(l.start||''),b=String(l.end||'');if(!id||!/^\\d{4}-\\d{2}-\\d{2}$/.test(a)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(b))continue;let days=[];for(let d=1;d<=monthDays(month);d++){let date=month+'-'+String(d).padStart(2,'0');if(date>=a&&date<=b)days.push(date)}leaves.push({id,days})}
+const leaves=[],statusFn=fn('personStatusAt'),dateFn=fn('dateStr');
+let unverified=[];
+for(const id of ids){
+ const who=people.find(x=>String(x.id)===id),days=new Set();
+ if(typeof statusFn==='function'){
+  for(let d=1;d<=monthDays(month);d++){
+   let date=month+'-'+String(d).padStart(2,'0');
+   try{let status=String(statusFn(who,typeof dateFn==='function'?dateFn(d):date)||'');if(status&&status!=='Aktif')days.add(date)}
+   catch(e){unverified.push(person(id)+': '+e.message);break}
+  }
+ }else unverified.push(person(id)+': personStatusAt kullanılamıyor');
+ for(const l of all.leaves||[]){
+  if(String(l.personId??l.idPerson??l.person?.id??'')!==id)continue;
+  let a=String(l.start||''),b=String(l.end||'');
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(a)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(b)){unverified.push(person(id)+': izin tarih biçimi tanınmadı');continue}
+  for(let d=1;d<=monthDays(month);d++){let date=month+'-'+String(d).padStart(2,'0');if(date>=a&&date<=b)days.add(date)}
+ }
+ leaves.push({id,days:[...days]});
+}
+if(unverified.length)throw Error('İzin uygunluğu doğrulanamadı; yanlış görevlendirme yapmamak için dağıtım durduruldu. '+unverified.slice(0,5).join('; '));
 const slots=editable.map(r=>({key:r.key,date:month+'-'+String(r.day).padStart(2,'0'),kind:kind(r),hours:Number(r.col.hours||0),allowed:ids}));
 const output=window.RPYSV2Independent.solve({slots,staff:ids.map(id=>({id})),targets,existing:[...fixed,...other],leaves,options:{beforeLeave:p.querySelector('#v2BeforeLeave').checked,rest16:p.querySelector('#v2Rest').checked,noConsecutive:false,allowDifferentHours:p.querySelector('#v2Double').checked}});
 if(!output.ok)throw Error(output.error);
