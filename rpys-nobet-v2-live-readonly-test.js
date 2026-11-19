@@ -9,19 +9,19 @@ function getPeople(){let d=data();let p=Array.isArray(d?.staff)?d.staff:Array.is
 function person(id){try{let f=fn('getPersonById');if(f){let p=f(Number(id));if(p)return p.name||p.fullName||String(id)}}catch{}let p=getPeople().find(x=>String(x.id)===String(id));return p?.name||p?.fullName||p?.adSoyad||('Personel '+id)}
 function overtimePreference(p){
  // Only read the actual Personnel page's matching staff row and overtime dropdown.
- const id=String(p.id),name=person(id).replace(/\\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
- const valid=/^(?:0\\s*saat|\\d+\\s*[-–—]\\s*\\d+\\s*saat|\\d+\\s*\\+?\\s*saat)$/i;
+ const id=String(p.id),name=person(id).replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
+ const valid=/^(?:0\s*saat|\d+\s*[-–—]\s*\d+\s*saat|\d+\s*\+?\s*saat)$/i;
  const roots=[...document.querySelectorAll('tr,[role="row"]')].filter(row=>!row.closest('#v2MotorPanel')&&!row.closest('#rpysV2Host'));
  for(const row of roots){
   const cells=[...row.children];
   if(!cells.length)continue;
-  const first=(cells[0].textContent||'').replace(/\\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
+  const first=(cells[0].textContent||'').replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
   if(!(first===name||first.startsWith(name+' ')||first.includes(name+' Ad Soyad')))continue;
   const selects=[...row.querySelectorAll('select')];
   for(const sel of selects){
-   const opts=[...sel.options].map(o=>o.textContent.replace(/\\s+/g,' ').trim());
+   const opts=[...sel.options].map(o=>o.textContent.replace(/\s+/g,' ').trim());
    if(opts.filter(x=>valid.test(x)).length<2)continue;
-   const label=sel.selectedOptions?.[0]?.textContent?.replace(/\\s+/g,' ').trim()||'';
+   const label=sel.selectedOptions?.[0]?.textContent?.replace(/\s+/g,' ').trim()||'';
    if(valid.test(label))return label;
   }
  }
