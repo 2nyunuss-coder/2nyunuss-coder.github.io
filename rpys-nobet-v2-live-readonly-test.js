@@ -113,7 +113,7 @@ const all=data(),month=selectedMonth;
 const fixed=rows.filter(r=>r.locked||r.manual).filter(r=>r.pid).map(r=>({key:r.key,id:r.pid,kind:kind(r),date:month+'-'+String(r.day).padStart(2,'0'),selected:true}));
 const other=Object.entries(all.assign||{}).filter(([key,id])=>key.startsWith(month+'|')&&id&&!rows.some(r=>r.key===key)).map(([key,id])=>{let z=key.split('|');return {key,id,date:month+'-'+String(Number(z[2])).padStart(2,'0'),selected:false}});
 const blocked=availabilityFor(ids),leaves=ids.map(id=>({id,days:[...blocked[id]]}));
-const slots=editable.map(r=>({key:r.key,date:month+'-'+String(r.day).padStart(2,'0'),kind:kind(r),hours:Number(r.col.hours||0),allowed:ids}));
+const polCols=[...new Set(rows.map(r=>r.col.key))];const slots=editable.map(r=>({key:r.key,date:month+'-'+String(r.day).padStart(2,'0'),kind:kind(r),hours:Number(r.col.hours||0),allowed:ids,rotation:unit.toLocaleUpperCase('tr-TR').includes('POL')?{column:polCols.indexOf(r.col.key),columns:polCols.length,week:Math.floor((r.day-1)/7),order:ids}:null}));
 const output=window.RPYSV2Independent.solve({slots,staff:ids.map(id=>({id})),targets,existing:[...fixed,...other],leaves,options:{beforeLeave:p.querySelector('#v2BeforeLeave').checked,rest16:p.querySelector('#v2Rest').checked,noConsecutive:false,allowDifferentHours:p.querySelector('#v2Double').checked}});
 if(!output.ok)throw Error(output.error);
 history.push([...draft]);for(let r of editable)draft.set(r.key,'');for(let [key,id] of output.assignments)if(editable.some(r=>r.key===key))draft.set(key,id);
