@@ -4,7 +4,7 @@ function solve({slots=[],staff=[],targets={},existing=[],leaves=[],options={},ma
  const ids=staff.map(p=>String(p.id)),t0=performance.now(),counts=Object.fromEntries(ids.map(id=>[id,{day:0,night:0,skopi:0}])),busy=new Map(),out=new Map(),reasons=[],unfilled=[];
  const dates=Object.fromEntries(ids.map(id=>[id,[]])),blocked=new Map(ids.map(id=>[id,new Set()]));
  const next=(d,n)=>{let x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
- for(const l of leaves){let id=String(l.id);if(!blocked.has(id))continue;for(const d of l.days||[]){blocked.get(id).add(d);if(options.beforeLeave!==false)blocked.get(id).add(next(d,-1))}}
+ for(const l of leaves){let id=String(l.id);if(!blocked.has(id))continue;for(const d of l.days||[]){blocked.get(id).add(d);if(options.beforeLeave!==false&&!blocked.get(id).has(next(d,-1)))blocked.get(id).add(next(d,-1))}}
  const byDate=new Map();for(const e of existing){if(!e?.id||!e.date)continue;let id=String(e.id);if(!byDate.has(id))byDate.set(id,[]);byDate.get(id).push({date:e.date,hours:Number(e.hours||0),start:e.start,end:e.end,key:e.key});if(e.selected&&counts[id]){let kind=e.kind||'day';counts[id][kind]=(counts[id][kind]||0)+1;out.set(e.key,id)}}
  const target=(id,k)=>Number(targets[id]?.[k]||0),strict=options.strictTargets!==false,allowDouble=options.allowDifferentHours===true,rest=options.rest16!==false;
  let nodes=0,timedOut=false;
@@ -27,7 +27,7 @@ function solve({slots=[],staff=[],targets={},existing=[],leaves=[],options={},ma
  let ok=dfs(work);if(!ok){/* Safe fallback: place only individually validated assignments; never relax safety constraints. */
  out.clear();for(const id of ids){counts[id]={day:0,night:0,skopi:0};dates[id]=[]}
  for(const e of existing)if(e.selected&&counts[String(e.id)]){let id=String(e.id),kind=e.kind||'day';counts[id][kind]++;out.set(e.key,id)}
- for(const s of work.slice().sort((a,b)=>a.date.localeCompare(b.date))){let candidates=ranked(s);if(!candidates.length){unfilled.push({key:s.key,date:s.date,reason:ids.map(id=>id+': '+eligible(s,id)).slice(0,8).join('; ')||'Uygun personel yok'});continue}let id=candidates[0];out.set(s.key,id);counts[id][s.kind]++;dates[id].push({date:s.date,hours:s.hours,start:s.start,end:s.end,key:s.key})}
+ for(const s of work.slice().sort((a,b)=>{let ac=ids.filter(id=>!blocked.get(id)?.has(a.date)).length,bc=ids.filter(id=>!blocked.get(id)?.has(b.date)).length;return ac-bc||a.date.localeCompare(b.date)})){let candidates=ranked(s);if(!candidates.length){unfilled.push({key:s.key,date:s.date,reason:ids.map(id=>id+': '+eligible(s,id)).slice(0,8).join('; ')||'Uygun personel yok'});continue}let id=candidates[0];out.set(s.key,id);counts[id][s.kind]++;dates[id].push({date:s.date,hours:s.hours,start:s.start,end:s.end,key:s.key})}
  reasons.push(timedOut?'Tam çözüm arama sınırına ulaştı; kısmi dağıtım gösteriliyor.':'Tüm hedefler karşılanamadı; kuralları bozmadan kısmi dağıtım oluşturuldu.')
  }
  const differences=[];for(const id of ids)for(const kind of ['day','night','skopi']){let wanted=target(id,kind),actual=counts[id][kind]||0;if(wanted!==actual&&wanted>0)differences.push({id,kind,wanted,actual})}
