@@ -19,7 +19,7 @@ function solve({slots=[],staff=[],targets={},existing=[],leaves=[],options={},ma
  }
  if(s.allowed&&!s.allowed.includes(id))return 'Birim personel havuzunda değil';return '';
  }
- function ranked(s){return ids.filter(id=>!eligible(s,id)).sort((a,b)=>{let qa=(target(a,s.kind)-counts[a][s.kind]),qb=(target(b,s.kind)-counts[b][s.kind]);let la=dates[a]||[],lb=dates[b]||[];let near=x=>x.reduce((n,e)=>n+1/(1+Math.abs((Date.parse(s.date)-Date.parse(e.date))/86400000)),0);return qb-qa||near(la)-near(lb)||a.localeCompare(b)})}
+ function ranked(s){return ids.filter(id=>!eligible(s,id)).sort((a,b)=>{let qa=(target(a,s.kind)-counts[a][s.kind]),qb=(target(b,s.kind)-counts[b][s.kind]);let la=dates[a]||[],lb=dates[b]||[];let near=x=>x.reduce((n,e)=>n+1/(1+Math.abs((Date.parse(s.date)-Date.parse(e.date))/86400000)),0);const rot=x=>{if(!s.rotation||!s.rotation.columns)return 0;const order=s.rotation.order||ids,index=order.indexOf(x);if(index<0)return 0;const expected=(index+s.rotation.week)%s.rotation.columns;const distance=(s.rotation.column-expected+s.rotation.columns)%s.rotation.columns;return Math.min(distance,s.rotation.columns-distance)};return rot(a)-rot(b)||qb-qa||near(la)-near(lb)||a.localeCompare(b)})}
  const work=slots.filter(s=>!out.has(s.key)).map(s=>({...s,kind:s.kind||'day',hours:Number(s.hours||0)}));
  function dfs(left){if(!left.length)return true;if(++nodes>maxNodes||performance.now()-t0>maxMs){timedOut=true;return false}
  let chosen=null,choices=null;for(const s of left){let c=ranked(s);if(!choices||c.length<choices.length){chosen=s;choices=c;if(!c.length)break}}if(!choices?.length)return false;
