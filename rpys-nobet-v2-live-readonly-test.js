@@ -8,18 +8,21 @@ function monthDays(m){let [y,n]=m.split('-').map(Number);return new Date(y,n,0).
 function getPeople(){let d=data();let p=Array.isArray(d?.staff)?d.staff:Array.isArray(d?.people)?d.people:Array.isArray(d?.personnel)?d.personnel:[];return p.filter(x=>x&&x.id!=null)}
 function person(id){try{let f=fn('getPersonById');if(f){let p=f(Number(id));if(p)return p.name||p.fullName||String(id)}}catch{}let p=getPeople().find(x=>String(x.id)===String(id));return p?.name||p?.fullName||p?.adSoyad||('Personel '+id)}
 function overtimePreference(p){
- // Read the existing Personnel page's saved selection from its rendered control, without changing it.
- const name=person(p.id).trim().toLocaleUpperCase('tr-TR');
- const tables=[...document.querySelectorAll('table')].filter(t=>!t.closest('#rpysV2Host')&&!t.closest('#v2MotorPanel'));
- for(const table of tables){
-  const headers=[...table.querySelectorAll('thead th')].map(x=>x.textContent.trim().toLocaleLowerCase('tr-TR'));
-  const idx=headers.findIndex(h=>h.includes('fazla mesai tercihi'));if(idx<0)continue;
-  for(const tr of table.querySelectorAll('tbody tr')){
-   const cells=[...tr.children];if(!cells.length)continue;
-   const first=(cells[0].textContent||'').trim().toLocaleUpperCase('tr-TR');
-   if(!first.includes(name)||!cells[idx])continue;
-   const sel=cells[idx].querySelector('select');if(sel){const opt=sel.selectedOptions?.[0];return (opt?.textContent||sel.value||'').trim()||'—'}
-   return (cells[idx].textContent||'').trim()||'—';
+ // Only read the actual Personnel page's matching staff row and overtime dropdown.
+ const id=String(p.id),name=person(id).replace(/\\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
+ const valid=/^(?:0\\s*saat|\\d+\\s*[-–—]\\s*\\d+\\s*saat|\\d+\\s*\\+?\\s*saat)$/i;
+ const roots=[...document.querySelectorAll('tr,[role="row"]')].filter(row=>!row.closest('#v2MotorPanel')&&!row.closest('#rpysV2Host'));
+ for(const row of roots){
+  const cells=[...row.children];
+  if(!cells.length)continue;
+  const first=(cells[0].textContent||'').replace(/\\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
+  if(!(first===name||first.startsWith(name+' ')||first.includes(name+' Ad Soyad')))continue;
+  const selects=[...row.querySelectorAll('select')];
+  for(const sel of selects){
+   const opts=[...sel.options].map(o=>o.textContent.replace(/\\s+/g,' ').trim());
+   if(opts.filter(x=>valid.test(x)).length<2)continue;
+   const label=sel.selectedOptions?.[0]?.textContent?.replace(/\\s+/g,' ').trim()||'';
+   if(valid.test(label))return label;
   }
  }
  return '—';
