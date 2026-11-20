@@ -17,8 +17,25 @@ function overtimePreference(p){
  return v; // Show actual stored preference without guessing a band.
 }
 function obligationInfo(p){
- const keys=['mukellef','mukellefSaat','mukellefHours','mukellefiyet','mukellefiyetSaat','monthlyObligation','obligationHours','requiredHours'];
- for(const key of keys){const v=p?.[key];if(v!==undefined&&v!==null&&v!==''&&typeof v!=='object')return String(v)+(typeof v==='number'?' saat':'')}
+ // Read the existing Nöbet Listesi puantaj row; do not fabricate monthly obligation.
+ const target=person(p.id).replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
+ for(const table of document.querySelectorAll('table')){
+  if(table.closest('#rpysV2Module'))continue;
+  const rows=[...table.querySelectorAll('tr')];
+  const idx=rows.findIndex(row=>[...row.children].some(c=>c.textContent.trim().toLocaleUpperCase('tr-TR')==='MÜKELLEF'));
+  if(idx<0)continue;
+  const values=[...rows[idx].children];
+  const headerRows=rows.slice(0,idx).filter(row=>row.children.length>=values.length-2);
+  for(const header of headerRows.reverse()){
+   const cells=[...header.children];
+   for(let i=0;i<cells.length;i++){
+    const label=(cells[i].textContent||'').replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
+    if(label!==target&&!label.includes(target))continue;
+    const v=values[i]?.textContent?.trim();
+    if(v!=null&&/^\d+(?:[.,]\d+)?$/.test(v))return v+' saat';
+   }
+  }
+ }
  return '—';
 }
 function briefLeaveInfo(p){
