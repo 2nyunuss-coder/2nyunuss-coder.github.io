@@ -117,7 +117,7 @@ if(unit==='all')throw Error('Dağıtım için önce tek bir birim seç. Tüm bir
 const pool=poolFor(unit);if(!pool.length)throw Error('Bu birim için RPYS personel havuzu boş. Önce mevcut RPYS içinde birim personellerini seç.');
 const members=people.filter(p=>pool.includes(String(p.id)));
 const p=document.createElement('section');p.id='v2MotorPanel';p.className='v2box';
-p.innerHTML='<h2>⚙ Nöbet V2 · Yeni Bağımsız Dağıtım Motoru</h2><div class="v2warn">Deneysel motor v0.2: seçilen hedeflere göre tam veya kısmi önizleme üretir. İzin şeması, vardiya saatleri ve özel Skopi kuralları henüz tam doğrulanmadı. Bu sonuçlar canlı kullanıma hazır değildir.</div><p><b>Birim:</b> '+E(unit)+' · <b>Ay:</b> '+E(selectedMonth)+' · <b>Havuz:</b> '+members.length+' personel</p><div class="v2scroll"><table id="v2TargetTable"><thead><tr><th>Seç</th><th>Personel</th><th>Fazla mesai tercihi (RPYS)</th><th>Gündüz hedefi</th><th>Nöbet hedefi</th></tr></thead><tbody>'+members.map(x=>'<tr><td><input type="checkbox" data-select="'+E(x.id)+'" checked></td><td>'+E(person(x.id))+'</td><td>'+E(overtimePreference(x))+'</td><td><input type="number" data-day="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td><td><input type="number" data-night="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td></tr>').join('')+'</tbody></table></div><div class="v2tools" style="margin-top:12px"><label><input type="checkbox" id="v2BeforeLeave" checked> İzin öncesi boşluk</label><label><input type="checkbox" id="v2Rest" checked> 16 saat sonrası dinlenme</label><label><input type="checkbox" id="v2Double"> Saatleri çakışmayan aynı gün çift görev</label></div><div class="v2tools" style="margin-top:12px"><button id="v2Equal">Hedefleri eşit öner</button><button id="v2Solve" class="primary">▶ Yeni motorla dağıt (önizleme)</button></div><div id="v2SolveResult" style="margin-top:12px"></div>';
+p.innerHTML='<h2>⚙ Nöbet V2 · Yeni Bağımsız Dağıtım Motoru</h2><div class="v2warn">Deneysel motor v0.2: seçilen hedeflere göre tam veya kısmi önizleme üretir. İzin şeması, vardiya saatleri ve özel Skopi kuralları henüz tam doğrulanmadı. Bu sonuçlar canlı kullanıma hazır değildir.</div><p><b>Birim:</b> '+E(unit)+' · <b>Ay:</b> '+E(selectedMonth)+' · <b>Havuz:</b> '+members.length+' personel</p><div class="v2scroll"><table id="v2TargetTable"><thead><tr><th>Seç</th><th>Personel</th><th>Fazla mesai tercihi (RPYS)</th><th>Gündüz hedefi</th><th>Nöbet hedefi</th></tr></thead><tbody>'+members.map(x=>'<tr><td><input type="checkbox" data-select="'+E(x.id)+'" checked></td><td>'+E(person(x.id))+'</td><td>'+E(overtimePreference(x))+'</td><td><input type="number" data-day="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td><td><input type="number" data-night="'+E(x.id)+'" min="0" max="100" value="0" style="width:85px"></td></tr>').join('')+'</tbody></table></div><div class="v2tools" style="margin-top:12px"><label><input type="checkbox" id="v2BeforeLeave" checked> İzin öncesi boşluk</label><label><input type="checkbox" id="v2Rest" checked> 16 saat sonrası dinlenme</label><label><input type="checkbox" id="v2Double"> Saatleri çakışmayan aynı gün çift görev</label></div><div class="v2tools" style="margin-top:12px"><button id="v2LeavePreview">İzin giriş/çıkışlarını göster</button><button id="v2Equal">Hedefleri eşit öner</button><button id="v2Solve" class="primary">▶ Yeni motorla dağıt (önizleme)</button></div><div id="v2LeavePlan" style="margin-top:12px"></div><div id="v2SolveResult" style="margin-top:12px"></div>';
 host.querySelector('.v2body').insertBefore(p,host.querySelector('#v2Stats'));
 const kind=r=>Number(r.col.hours||0)>=16?'night':'day';
 const editable=rows.filter(r=>!r.locked&&!r.manual);
@@ -145,6 +145,25 @@ function availabilityFor(ids){
  return result;
 }
 
+function leaveWindows(ids){
+ const blocked=availabilityFor(ids),windows=[];
+ for(const id of ids){let begin=null,prev=null;
+  const days=[...blocked[id]].filter(d=>d.startsWith(selectedMonth+'-')).sort();
+  const flush=()=>{if(begin){const first=new Date(begin+'T12:00:00'),last=new Date(prev+'T12:00:00');let prior=new Date(first),returnDate=new Date(last);prior.setDate(prior.getDate()-1);returnDate.setDate(returnDate.getDate()+1);while(returnDate.getDay()===0||returnDate.getDay()===6)returnDate.setDate(returnDate.getDate()+1);
+   const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+   windows.push({id,start:begin,end:prev,returnDate:fmt(returnDate),thursday:fmt(new Date(first.getFullYear(),first.getMonth(),first.getDate()-((first.getDay()+2)%7+3))),friday:fmt(new Date(first.getFullYear(),first.getMonth(),first.getDate()-((first.getDay()+2)%7+2)))});
+   begin=null}}
+  for(const day of days){const d=new Date(day+'T12:00:00');const p=prev?new Date(prev+'T12:00:00'):null;if(p&&Math.round((d-p)/86400000)>1)flush();if(!begin)begin=day;prev=day}flush();
+ }
+ return windows;
+}
+function showLeavePlan(){
+ const ids=members.filter(x=>p.querySelector('[data-select="'+x.id+'"]').checked).map(x=>String(x.id));
+ const el=p.querySelector('#v2LeavePlan');
+ const windows=leaveWindows(ids);
+ el.innerHTML='<h3>İzin giriş/çıkış ön planı (salt-okunur)</h3><p>İzinli/uygun değil durumları RPYS kayıtlarından okunur. İzin türü ve ay dışındaki devamı doğrulanmadan görev ön yerleştirilmez.</p><div class="v2scroll"><table><thead><tr><th>Personel</th><th>Başlangıç</th><th>Son görünür gün</th><th>İlk iş günü (tahmini)</th></tr></thead><tbody>'+windows.map(w=>'<tr><td>'+E(person(w.id))+'</td><td>'+E(w.start)+'</td><td>'+E(w.end)+'</td><td>'+E(w.returnDate)+'</td></tr>').join('')+'</tbody></table></div>';
+}
+p.querySelector('#v2LeavePreview').onclick=()=>{try{showLeavePlan()}catch(e){p.querySelector('#v2LeavePlan').textContent='⚠ '+e.message}};
 p.querySelector('#v2Equal').onclick=()=>{try{
  const ids=members.filter(x=>p.querySelector('[data-select="'+x.id+'"]').checked).map(x=>String(x.id));
  if(!ids.length)throw Error('Personel seç.');
