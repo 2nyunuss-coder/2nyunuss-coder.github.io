@@ -17,26 +17,18 @@ function overtimePreference(p){
  return v; // Show actual stored preference without guessing a band.
 }
 function obligationInfo(p){
- // Read the existing Nöbet Listesi puantaj row; do not fabricate monthly obligation.
- const target=person(p.id).replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
- for(const table of document.querySelectorAll('table')){
-  if(table.closest('#rpysV2Module'))continue;
-  const rows=[...table.querySelectorAll('tr')];
-  const idx=rows.findIndex(row=>[...row.children].some(c=>c.textContent.trim().toLocaleUpperCase('tr-TR')==='MÜKELLEF'));
-  if(idx<0)continue;
-  const values=[...rows[idx].children];
-  const headerRows=rows.slice(0,idx).filter(row=>row.children.length>=values.length-2);
-  for(const header of headerRows.reverse()){
-   const cells=[...header.children];
-   for(let i=0;i<cells.length;i++){
-    const label=(cells[i].textContent||'').replace(/\s+/g,' ').trim().toLocaleUpperCase('tr-TR');
-    if(label!==target&&!label.includes(target))continue;
-    const v=values[i]?.textContent?.trim();
-    if(v!=null&&/^\d+(?:[.,]\d+)?$/.test(v))return v+' saat';
-   }
-  }
- }
- return '—';
+ // Exact same source as Nöbet Listesi's MÜKELLEF row: totals() + puantajValue(row,'muk').
+ // Both use ym(), so never silently display another month's obligation.
+ const ymFn=fn('ym'),totalsFn=fn('totals'),valueFn=fn('puantajValue');
+ if(!ymFn||!totalsFn||!valueFn)return '—';
+ try{
+  if(String(ymFn())!==selectedMonth)return '— (ay farklı)';
+  const row=totalsFn().find(r=>String(r?.p?.id)===String(p.id));
+  if(!row)return '—';
+  const value=valueFn(row,'muk');
+  if(value===null||value===undefined||value==='')return '—';
+  const n=Number(value);return Number.isFinite(n)?String(n)+' saat':'—';
+ }catch{return '—'}
 }
 function briefLeaveInfo(p){
  const d=data(),month=selectedMonth,days=monthDays(month),blocked=new Set(),unverified=[];
