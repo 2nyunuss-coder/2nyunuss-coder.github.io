@@ -22,18 +22,26 @@ function obligationInfo(p){
  return '—';
 }
 function briefLeaveInfo(p){
- const status=fn('personStatusAt'),dateFn=fn('dateStr');if(!status)return '—';
- const ranges=[];let start=null,last=null,kind='';
- const finish=()=>{if(start){ranges.push(start===last?start.slice(8):start.slice(8)+'–'+last.slice(8));start=null}};
- for(let d=1;d<=monthDays(selectedMonth);d++){
-  const date=selectedMonth+'-'+String(d).padStart(2,'0');let state='';
-  try{state=String(status(p,dateFn?dateFn(d):date)||'').trim().toLocaleLowerCase('tr-TR')}catch{return '—'}
-  if(!state)return '—';
-  if(state==='aktif'){finish();continue}
-  if(start&&kind!==state)finish();
-  if(!start){start=date;kind=state}last=date;
+ const d=data(),month=selectedMonth,days=monthDays(month),blocked=new Set(),unverified=[];
+ const datePattern=/^\d{4}-\d{2}-\d{2}$/;
+ const toDate=v=>{if(!v)return '';const x=String(v).slice(0,10);return datePattern.test(x)?x:''};
+ const records=(d?.leaves||[]).filter(l=>String(l.personId??l.idPerson??l.person?.id??'')===String(p.id));
+ for(const l of records){
+  const start=toDate(l.start),end=toDate(l.end);
+  if(!start||!end){unverified.push('Tarih biçimi');continue}
+  for(let day=1;day<=days;day++){const date=month+'-'+String(day).padStart(2,'0');if(date>=start&&date<=end)blocked.add(day)}
  }
- finish();return ranges.length?ranges.join(', ')+' ('+selectedMonth.slice(5)+')':'Yok';
+ const status=fn('personStatusAt');
+ if(status)for(let day=1;day<=days;day++){
+  const date=month+'-'+String(day).padStart(2,'0');
+  try{const v=String(status(p,date)||'').trim().toLocaleLowerCase('tr-TR');if(!v)unverified.push('Durum boş');else if(v!=='aktif')blocked.add(day)}
+  catch{unverified.push('Durum hatası')}
+ }else if(!records.length)unverified.push('Uygunluk kaynağı yok');
+ const arr=[...blocked].sort((x,y)=>x-y),ranges=[];let start=null,last=null;
+ for(const day of arr){if(start===null)start=day;else if(day!==last+1){ranges.push(start===last?String(start):start+'–'+last);start=day}last=day}
+ if(start!==null)ranges.push(start===last?String(start):start+'–'+last);
+ const summary=ranges.length?ranges.join(', ')+' ('+month.slice(5)+')':'';
+ return (summary||(!unverified.length?'Yok':'Doğrulanamadı'))+(unverified.length&&summary?' · kısmi':'');
 }
 function getUnits(){let d=data();let pool=Object.keys(d?.unitPools||{}).filter(k=>k.startsWith(selectedMonth+'|')).map(k=>k.slice(8));let el=document.getElementById('autoUnit');let opts=el?[...el.options].map(o=>o.value).filter(Boolean):[];let known=['POLİKLİNİK RÖNTGEN','PORTABL + SKOPİ'];return [...new Set([...opts,...pool,...known])].filter(Boolean)}
 function slots(){let f=fn('unitSlots');if(!f)throw Error('RPYS unitSlots fonksiyonu yüklenmedi.');let units=getUnits();let out=[];for(let u of units){let a;try{a=f(u)}catch{continue}if(!Array.isArray(a))continue;for(let s of a){if(!s?.col?.key)continue;out.push({unit:u,type:s.type,col:s.col,key:s.col.key})}}return out}
